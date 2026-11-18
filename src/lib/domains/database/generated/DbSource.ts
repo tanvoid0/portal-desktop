@@ -4,19 +4,16 @@
  * A connectable database the explorer knows about. P0: SQLite files only
  * (Portal's own DB + ad-hoc opens). Later phases add server + discovered sources.
  */
-export type DbSource = {
-  id: string;
-  label: string;
-  /**
-   * "sqlite" for now.
-   */
-  engine: string;
-  /**
-   * Human detail, e.g. the file path.
-   */
-  detail: string;
-  /**
-   * P0 is read-only everywhere; editing arrives in P2.
-   */
-  editable: boolean;
-};
+export type DbSource = { id: string, label: string, 
+/**
+ * "sqlite" for now.
+ */
+engine: string, 
+/**
+ * Human detail, e.g. the file path.
+ */
+detail: string, 
+/**
+ * P0 is read-only everywhere; editing arrives in P2.
+ */
+editable: boolean, };

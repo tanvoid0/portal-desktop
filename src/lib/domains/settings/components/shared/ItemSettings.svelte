@@ -6,38 +6,20 @@
 <script lang="ts" generics="T extends BaseItem, TSuggested extends BaseSuggestedItem">
   import { onMount } from 'svelte';
   import { Button } from '$lib/components/ui/button';
-  import Select from '$lib/components/ui/select.svelte';
   import { Input } from '$lib/components/ui/input';
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from '$lib/components/ui/card';
-  import { Label } from '$lib/components/ui/label';
-  import { Badge } from '$lib/components/ui/badge';
-  import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-  } from '$lib/components/ui/dialog';
   import { Tabs, TabsList, TabsTrigger, TabsContent } from '$lib/components/ui/tabs';
   import Plus from '~icons/fa6-solid/plus';
-  import Edit from '~icons/fa6-solid/pen-to-square';
-  import Trash2 from '~icons/fa6-solid/trash';
   import Search from '~icons/fa6-solid/magnifying-glass';
   import Loader2 from '~icons/fa6-solid/spinner';
   import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
-  import TrendingUp from '~icons/fa6-solid/arrow-trend-up';
+  import { rankRecommendedNames, mergeRecommendedGroup } from './recommendations';
+  import ItemCardGrid from './ItemCardGrid.svelte';
+  import ItemSuggestedList from './ItemSuggestedList.svelte';
+  import ItemFormDialog from './ItemFormDialog.svelte';
   import { toast } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
   import { logger } from '$lib/domains/shared';
   import { suggestionEngine, learningService } from '$lib/domains/learning';
-  import Icon from '@iconify/svelte';
   import type {
     BaseItem,
     BaseSuggestedItem,
@@ -53,10 +35,6 @@
   let { config }: Props<T, TSuggested> = $props();
 
   const log = logger.createScoped(`${config.itemName}Settings`);
-
-  // Components are dynamic by default in Svelte 5, so this renders directly as
-  // `<EmptyIcon />` — no `<svelte:component>`.
-  const EmptyIcon = $derived(config.emptyIcon);
 
   // State
   let items = $state<T[]>([]);
@@ -115,23 +93,7 @@
       const suggestions = await suggestionEngine.getContextualSuggestions(
         config.recommendationPatternType
       );
-      const scores = new Map<string, number>();
-      for (const suggestion of suggestions) {
-        if (suggestion.pattern_data && typeof suggestion.pattern_data === 'object') {
-          const data = suggestion.pattern_data as Record<string, unknown>;
-          const value = data[config.recommendationDataKey];
-          if (value && typeof value === 'string') {
-            const score = suggestion.frequency * suggestion.success_rate;
-            const currentScore = scores.get(value) || 0;
-            scores.set(value, currentScore + score);
-          }
-        }
-      }
-      const sorted = Array.from(scores.entries())
-        .sort((a, b) => b[1] - a[1])
-        .map(([name]) => name)
-        .slice(0, 15);
-      recommendedNames = sorted;
+      recommendedNames = rankRecommendedNames(suggestions, config.recommendationDataKey);
       log.info(`Recommended ${config.itemNamePlural.toLowerCase()} loaded`, {
         count: recommendedNames.length,
       });
@@ -250,35 +212,9 @@
     return all;
   });
 
-  // Merge recommended items into suggested groups
-  const mergedSuggestedGroups = $derived.by(() => {
-    const groups = [...suggestedGroups];
-
-    if (recommendedNames.length > 0) {
-      const recommendedItems: TSuggested[] = recommendedNames.map((name) => {
-        const existing = allSuggestedItems.find(
-          (si) => si.name.toLowerCase() === name.toLowerCase()
-        );
-
-        if (existing) {
-          return existing;
-        }
-
-        return {
-          name,
-          icon: `logos:${name.toLowerCase().replace(/\s+/g, '-')}`,
-          category: 'Recommended',
-        } as TSuggested;
-      });
-
-      groups.unshift({
-        category: 'Recommended (Based on Your Usage)',
-        items: recommendedItems,
-      });
-    }
-
-    return groups;
-  });
+  const mergedSuggestedGroups = $derived(
+    mergeRecommendedGroup(suggestedGroups, allSuggestedItems, recommendedNames)
+  );
 
   // Filter out already-added items from each group
   const filteredSuggestedGroups = $derived.by(() => {
@@ -373,208 +309,42 @@
       </TabsList>
 
       <TabsContent value="your-items" class="space-y-4">
-        {@const filtered = filteredItems}
-        {#if filtered.length === 0}
-          <Card>
-            <CardContent class="flex flex-col items-center justify-center py-12">
-              <EmptyIcon class="mb-4 h-12 w-12 text-muted-foreground" />
-              <p class="mb-2 text-muted-foreground">
-                {#if searchQuery}
-                  {config.emptySearchMessage}
-                {:else}
-                  {config.emptyMessage}
-                {/if}
-              </p>
-              <Button variant="outline" onclick={() => startAddingItem()}>
-                <Plus class="mr-2 h-4 w-4" />
-                Add Your First {config.itemName}
-              </Button>
-            </CardContent>
-          </Card>
-        {:else}
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {#each filtered as item}
-              <Card class="relative">
-                <CardHeader>
-                  <div class="flex items-start justify-between">
-                    <div class="flex items-center gap-3">
-                      {#if item.icon_type === 'devicon'}
-                        <Icon icon={item.icon} class="h-8 w-8" />
-                      {:else}
-                        <img src={item.icon} alt={item.name} class="h-8 w-8" />
-                      {/if}
-                      <div>
-                        <CardTitle class="text-lg">{item.name}</CardTitle>
-                        <CardDescription>{item.category}</CardDescription>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div class="mt-2 flex items-center justify-end gap-2">
-                    <Button variant="outline" size="sm" onclick={() => startEditingItem(item)}>
-                      <Edit class="mr-1 h-3 w-3" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onclick={() => deleteItem(item.id, item.name)}
-                      class="text-red-500 hover:text-red-700"
-                    >
-                      <Trash2 class="mr-1 h-3 w-3" />
-                      Delete
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            {/each}
-          </div>
-        {/if}
+        <ItemCardGrid
+          items={filteredItems}
+          isSearching={!!searchQuery}
+          itemName={config.itemName}
+          emptyMessage={config.emptyMessage}
+          emptySearchMessage={config.emptySearchMessage}
+          emptyIcon={config.emptyIcon}
+          onAdd={() => startAddingItem()}
+          onEdit={startEditingItem}
+          onDelete={deleteItem}
+        />
       </TabsContent>
 
       <TabsContent value="suggested" class="space-y-4">
-        {#if filteredSuggestedGroups.length === 0}
-          <Card>
-            <CardContent class="flex flex-col items-center justify-center py-12">
-              <EmptyIcon class="mb-4 h-12 w-12 text-muted-foreground" />
-              <p class="text-muted-foreground">
-                {#if mergedSuggestedGroups.length === 0}
-                  No suggested {config.itemNamePlural.toLowerCase()} available
-                {:else}
-                  All suggested {config.itemNamePlural.toLowerCase()} have been added
-                {/if}
-              </p>
-            </CardContent>
-          </Card>
-        {:else}
-          {#each filteredSuggestedGroups as group}
-            <Card>
-              <CardHeader>
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    {#if group.category.includes('Recommended')}
-                      <Sparkles class="h-5 w-5 text-primary" />
-                    {/if}
-                    <div>
-                      <CardTitle>{group.category}</CardTitle>
-                      <CardDescription>
-                        {group.items.length}
-                        {config.itemName.toLowerCase()}{group.items.length > 1 ? 's' : ''} available
-                      </CardDescription>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onclick={() => addAllItemsFromGroup(group)}
-                    disabled={isLoading}
-                  >
-                    <Plus class="mr-2 h-4 w-4" />
-                    Add All
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                  {#each group.items as item}
-                    <div
-                      class="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-accent/50"
-                    >
-                      <div class="flex min-w-0 flex-1 items-center gap-3">
-                        <Icon icon={item.icon} class="h-6 w-6 flex-shrink-0" />
-                        <div class="min-w-0 flex-1">
-                          <div class="flex items-center gap-1 truncate font-medium">
-                            {item.name}
-                            {#if group.category.includes('Recommended')}
-                              <Badge
-                                variant="outline"
-                                class="border-primary bg-primary/5 text-xs text-primary"
-                              >
-                                <TrendingUp class="mr-1 h-3 w-3" />
-                                Recommended
-                              </Badge>
-                            {/if}
-                          </div>
-                          <div class="text-xs text-muted-foreground">
-                            {item.category}
-                          </div>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="sm" onclick={() => startAddingItem(item)}>
-                        <Plus class="h-4 w-4" />
-                      </Button>
-                    </div>
-                  {/each}
-                </div>
-              </CardContent>
-            </Card>
-          {/each}
-        {/if}
+        <ItemSuggestedList
+          groups={filteredSuggestedGroups}
+          hasAnySuggestions={mergedSuggestedGroups.length > 0}
+          itemName={config.itemName}
+          itemNamePlural={config.itemNamePlural}
+          emptyIcon={config.emptyIcon}
+          {isLoading}
+          onAddAll={addAllItemsFromGroup}
+          onAdd={startAddingItem}
+        />
       </TabsContent>
     </Tabs>
   {/if}
 </div>
 
-<Dialog bind:open={showAddDialog}>
-  <DialogContent class="sm:max-w-[500px]">
-    <DialogHeader>
-      <DialogTitle>
-        {editingItem ? `Edit ${config.itemName}` : `Add ${config.itemName}`}
-      </DialogTitle>
-      <DialogDescription>
-        {editingItem
-          ? `Update ${config.itemName.toLowerCase()} details`
-          : `Add a new ${config.itemName.toLowerCase()} to your collection`}
-      </DialogDescription>
-    </DialogHeader>
-
-    <div class="grid gap-4 py-4">
-      <div class="space-y-2">
-        <Label for="item-name">{config.itemName} Name *</Label>
-        <Input id="item-name" bind:value={itemName} placeholder="Enter name..." />
-      </div>
-      <div class="space-y-2">
-        <Label for="item-category">Category</Label>
-        <Input id="item-category" bind:value={itemCategory} placeholder="Enter category..." />
-      </div>
-      <div class="space-y-2">
-        <Label for="item-icon">Icon</Label>
-        <Input
-          id="item-icon"
-          bind:value={itemIcon}
-          placeholder="logos:example (for Devicon) or image URL"
-        />
-        <p class="text-xs text-muted-foreground">
-          Enter a Devicon name (e.g., "logos:javascript") or an image URL
-        </p>
-      </div>
-      <div class="space-y-2">
-        <Label for="item-icon-type">Icon Type</Label>
-        <Select
-          bind:value={itemIconType}
-          options={[
-            { value: 'devicon', label: 'Devicon' },
-            { value: 'file', label: 'Image URL' },
-          ]}
-        />
-      </div>
-    </div>
-
-    <DialogFooter>
-      <Button variant="outline" onclick={() => (showAddDialog = false)}>Cancel</Button>
-      <Button onclick={saveItem}>
-        {editingItem ? 'Update' : 'Add'}
-        {config.itemName}
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
-
-<style>
-  select {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
-    border-color: hsl(var(--border));
-  }
-</style>
+<ItemFormDialog
+  bind:open={showAddDialog}
+  itemLabel={config.itemName}
+  editing={!!editingItem}
+  bind:name={itemName}
+  bind:category={itemCategory}
+  bind:icon={itemIcon}
+  bind:iconType={itemIconType}
+  onSave={saveItem}
+/>

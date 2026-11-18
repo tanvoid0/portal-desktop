@@ -10,6 +10,7 @@ import Loader2 from '~icons/fa6-solid/spinner';
 export function getStatusIcon(status: string) {
   switch (status) {
     case 'pending':
+    case 'queued':
       return Clock;
     case 'running':
       return Loader2;
@@ -27,6 +28,7 @@ export function getStatusIcon(status: string) {
 export function getStatusColor(status: string): string {
   switch (status) {
     case 'pending':
+    case 'queued':
       return 'text-yellow-500';
     case 'running':
       return 'text-blue-500 animate-spin';

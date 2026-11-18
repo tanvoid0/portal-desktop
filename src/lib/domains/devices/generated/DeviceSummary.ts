@@ -3,13 +3,4 @@
 /**
  * One row of `list_devices`, deduplicated to the most recent per device_id.
  */
-export type DeviceSummary = {
-  device_id: string;
-  device_name: string;
-  approval_type: string;
-  approved: boolean;
-  capabilities: Array<string>;
-  expires_at: string | null;
-  last_used_at: string | null;
-  created_at: string;
-};
+export type DeviceSummary = { device_id: string, device_name: string, approval_type: string, approved: boolean, capabilities: Array<string>, expires_at: string | null, last_used_at: string | null, created_at: string, };

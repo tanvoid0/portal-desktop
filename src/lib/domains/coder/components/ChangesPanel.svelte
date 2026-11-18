@@ -7,10 +7,10 @@
   import X from '~icons/fa6-solid/xmark';
   import FileEdit from '~icons/fa6-solid/file-pen';
   import Pencil from '~icons/fa6-solid/pencil';
-  import ChevronDown from '~icons/fa6-solid/chevron-down';
-  import ChevronUp from '~icons/fa6-solid/chevron-up';
   import { coderService } from '../services/coderService.js';
   import type { FileChange, Hunk } from '../types.js';
+  import ChangesReviewBar from './ChangesReviewBar.svelte';
+  import ChangeHunk from './ChangeHunk.svelte';
 
   interface Props {
     changes: FileChange[];
@@ -164,10 +164,6 @@
     reviewedHunks = next;
   }
 
-  function display(lines: string[]): string {
-    return lines.map((l) => l.replace(/\n$/, '')).join('\n');
-  }
-
   async function acceptHunk(c: FileChange, h: Hunk) {
     if (!h.accepted) {
       await coderService.setHunk(c.id, h.index, true);
@@ -276,53 +272,15 @@
   {/if}
 
   {#if pendingChanges.length > 0}
-    <div
-      class="sticky top-0 z-10 flex flex-col gap-2 rounded-md border border-border bg-background px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-    >
-      <div class="min-w-0 truncate text-xs text-muted-foreground">
-        {#if focusChange && focusPosition}
-          <span class="font-medium text-foreground">{focusChange.path}</span>
-          <span class="mx-1">·</span>
-          hunk {focusPosition.hunkIdx + 1} of {focusPosition.totalHunks}
-          <span class="mx-1">·</span>
-          file {focusPosition.changeIdx + 1} of {focusPosition.totalChanges}
-        {:else}
-          {pendingChanges.length} file{pendingChanges.length === 1 ? '' : 's'} to review
-        {/if}
-      </div>
-      <div class="flex shrink-0 flex-wrap items-center justify-end gap-1">
-        {#if focusPosition}
-          <Button
-            size="sm"
-            variant="ghost"
-            class="h-7 w-7"
-            title="Previous hunk"
-            onclick={goToPrevHunk}
-            disabled={focusPosition.changeIdx === 0 && focusPosition.hunkIdx === 0}
-          >
-            <ChevronUp class="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            class="h-7 w-7"
-            title="Next hunk"
-            onclick={goToNextHunk}
-            disabled={focusPosition.changeIdx === focusPosition.totalChanges - 1 &&
-              focusPosition.hunkIdx === focusPosition.totalHunks - 1}
-          >
-            <ChevronDown class="h-3.5 w-3.5" />
-          </Button>
-          <div class="mx-1 h-4 w-px bg-border"></div>
-        {/if}
-        <Button size="sm" variant="secondary" class="h-7" onclick={acceptAllFiles}>
-          <Check class="mr-1 h-3.5 w-3.5" /> Accept all
-        </Button>
-        <Button size="sm" variant="destructive" class="h-7" onclick={rejectAllFiles}>
-          <X class="mr-1 h-3.5 w-3.5" /> Reject all
-        </Button>
-      </div>
-    </div>
+    <ChangesReviewBar
+      focusPath={focusChange?.path}
+      position={focusPosition}
+      pendingCount={pendingChanges.length}
+      onPrev={goToPrevHunk}
+      onNext={goToNextHunk}
+      onAcceptAll={acceptAllFiles}
+      onRejectAll={rejectAllFiles}
+    />
   {/if}
 
   {#each pendingChanges as c (c.id)}
@@ -375,100 +333,19 @@
       {:else}
         <div class="divide-y divide-border">
           {#each c.hunks as h (h.index)}
-            {@const reviewed = isReviewed(c.id, h.index)}
-            {@const focused = isFocused(c.id, h.index)}
-            <!--
-              A labelled group, NOT role="button". This div wraps the real
-              Accept/Reject Button elements, and a nested button role is both
-              invalid ARIA and unusable: the outer role's accessible name is
-              computed from its descendants, so it announced the whole diff plus both
-              button labels, and `getByRole('button', { name: 'Reject hunk' })`
-              resolved to this wrapper instead of the button — the click then
-              landed on the focus handler and silently did nothing (QA-083).
-              `aria-label` keeps the name off the children either way.
-            -->
-            <div
-              data-hunk-id="{c.id}:{h.index}"
-              role="group"
-              aria-label="Hunk {h.index + 1}, line {h.before_start + 1}"
-              aria-current={focused ? 'true' : undefined}
-              tabindex="0"
-              class="p-2 transition-colors {focused
-                ? 'bg-primary/5 ring-2 ring-primary/30 ring-inset'
-                : reviewed
-                  ? 'opacity-70'
-                  : ''}"
-              onclick={() => {
-                if (isPending) {
-                  focusChangeId = c.id;
-                  focusHunkIndex = h.index;
-                }
+            <ChangeHunk
+              changeId={c.id}
+              hunk={h}
+              {isPending}
+              reviewed={isReviewed(c.id, h.index)}
+              focused={isFocused(c.id, h.index)}
+              onFocus={() => {
+                focusChangeId = c.id;
+                focusHunkIndex = h.index;
               }}
-              onkeydown={(e) => {
-                if (isPending && (e.key === 'Enter' || e.key === ' ')) {
-                  e.preventDefault();
-                  focusChangeId = c.id;
-                  focusHunkIndex = h.index;
-                }
-              }}
-            >
-              <div class="mb-1 flex items-center justify-between gap-2">
-                <div class="flex items-center gap-2">
-                  <span class="text-[10px] text-muted-foreground">
-                    hunk {h.index + 1} · line {h.before_start + 1}
-                  </span>
-                  {#if reviewed}
-                    <Badge variant={h.accepted ? 'secondary' : 'destructive'} class="text-[10px]">
-                      {h.accepted ? 'accepted' : 'rejected'}
-                    </Badge>
-                  {/if}
-                </div>
-
-                {#if isPending}
-                  <div class="flex items-center gap-1">
-                    <Button
-                      size="sm"
-                      variant={focused && !reviewed ? 'secondary' : 'ghost'}
-                      class="h-6 text-[10px]"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        acceptHunk(c, h);
-                      }}
-                    >
-                      <Check class="mr-1 h-3 w-3" />
-                      {reviewed ? 'Accept' : 'Accept hunk'}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      class="h-6 text-[10px] text-destructive hover:text-destructive"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        rejectHunk(c, h);
-                      }}
-                    >
-                      <X class="mr-1 h-3 w-3" />
-                      {reviewed ? 'Reject' : 'Reject hunk'}
-                    </Button>
-                  </div>
-                {/if}
-              </div>
-              {#if h.before_lines.length}
-                <pre
-                  class="overflow-auto rounded bg-red-500/10 px-2 py-1 text-xs {h.accepted
-                    ? ''
-                    : 'opacity-50'}"><code>{display(h.before_lines).replace(/^/gm, '- ')}</code
-                  ></pre>
-              {/if}
-              {#if h.after_lines.length}
-                <pre
-                  class="overflow-auto rounded bg-green-500/10 px-2 py-1 text-xs {h.accepted
-                    ? ''
-                    : 'line-through opacity-50'}"><code
-                    >{display(h.after_lines).replace(/^/gm, '+ ')}</code
-                  ></pre>
-              {/if}
-            </div>
+              onAccept={() => acceptHunk(c, h)}
+              onReject={() => rejectHunk(c, h)}
+            />
           {/each}
         </div>
       {/if}

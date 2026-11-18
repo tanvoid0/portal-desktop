@@ -1,9 +1,12 @@
 <!-- Log Entry Component - Displays formatted log entries -->
 <script lang="ts">
-  import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
   import Copy from '~icons/fa6-solid/copy';
   import { toastActions } from '$lib/domains/shared/stores/toastStore';
+  import ExpandableText from '$lib/components/shared/ExpandableText.svelte';
+  import { getSeverityColor } from '../../utils/logSeverity';
+  import LogSeverityBadge from './LogSeverityBadge.svelte';
+  import LogStructuredFields from './LogStructuredFields.svelte';
   import type { K8sLog } from '../../types/k8s';
 
   interface Props {
@@ -55,44 +58,6 @@
     };
   });
 
-  function getSeverityColor(severity: string): string {
-    const s = severity?.toUpperCase();
-    switch (s) {
-      case 'ERROR':
-      case 'FATAL':
-      case 'CRITICAL':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-l-4 border-red-400';
-      case 'WARN':
-      case 'WARNING':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 border-l-4 border-yellow-400';
-      case 'INFO':
-      case 'INFORMATION':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-l-4 border-blue-400';
-      case 'DEBUG':
-      case 'TRACE':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 border-l-4 border-gray-400';
-      default:
-        return 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200 border-l-4 border-slate-400';
-    }
-  }
-
-  function getSeverityBadgeVariant(
-    severity: string
-  ): 'default' | 'secondary' | 'destructive' | 'outline' {
-    const s = severity?.toUpperCase();
-    switch (s) {
-      case 'ERROR':
-      case 'FATAL':
-      case 'CRITICAL':
-        return 'destructive';
-      case 'WARN':
-      case 'WARNING':
-        return 'outline';
-      default:
-        return 'default';
-    }
-  }
-
   function formatTimestamp(timestamp: string): string {
     try {
       return new Date(timestamp).toLocaleString();
@@ -115,10 +80,6 @@
       onFilterBySeverity(severity);
     }
   }
-
-  let showFullMessage = $state(false);
-  let showFullError = $state(false);
-  let showFullStackTrace = $state(false);
 </script>
 
 <div class="mb-2 rounded-md p-3 {getSeverityColor(structuredFields?.severity || log.level)}">
@@ -144,15 +105,10 @@
   {:else if viewMode === 'compact'}
     <!-- Compact Mode -->
     <div class="flex items-center space-x-2 text-sm">
-      <Button
-        variant="ghost"
-        onclick={() => handleSeverityClick(structuredFields?.severity || log.level)}
-        class="h-auto cursor-pointer p-0 hover:opacity-80"
-      >
-        <Badge variant={getSeverityBadgeVariant(structuredFields?.severity || log.level)}>
-          {structuredFields?.severity || log.level}
-        </Badge>
-      </Button>
+      <LogSeverityBadge
+        severity={structuredFields?.severity || log.level}
+        onclick={handleSeverityClick}
+      />
       <span class="font-mono text-xs text-slate-500 dark:text-slate-400">
         {formatTimestamp(structuredFields?.time || log.timestamp)}
       </span>
@@ -175,15 +131,10 @@
       <!-- Header -->
       <div class="flex items-center justify-between">
         <div class="flex flex-wrap items-center space-x-2">
-          <Button
-            variant="ghost"
-            onclick={() => handleSeverityClick(structuredFields?.severity || log.level)}
-            class="h-auto cursor-pointer p-0 hover:opacity-80"
-          >
-            <Badge variant={getSeverityBadgeVariant(structuredFields?.severity || log.level)}>
-              {structuredFields?.severity || log.level}
-            </Badge>
-          </Button>
+          <LogSeverityBadge
+            severity={structuredFields?.severity || log.level}
+            onclick={handleSeverityClick}
+          />
           <span class="font-mono text-xs text-slate-500 dark:text-slate-400">
             {formatTimestamp(structuredFields?.time || log.timestamp)}
           </span>
@@ -209,116 +160,17 @@
       <div class="text-sm break-words">
         {#if structuredFields?.message}
           <div class="rounded border bg-white p-2 font-mono dark:bg-slate-800">
-            {#if structuredFields.message.length > 200 && !showFullMessage}
-              <div>
-                <span>{structuredFields.message.slice(0, 200)}...</span>
-                <Button
-                  variant="link"
-                  size="sm"
-                  onclick={() => (showFullMessage = true)}
-                  class="ml-2 h-auto p-0 text-xs text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                >
-                  Show more
-                </Button>
-              </div>
-            {:else}
-              <div>
-                {structuredFields.message}
-                {#if structuredFields.message.length > 200 && showFullMessage}
-                  <Button
-                    variant="link"
-                    size="sm"
-                    onclick={() => (showFullMessage = false)}
-                    class="ml-2 h-auto p-0 text-xs text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                  >
-                    Show less
-                  </Button>
-                {/if}
-              </div>
-            {/if}
+            <ExpandableText text={String(structuredFields.message)} />
           </div>
         {:else}
           <div class="rounded border bg-white p-2 font-mono whitespace-pre-wrap dark:bg-slate-800">
-            {#if parsedLog.rawMessage.length > 200 && !showFullMessage}
-              <div>
-                <span>{parsedLog.rawMessage.slice(0, 200)}...</span>
-                <Button
-                  variant="link"
-                  size="sm"
-                  onclick={() => (showFullMessage = true)}
-                  class="ml-2 h-auto p-0 text-xs text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                >
-                  Show more
-                </Button>
-              </div>
-            {:else}
-              <div>
-                {parsedLog.rawMessage}
-                {#if parsedLog.rawMessage.length > 200 && showFullMessage}
-                  <Button
-                    variant="link"
-                    size="sm"
-                    onclick={() => (showFullMessage = false)}
-                    class="ml-2 h-auto p-0 text-xs text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                  >
-                    Show less
-                  </Button>
-                {/if}
-              </div>
-            {/if}
+            <ExpandableText text={parsedLog.rawMessage} />
           </div>
         {/if}
       </div>
 
-      <!-- Structured Fields -->
       {#if structuredFields}
-        <div class="space-y-1 text-xs">
-          {#if structuredFields.logger || structuredFields.requestId || structuredFields.traceId}
-            <div class="flex flex-wrap items-center gap-2 space-x-4">
-              {#if structuredFields.logger}
-                <div>
-                  <span class="font-medium text-slate-600 dark:text-slate-400">Logger:</span>
-                  <span class="ml-1">{structuredFields.logger}</span>
-                </div>
-              {/if}
-              {#if structuredFields.requestId}
-                <div>
-                  <span class="font-medium text-slate-600 dark:text-slate-400">Request ID:</span>
-                  <span class="ml-1 font-mono">{structuredFields.requestId}</span>
-                </div>
-              {/if}
-              {#if structuredFields.traceId}
-                <div>
-                  <span class="font-medium text-slate-600 dark:text-slate-400">Trace ID:</span>
-                  <span class="ml-1 font-mono">{structuredFields.traceId}</span>
-                </div>
-              {/if}
-            </div>
-          {/if}
-
-          {#if structuredFields.method || structuredFields.url || structuredFields.statusCode}
-            <div class="flex flex-wrap items-center gap-2 space-x-4">
-              {#if structuredFields.method}
-                <div>
-                  <span class="font-medium text-slate-600 dark:text-slate-400">Method:</span>
-                  <span class="ml-1">{structuredFields.method}</span>
-                </div>
-              {/if}
-              {#if structuredFields.url}
-                <div>
-                  <span class="font-medium text-slate-600 dark:text-slate-400">URL:</span>
-                  <span class="ml-1 font-mono">{structuredFields.url}</span>
-                </div>
-              {/if}
-              {#if structuredFields.statusCode}
-                <div>
-                  <span class="font-medium text-slate-600 dark:text-slate-400">Status:</span>
-                  <span class="ml-1">{structuredFields.statusCode}</span>
-                </div>
-              {/if}
-            </div>
-          {/if}
-        </div>
+        <LogStructuredFields fields={structuredFields} />
       {/if}
 
       <!-- Error -->
@@ -328,33 +180,7 @@
           <div
             class="mt-1 rounded border border-red-200 bg-red-50 p-2 font-mono break-words text-red-900 dark:border-red-800 dark:bg-red-900/20 dark:text-red-100"
           >
-            {#if String(structuredFields.error).length > 200 && !showFullError}
-              <div>
-                <span>{String(structuredFields.error).slice(0, 200)}...</span>
-                <Button
-                  variant="link"
-                  size="sm"
-                  onclick={() => (showFullError = true)}
-                  class="ml-2 h-auto p-0 text-xs text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                >
-                  Show more
-                </Button>
-              </div>
-            {:else}
-              <div>
-                {String(structuredFields.error)}
-                {#if String(structuredFields.error).length > 200 && showFullError}
-                  <Button
-                    variant="link"
-                    size="sm"
-                    onclick={() => (showFullError = false)}
-                    class="ml-2 h-auto p-0 text-xs text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                  >
-                    Show less
-                  </Button>
-                {/if}
-              </div>
-            {/if}
+            <ExpandableText text={String(structuredFields.error)} />
           </div>
         </div>
       {/if}
@@ -366,33 +192,7 @@
           <div
             class="mt-1 rounded border border-red-200 bg-red-50 p-2 font-mono text-xs break-words whitespace-pre-wrap text-red-900 dark:border-red-800 dark:bg-red-900/20 dark:text-red-100"
           >
-            {#if String(structuredFields.stackTrace).length > 300 && !showFullStackTrace}
-              <div>
-                <span>{String(structuredFields.stackTrace).slice(0, 300)}...</span>
-                <Button
-                  variant="link"
-                  size="sm"
-                  onclick={() => (showFullStackTrace = true)}
-                  class="ml-2 h-auto p-0 text-xs text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                >
-                  Show more
-                </Button>
-              </div>
-            {:else}
-              <div>
-                {String(structuredFields.stackTrace)}
-                {#if String(structuredFields.stackTrace).length > 300 && showFullStackTrace}
-                  <Button
-                    variant="link"
-                    size="sm"
-                    onclick={() => (showFullStackTrace = false)}
-                    class="ml-2 h-auto p-0 text-xs text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                  >
-                    Show less
-                  </Button>
-                {/if}
-              </div>
-            {/if}
+            <ExpandableText text={String(structuredFields.stackTrace)} limit={300} />
           </div>
         </div>
       {/if}

@@ -7,29 +7,11 @@
  * columns plus `cancel_requested` and `running`, which live in the command
  * layer's `MoveControl`, not the row.
  */
-export type MoveSummary = {
-  id: string;
-  project_id: number;
-  source_path: string;
-  dest_path: string;
-  state: string;
-  include_regenerable: boolean;
-  file_count: number;
-  total_bytes: number;
-  files_done: number;
-  bytes_done: number;
-  resume_count: number;
-  unrewritten: Array<string>;
-  error: string | null;
-  started_at: string;
-  updated_at: string;
-  finished_at: string | null;
-  cancel_requested: boolean;
-  /**
-   * A move command for this row's project is actively awaiting right now
-   * — not just journaled mid-flight. Lets the interrupted-move banner
-   * skip a `copying`/`verifying` row that is someone's live move, not a
-   * crash left for the user to resolve (board #207/#208 review).
-   */
-  running: boolean;
-};
+export type MoveSummary = { id: string, project_id: number, source_path: string, dest_path: string, state: string, include_regenerable: boolean, file_count: number, total_bytes: number, files_done: number, bytes_done: number, resume_count: number, unrewritten: Array<string>, error: string | null, started_at: string, updated_at: string, finished_at: string | null, cancel_requested: boolean, 
+/**
+ * A move command for this row's project is actively awaiting right now
+ * — not just journaled mid-flight. Lets the interrupted-move banner
+ * skip a `copying`/`verifying` row that is someone's live move, not a
+ * crash left for the user to resolve (board #207/#208 review).
+ */
+running: boolean, };

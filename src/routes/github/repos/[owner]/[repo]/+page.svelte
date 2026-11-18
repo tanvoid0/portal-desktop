@@ -18,6 +18,7 @@
     GitHubError,
     GitHubWorkflowRunsPanel,
   } from '$lib/domains/github';
+  import GitHubIssueList from '$lib/domains/github/components/GitHubIssueList.svelte';
   import { isTokenUnreadableError } from '$lib/domains/github/utils/tokenError';
   import { toast } from '$lib/utils/toast';
   import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
@@ -247,97 +248,23 @@
           </TabsContent>
 
           <TabsContent value="issues" class="mt-4">
-            {#if repoIssuesQuery.isPending}
-              <PageLoading message="Loading issues..." />
-            {:else if repoIssuesQuery.isError}
-              <GitHubError
-                title="Failed to load issues"
-                message={repoIssuesQuery.error instanceof Error
-                  ? repoIssuesQuery.error.message
-                  : 'Unable to load issues'}
-                onRetry={() => repoIssuesQuery.refetch()}
-              />
-            {:else if openIssues.length === 0}
-              <p class="text-sm text-muted-foreground">No open issues.</p>
-            {:else}
-              <div class="space-y-3">
-                {#each openIssues as issue}
-                  <div class="rounded border p-3">
-                    <div class="flex items-center justify-between gap-3">
-                      <div class="font-medium">
-                        #{issue.number}
-                        {issue.title}
-                      </div>
-                      <a
-                        href={issue.htmlUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        class="inline-flex items-center text-xs text-primary"
-                      >
-                        Open
-                        <ExternalLink class="ml-1 h-3 w-3" />
-                      </a>
-                    </div>
-                    <div class="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                      <span>{issue.state}</span>
-                      {#if issue.authorLogin}
-                        <span>by {issue.authorLogin}</span>
-                      {/if}
-                      {#if issue.labels.length > 0}
-                        <span>labels: {issue.labels.join(', ')}</span>
-                      {/if}
-                    </div>
-                  </div>
-                {/each}
-              </div>
-            {/if}
+            <GitHubIssueList
+              items={openIssues}
+              isPending={repoIssuesQuery.isPending}
+              error={repoIssuesQuery.isError ? repoIssuesQuery.error : null}
+              noun="issues"
+              onRetry={() => repoIssuesQuery.refetch()}
+            />
           </TabsContent>
 
           <TabsContent value="pulls" class="mt-4">
-            {#if repoIssuesQuery.isPending}
-              <PageLoading message="Loading pull requests..." />
-            {:else if repoIssuesQuery.isError}
-              <GitHubError
-                title="Failed to load pull requests"
-                message={repoIssuesQuery.error instanceof Error
-                  ? repoIssuesQuery.error.message
-                  : 'Unable to load pull requests'}
-                onRetry={() => repoIssuesQuery.refetch()}
-              />
-            {:else if openPullRequests.length === 0}
-              <p class="text-sm text-muted-foreground">No open pull requests.</p>
-            {:else}
-              <div class="space-y-3">
-                {#each openPullRequests as pr}
-                  <div class="rounded border p-3">
-                    <div class="flex items-center justify-between gap-3">
-                      <div class="font-medium">
-                        #{pr.number}
-                        {pr.title}
-                      </div>
-                      <a
-                        href={pr.htmlUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        class="inline-flex items-center text-xs text-primary"
-                      >
-                        Open
-                        <ExternalLink class="ml-1 h-3 w-3" />
-                      </a>
-                    </div>
-                    <div class="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                      <span>{pr.state}</span>
-                      {#if pr.authorLogin}
-                        <span>by {pr.authorLogin}</span>
-                      {/if}
-                      {#if pr.labels.length > 0}
-                        <span>labels: {pr.labels.join(', ')}</span>
-                      {/if}
-                    </div>
-                  </div>
-                {/each}
-              </div>
-            {/if}
+            <GitHubIssueList
+              items={openPullRequests}
+              isPending={repoIssuesQuery.isPending}
+              error={repoIssuesQuery.isError ? repoIssuesQuery.error : null}
+              noun="pull requests"
+              onRetry={() => repoIssuesQuery.refetch()}
+            />
           </TabsContent>
         </Tabs>
       </CardContent>

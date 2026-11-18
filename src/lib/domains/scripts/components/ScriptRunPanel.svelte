@@ -13,12 +13,8 @@
     CardTitle,
   } from '$lib/components/ui/card';
   import { Input } from '$lib/components/ui/input';
-  import { Badge } from '$lib/components/ui/badge';
   import { Label } from '$lib/components/ui/label';
-  import { Checkbox } from '$lib/components/ui/checkbox';
   import { Switch } from '$lib/components/ui/switch';
-  import Select from '$lib/components/ui/select.svelte';
-  import Copy from '~icons/fa6-solid/copy';
   import Play from '~icons/fa6-solid/play';
   import Square from '~icons/fa6-solid/square';
   import Terminal from '~icons/fa6-solid/terminal';
@@ -26,7 +22,8 @@
   import { automation } from '$lib/domains/automation';
   import { scriptExecutionService, type ScriptExecutionInfo } from '../services';
   import EmbeddedTerminal from './EmbeddedTerminal.svelte';
-  import { getStatusIcon, getStatusColor, formatDuration } from '../utils/executionStatus';
+  import ScriptParamFields from './ScriptParamFields.svelte';
+  import ScriptExecutionOutput from './ScriptExecutionOutput.svelte';
   import { toast } from '$lib/utils/toast';
 
   interface Props {
@@ -187,12 +184,6 @@
     showInteractiveTerminal = false;
     executing = false;
   }
-
-  function handleCopyOutput() {
-    if (!currentExecution?.output) return;
-    navigator.clipboard.writeText(currentExecution.output);
-    toast.success('Output copied to clipboard');
-  }
 </script>
 
 <Card class="border-primary/50">
@@ -243,50 +234,7 @@
 
     <!-- Parameters -->
     {#if script.parameters.length > 0}
-      <div class="space-y-3">
-        <Label class="text-sm font-medium">Parameters</Label>
-        {#each script.parameters as param}
-          <div class="grid grid-cols-3 items-start gap-4">
-            <div class="flex items-center gap-2">
-              <code class="font-mono text-sm">{param.name}</code>
-              {#if param.required}
-                <span class="text-red-500">*</span>
-              {/if}
-            </div>
-            <div class="col-span-2">
-              {#if param.type === 'select' && param.options}
-                <Select
-                  options={param.options.map((o) => ({
-                    value: o,
-                    label: o,
-                  }))}
-                  bind:value={parameterValues[param.name]}
-                  placeholder={param.description || `Select ${param.name}`}
-                />
-              {:else if param.type === 'boolean'}
-                <div class="flex items-center gap-2">
-                  <Checkbox
-                    aria-label={param.name}
-                    checked={parameterValues[param.name] === 'true'}
-                    onCheckedChange={(checked) => {
-                      parameterValues[param.name] = checked === true ? 'true' : 'false';
-                    }}
-                    id={`param-${param.name}`}
-                  />
-                  <Label for={`param-${param.name}`} class="text-sm text-muted-foreground">
-                    {param.description}
-                  </Label>
-                </div>
-              {:else}
-                <Input
-                  bind:value={parameterValues[param.name]}
-                  placeholder={param.description || param.name}
-                />
-              {/if}
-            </div>
-          </div>
-        {/each}
-      </div>
+      <ScriptParamFields parameters={script.parameters} bind:values={parameterValues} />
     {/if}
 
     <!-- Interactive Terminal -->
@@ -312,62 +260,7 @@
 
     <!-- Execution Output (non-interactive mode) -->
     {#if currentExecution && !showInteractiveTerminal}
-      {@const StatusIcon = getStatusIcon(currentExecution.status)}
-      <div class="divider-edge-t divider-edge-full space-y-3 pt-4">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <Terminal class="h-4 w-4" />
-            <span class="font-medium">Output</span>
-            {#if currentExecution.output}
-              <Button variant="ghost" size="sm" onclick={handleCopyOutput} class="h-6 px-2">
-                <Copy class="mr-1 h-3 w-3" />
-                Copy
-              </Button>
-            {/if}
-          </div>
-          <div class="flex items-center gap-2">
-            <StatusIcon class="h-4 w-4 {getStatusColor(currentExecution.status)}" />
-            <Badge
-              variant={currentExecution.status === 'success'
-                ? 'default'
-                : currentExecution.status === 'failed'
-                  ? 'destructive'
-                  : 'secondary'}
-            >
-              {currentExecution.status}
-            </Badge>
-            {#if currentExecution.finishedAt}
-              <span class="text-xs text-muted-foreground">
-                {formatDuration(currentExecution.startedAt, currentExecution.finishedAt)}
-              </span>
-            {/if}
-          </div>
-        </div>
-        <div
-          class="max-h-80 overflow-auto rounded-lg bg-black p-4 font-mono text-sm text-green-400"
-        >
-          {#if currentExecution.output}
-            <pre class="whitespace-pre-wrap">{currentExecution.output}</pre>
-          {:else if ['pending', 'queued', 'running'].includes(currentExecution.status)}
-            <span class="animate-pulse">Waiting for output...</span>
-          {:else}
-            <span class="text-gray-500">No output</span>
-          {/if}
-        </div>
-        {#if currentExecution.error}
-          <div class="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
-            <p class="text-sm font-medium text-red-500">Error</p>
-            <p class="mt-1 text-sm text-red-400">
-              {currentExecution.error}
-            </p>
-          </div>
-        {/if}
-        {#if currentExecution.exitCode !== null}
-          <p class="text-sm text-muted-foreground">
-            Exit code: <code class="rounded bg-muted px-1">{currentExecution.exitCode}</code>
-          </p>
-        {/if}
-      </div>
+      <ScriptExecutionOutput execution={currentExecution} />
     {/if}
   </CardContent>
 </Card>

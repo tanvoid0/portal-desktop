@@ -12,7 +12,6 @@
   import { Textarea } from '$lib/components/ui/textarea';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import FolderPicker from '$lib/components/ui/folder-picker.svelte';
-  import MultiSelect from '$lib/components/ui/multi-select.svelte';
   import {
     Tooltip,
     TooltipContent,
@@ -27,6 +26,8 @@
   import { ideService, type Framework } from '$lib/domains/ide';
   import { packageManagerService, type PackageManager } from '$lib/domains/package_managers';
   import { languageService, type Language } from '$lib/domains/languages';
+  import ProjectFormNotice from './ProjectFormNotice.svelte';
+  import ProjectEntityPickers from './ProjectEntityPickers.svelte';
 
   interface ProjectAnalysis {
     name: string;
@@ -153,6 +154,16 @@
     }
   }
 
+  /** Ids of the entities whose name matches a detected name, as MultiSelect value strings. */
+  function matchIds(names: string[], list: { id: number; name: string }[]): string[] {
+    const ids = new Set<number>();
+    for (const n of names) {
+      const found = list.find((e) => e.name.toLowerCase() === n.toLowerCase());
+      if (found) ids.add(found.id);
+    }
+    return [...ids].map((id) => id.toString());
+  }
+
   async function analyzeProject(projectPath: string, forceSync = false) {
     try {
       isAnalyzing = true;
@@ -174,79 +185,18 @@
         name = analysis.name;
       }
 
-      // Always update these fields when syncing
-      if (forceSync) {
-        // Match all detected frameworks by name
-        const matchedFrameworkIds: number[] = [];
-        for (const frameworkName of analysis.frameworks) {
-          const found = frameworks.find(
-            (f) => f.name.toLowerCase() === frameworkName.toLowerCase()
-          );
-          if (found && !matchedFrameworkIds.includes(found.id)) {
-            matchedFrameworkIds.push(found.id);
-          }
-        }
-        frameworkValueStrings = matchedFrameworkIds.map((id) => id.toString());
-
-        // Match all detected package managers by name
-        const matchedPMIds: number[] = [];
-        for (const pmName of analysis.package_managers) {
-          const found = packageManagers.find(
-            (pm) => pm.name.toLowerCase() === pmName.toLowerCase()
-          );
-          if (found && !matchedPMIds.includes(found.id)) {
-            matchedPMIds.push(found.id);
-          }
-        }
-        packageManagerValueStrings = matchedPMIds.map((id) => id.toString());
-
-        // Match all detected languages by name
-        const matchedLanguageIds: number[] = [];
-        for (const languageName of analysis.languages) {
-          const found = languages.find((l) => l.name.toLowerCase() === languageName.toLowerCase());
-          if (found && !matchedLanguageIds.includes(found.id)) {
-            matchedLanguageIds.push(found.id);
-          }
-        }
-        languageValueStrings = matchedLanguageIds.map((id) => id.toString());
-      } else {
-        // Only update if not already set
-        if (frameworkValueStrings.length === 0 && analysis.frameworks.length > 0) {
-          const matchedFrameworkIds: number[] = [];
-          for (const frameworkName of analysis.frameworks) {
-            const found = frameworks.find(
-              (f) => f.name.toLowerCase() === frameworkName.toLowerCase()
-            );
-            if (found && !matchedFrameworkIds.includes(found.id)) {
-              matchedFrameworkIds.push(found.id);
-            }
-          }
-          frameworkValueStrings = matchedFrameworkIds.map((id) => id.toString());
-        }
-        if (packageManagerValueStrings.length === 0 && analysis.package_managers.length > 0) {
-          const matchedPMIds: number[] = [];
-          for (const pmName of analysis.package_managers) {
-            const found = packageManagers.find(
-              (pm) => pm.name.toLowerCase() === pmName.toLowerCase()
-            );
-            if (found && !matchedPMIds.includes(found.id)) {
-              matchedPMIds.push(found.id);
-            }
-          }
-          packageManagerValueStrings = matchedPMIds.map((id) => id.toString());
-        }
-        if (languageValueStrings.length === 0 && analysis.languages.length > 0) {
-          const matchedLanguageIds: number[] = [];
-          for (const languageName of analysis.languages) {
-            const found = languages.find(
-              (l) => l.name.toLowerCase() === languageName.toLowerCase()
-            );
-            if (found && !matchedLanguageIds.includes(found.id)) {
-              matchedLanguageIds.push(found.id);
-            }
-          }
-          languageValueStrings = matchedLanguageIds.map((id) => id.toString());
-        }
+      // Always update these fields when syncing; otherwise only fill the empty ones
+      if (forceSync || frameworkValueStrings.length === 0) {
+        if (forceSync || analysis.frameworks.length > 0)
+          frameworkValueStrings = matchIds(analysis.frameworks, frameworks);
+      }
+      if (forceSync || packageManagerValueStrings.length === 0) {
+        if (forceSync || analysis.package_managers.length > 0)
+          packageManagerValueStrings = matchIds(analysis.package_managers, packageManagers);
+      }
+      if (forceSync || languageValueStrings.length === 0) {
+        if (forceSync || analysis.languages.length > 0)
+          languageValueStrings = matchIds(analysis.languages, languages);
       }
 
       detectedCommands = {
@@ -321,44 +271,11 @@
 </script>
 
 <div class="space-y-6">
-  <!-- Success Message -->
   {#if success}
-    <Card class="mb-6 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
-      <CardContent class="pt-6">
-        <div class="flex items-center gap-2 text-green-800 dark:text-green-200">
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
-          <span class="font-medium">Success</span>
-        </div>
-        <p class="mt-1 text-sm text-green-600 dark:text-green-300">{success}</p>
-      </CardContent>
-    </Card>
+    <ProjectFormNotice kind="success" message={success} />
   {/if}
-
-  <!-- Error Message -->
   {#if error}
-    <Card class="mb-6 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
-      <CardContent class="pt-6">
-        <div class="flex items-center gap-2 text-red-800 dark:text-red-200">
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <span class="font-medium">Error</span>
-        </div>
-        <p class="mt-1 text-sm text-red-600 dark:text-red-300">{error}</p>
-      </CardContent>
-    </Card>
+    <ProjectFormNotice kind="error" message={error} />
   {/if}
 
   <form onsubmit={handleSubmit} class="space-y-8">
@@ -465,56 +382,15 @@
         <CardTitle>Framework, Package Manager & Languages</CardTitle>
       </CardHeader>
       <CardContent class="space-y-6">
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-          <div class="space-y-2">
-            <Label for="frameworks">Frameworks</Label>
-            <MultiSelect
-              options={frameworks.map((f) => ({
-                value: f.id.toString(),
-                label: f.name,
-                icon: f.icon,
-                iconType: f.icon_type,
-              }))}
-              bind:value={frameworkValueStrings}
-              placeholder="Select frameworks..."
-              searchPlaceholder="Search frameworks..."
-              disabled={isLoading || isAnalyzing || isLoadingEntities}
-              class="w-full"
-            />
-          </div>
-          <div class="space-y-2">
-            <Label for="package-managers">Package Managers</Label>
-            <MultiSelect
-              options={packageManagers.map((pm) => ({
-                value: pm.id.toString(),
-                label: pm.name,
-                icon: pm.icon,
-                iconType: pm.icon_type,
-              }))}
-              bind:value={packageManagerValueStrings}
-              placeholder="Select package managers..."
-              searchPlaceholder="Search package managers..."
-              disabled={isLoading || isAnalyzing || isLoadingEntities}
-              class="w-full"
-            />
-          </div>
-          <div class="space-y-2">
-            <Label for="languages">Languages</Label>
-            <MultiSelect
-              options={languages.map((lang) => ({
-                value: lang.id.toString(),
-                label: lang.name,
-                icon: lang.icon,
-                iconType: lang.icon_type,
-              }))}
-              bind:value={languageValueStrings}
-              placeholder="Select languages..."
-              searchPlaceholder="Search languages..."
-              disabled={isLoading || isAnalyzing || isLoadingEntities}
-              class="w-full"
-            />
-          </div>
-        </div>
+        <ProjectEntityPickers
+          {frameworks}
+          {packageManagers}
+          {languages}
+          bind:frameworkValues={frameworkValueStrings}
+          bind:packageManagerValues={packageManagerValueStrings}
+          bind:languageValues={languageValueStrings}
+          disabled={isLoading || isAnalyzing || isLoadingEntities}
+        />
       </CardContent>
     </Card>
 

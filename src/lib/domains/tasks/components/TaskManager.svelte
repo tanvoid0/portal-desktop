@@ -2,21 +2,11 @@
   import FaTableColumns from '~icons/fa6-solid/table-columns';
   import FaList from '~icons/fa6-solid/list';
   import FaSquareCheck from '~icons/fa6-solid/square-check';
-  import FaCheckDouble from '~icons/fa6-solid/check-double';
   import FaXmark from '~icons/fa6-solid/xmark';
-  import FaTrash from '~icons/fa6-solid/trash';
   import FaKeyboard from '~icons/fa6-solid/keyboard';
   import FaPlus from '~icons/fa6-solid/plus';
   import FaMagnifyingGlass from '~icons/fa6-solid/magnifying-glass';
   import FaFilter from '~icons/fa6-solid/filter';
-  import FaCircle from '~icons/fa6-solid/circle';
-  import FaFlag from '~icons/fa6-solid/flag';
-  import FaFilterCircleXmark from '~icons/fa6-solid/filter-circle-xmark';
-  import FaBoxArchive from '~icons/fa6-solid/box-archive';
-  import FaLayerGroup from '~icons/fa6-solid/layer-group';
-  import FaFolder from '~icons/fa6-solid/folder';
-  import FaInbox from '~icons/fa6-solid/inbox';
-  import * as Dialog from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { Input } from '$lib/components/ui/input';
@@ -39,7 +29,7 @@
     ShellSidebarLayout,
     ResponsivePanel,
   } from '$lib/components/shell';
-  import { taskStatusLabel, type Task, type TaskStatus, type TaskPriority } from '../types';
+  import { type Task, type TaskStatus, type TaskPriority } from '../types';
   import { copyText } from '$lib/domains/shared/utils/clipboard';
   import { openCoderSession } from '$lib/domains/coder/utils/launch';
   import { openAgentsSession } from '$lib/domains/agents/utils/launch';
@@ -49,6 +39,10 @@
   import KanbanBoard from './KanbanBoard.svelte';
   import TaskList from './TaskList.svelte';
   import ArchiveView from './ArchiveView.svelte';
+  import TaskShortcutsDialog from './TaskShortcutsDialog.svelte';
+  import TaskProjectNav from './TaskProjectNav.svelte';
+  import TaskActiveFilters from './TaskActiveFilters.svelte';
+  import TaskMultiSelectBar from './TaskMultiSelectBar.svelte';
 
   const tasksQuery = createTasksQuery();
   const projectsQuery = createProjectsQuery();
@@ -400,22 +394,6 @@
 
 <svelte:window onkeydowncapture={noteDialogState} onkeydown={handleKeydown} />
 
-{#snippet navItem(label: string, count: number, active: boolean, onclick: () => void, Ico: any)}
-  <Button
-    {onclick}
-    variant={active ? 'secondary' : 'ghost'}
-    size="sm"
-    class="h-7 w-full justify-between gap-2 px-2"
-    aria-current={active ? 'true' : undefined}
-  >
-    <span class="flex min-w-0 items-center gap-2">
-      <Ico class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      <span class="truncate" title={label}>{label}</span>
-    </span>
-    <Badge variant="outline" class="shrink-0 px-1.5">{count}</Badge>
-  </Button>
-{/snippet}
-
 <div class="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background">
   <div class="shrink-0 px-4 py-4 md:px-6">
     <PageHeader title="Tasks" description="Organize and track your work efficiently">
@@ -445,42 +423,17 @@
 
   <ShellSidebarLayout mobileTriggerLabel="Projects menu">
     {#snippet sidebar()}
-      <nav class="flex flex-col gap-1 p-3" aria-label="Task projects">
-        {@render navItem(
-          'All projects',
-          taskUi.projectCounts.openTotal,
-          selectedProject === 'all' && currentView !== 'archive',
-          () => navigate('all', currentView === 'archive' ? 'board' : currentView),
-          FaLayerGroup
-        )}
-        <div class="divider-edge-t divider-edge-full my-1"></div>
-        {#each sidebarProjects as p (p.id)}
-          {@render navItem(
-            p.name,
-            p.open,
-            selectedProject === p.id && currentView !== 'archive',
-            () => navigate(p.id, currentView === 'archive' ? 'board' : currentView),
-            FaFolder
-          )}
-        {/each}
-        {#if hasNoProjectTasks}
-          {@render navItem(
-            'No project',
-            noProjectOpen,
-            selectedProject === 'none' && currentView !== 'archive',
-            () => navigate('none', currentView === 'archive' ? 'board' : currentView),
-            FaInbox
-          )}
-        {/if}
-        <div class="divider-edge-t divider-edge-full my-1"></div>
-        {@render navItem(
-          'Archive',
-          taskUi.projectCounts.archived,
-          currentView === 'archive',
-          () => navigate(selectedProject, 'archive'),
-          FaBoxArchive
-        )}
-      </nav>
+      <TaskProjectNav
+        projects={sidebarProjects}
+        selected={selectedProject}
+        archiveActive={currentView === 'archive'}
+        openTotal={taskUi.projectCounts.openTotal}
+        {noProjectOpen}
+        showNoProject={hasNoProjectTasks}
+        archivedCount={taskUi.projectCounts.archived}
+        onSelect={(project) => navigate(project, currentView === 'archive' ? 'board' : currentView)}
+        onArchive={() => navigate(selectedProject, 'archive')}
+      />
     {/snippet}
 
     <!--
@@ -537,134 +490,29 @@
           </div>
 
           {#if hasActiveFilters}
-            {#if searchQuery.trim() !== ''}
-              <Badge variant="outline" class="text-xs">
-                <FaMagnifyingGlass class="mr-1 h-3 w-3" />
-                "{searchQuery}"
-                <Button
-                  onclick={() => (searchQuery = '')}
-                  variant="ghost"
-                  size="sm"
-                  class="ml-1 h-4 w-4 p-0 hover:bg-muted"
-                  aria-label="Clear search"
-                >
-                  <FaXmark class="h-3 w-3" />
-                </Button>
-              </Badge>
-            {/if}
-
-            {#each statusFilters as status (status)}
-              <Badge variant="outline" class="text-xs">
-                <FaCircle class="mr-1 h-3 w-3" />
-                {taskStatusLabel(status)}
-                <Button
-                  onclick={() => toggleStatusFilter(status)}
-                  variant="ghost"
-                  size="sm"
-                  class="ml-1 h-4 w-4 p-0 hover:bg-muted"
-                  aria-label="Remove status filter"
-                >
-                  <FaXmark class="h-3 w-3" />
-                </Button>
-              </Badge>
-            {/each}
-
-            {#each priorityFilters as priority (priority)}
-              <Badge variant="outline" class="text-xs">
-                <FaFlag
-                  class="mr-1 h-3 w-3 {priority === 'high'
-                    ? 'text-red-500'
-                    : priority === 'medium'
-                      ? 'text-yellow-500'
-                      : 'text-green-500'}"
-                />
-                {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                <Button
-                  onclick={() => togglePriorityFilter(priority)}
-                  variant="ghost"
-                  size="sm"
-                  class="ml-1 h-4 w-4 p-0 hover:bg-muted"
-                  aria-label="Remove priority filter"
-                >
-                  <FaXmark class="h-3 w-3" />
-                </Button>
-              </Badge>
-            {/each}
-
-            {#each typeFilters as type (type)}
-              <Badge variant="outline" class="text-xs">
-                {type}
-                <Button
-                  onclick={() => toggleTypeFilter(type)}
-                  variant="ghost"
-                  size="sm"
-                  class="ml-1 h-4 w-4 p-0 hover:bg-muted"
-                  aria-label="Remove type filter"
-                >
-                  <FaXmark class="h-3 w-3" />
-                </Button>
-              </Badge>
-            {/each}
-
-            <Button variant="ghost" size="sm" onclick={clearAllFilters} class="h-7 text-xs">
-              <FaFilterCircleXmark class="mr-1 h-3 w-3" />
-              Clear All
-            </Button>
+            <TaskActiveFilters
+              {searchQuery}
+              {statusFilters}
+              {priorityFilters}
+              {typeFilters}
+              onClearSearch={() => (searchQuery = '')}
+              onToggleStatus={toggleStatusFilter}
+              onTogglePriority={togglePriorityFilter}
+              onToggleType={toggleTypeFilter}
+              onClearAll={clearAllFilters}
+            />
           {/if}
         </div>
 
         <!-- Multi-select controls (only while active) -->
         {#if taskUi.isMultiSelectMode}
-          <div
-            class="flex flex-wrap items-center gap-3 rounded-lg border border-warning-200 bg-warning-50 px-4 py-2 dark:border-warning-800 dark:bg-warning-900/20"
-          >
-            <Badge
-              variant="secondary"
-              class="bg-warning-100 text-warning-800 dark:bg-warning-800 dark:text-warning-100"
-            >
-              <FaSquareCheck class="mr-1 h-3 w-3" />
-              {taskUi.selectedTaskIds.size} selected
-            </Badge>
-            <div class="flex items-center gap-2">
-              <Button
-                onclick={handleSelectAll}
-                variant="outline"
-                size="sm"
-                class="h-7 px-2 text-xs"
-              >
-                <FaCheckDouble class="mr-1 h-3 w-3" />
-                Select All
-              </Button>
-              <Button
-                onclick={handleClearSelection}
-                variant="outline"
-                size="sm"
-                class="h-7 px-2 text-xs"
-              >
-                <FaXmark class="mr-1 h-3 w-3" />
-                Clear
-              </Button>
-              <Button
-                onclick={handleBulkDelete}
-                disabled={taskUi.selectedTaskIds.size === 0}
-                variant="destructive"
-                size="sm"
-                class="h-7 px-2 text-xs"
-              >
-                <FaTrash class="mr-1 h-3 w-3" />
-                Delete ({taskUi.selectedTaskIds.size})
-              </Button>
-              <Button
-                onclick={handleMultiSelectToggle}
-                variant="ghost"
-                size="sm"
-                class="h-7 px-2 text-xs"
-              >
-                <FaXmark class="mr-1 h-3 w-3" />
-                Cancel
-              </Button>
-            </div>
-          </div>
+          <TaskMultiSelectBar
+            count={taskUi.selectedTaskIds.size}
+            onSelectAll={handleSelectAll}
+            onClear={handleClearSelection}
+            onDelete={handleBulkDelete}
+            onCancel={handleMultiSelectToggle}
+          />
         {/if}
 
         <!-- Filter Modal -->
@@ -794,70 +642,5 @@
     </div>
   </ShellSidebarLayout>
 
-  <!-- Keyboard Shortcuts Modal -->
-  <Dialog.Root bind:open={showKeyboardShortcuts}>
-    <Dialog.Content class="max-h-[80vh] max-w-2xl overflow-hidden">
-      <Dialog.Header class="pb-3">
-        <Dialog.Title class="text-lg">Keyboard Shortcuts</Dialog.Title>
-      </Dialog.Header>
-
-      <div class="space-y-6 overflow-y-auto px-6 pb-6">
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <div class="space-y-4">
-            <h3 class="font-semibold text-foreground">Navigation & Actions</h3>
-            <div class="space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-sm">Create new task</span>
-                <kbd class="rounded bg-muted px-2 py-1 text-xs">Ctrl+N</kbd>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-sm">Open filters</span>
-                <kbd class="rounded bg-muted px-2 py-1 text-xs">Ctrl+F</kbd>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-sm">Focus search</span>
-                <kbd class="rounded bg-muted px-2 py-1 text-xs">Ctrl+K</kbd>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-sm">Toggle multi-select</span>
-                <kbd class="rounded bg-muted px-2 py-1 text-xs">Ctrl+M</kbd>
-              </div>
-            </div>
-          </div>
-
-          <div class="space-y-4">
-            <h3 class="font-semibold text-foreground">Multi-Select Mode</h3>
-            <div class="space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-sm">Select all tasks</span>
-                <kbd class="rounded bg-muted px-2 py-1 text-xs">Ctrl+A</kbd>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-sm">Delete selected</span>
-                <kbd class="rounded bg-muted px-2 py-1 text-xs">Delete</kbd>
-              </div>
-            </div>
-
-            <h3 class="font-semibold text-foreground">General</h3>
-            <div class="space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-sm">Show shortcuts</span>
-                <kbd class="rounded bg-muted px-2 py-1 text-xs">Ctrl+H</kbd>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-sm">Close modal</span>
-                <kbd class="rounded bg-muted px-2 py-1 text-xs">Esc</kbd>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="divider-edge-t divider-edge-full pt-4">
-          <div class="flex items-center justify-end">
-            <Button onclick={() => (showKeyboardShortcuts = false)}>Got it</Button>
-          </div>
-        </div>
-      </div>
-    </Dialog.Content>
-  </Dialog.Root>
+  <TaskShortcutsDialog bind:open={showKeyboardShortcuts} />
 </div>

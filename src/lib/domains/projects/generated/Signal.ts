@@ -4,4 +4,4 @@
  * One reported signal. `kind` is a short machine tag the UI maps to
  * copy/icon; `detail` is the human-readable reason.
  */
-export type Signal = { kind: string; detail: string };
+export type Signal = { kind: string, detail: string, };

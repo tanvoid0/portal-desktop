@@ -4,6 +4,4 @@
  * A Redis write. Built into one command by `RedisWrite::args` (redis.rs),
  * which both the confirm preview and the execution use.
  */
-export type RedisWrite =
-  | { op: 'set'; key: string; value: string; ttl: number | null; create: boolean }
-  | { op: 'del'; key: string };
+export type RedisWrite = { "op": "set", key: string, value: string, ttl: number | null, create: boolean, } | { "op": "del", key: string, };

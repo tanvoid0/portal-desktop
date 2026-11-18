@@ -1,21 +1,10 @@
 <script lang="ts">
   import FaFileLines from '~icons/fa6-solid/file-lines';
   import FaChevronDown from '~icons/fa6-solid/chevron-down';
-  import FaPencil from '~icons/fa6-solid/pencil';
-  import FaTrash from '~icons/fa6-solid/trash';
   import { onMount } from 'svelte';
   import { Button } from '$lib/components/ui/button';
   import { Textarea } from '$lib/components/ui/textarea';
   import { Label } from '$lib/components/ui/label';
-  import { Input } from '$lib/components/ui/input';
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from '$lib/components/ui/card';
-  import { Badge } from '$lib/components/ui/badge';
   import {
     Collapsible,
     CollapsibleContent,
@@ -25,14 +14,14 @@
   import Icon from '@iconify/svelte';
   import { toastActions } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
-
-  export interface InstructionTemplate {
-    id: string;
-    name: string;
-    instruction: string;
-    isDefault?: boolean;
-    createdAt: Date;
-  }
+  import {
+    hasStoredTemplates,
+    loadTemplatesFromStorage,
+    saveTemplatesToStorage,
+    type InstructionTemplate,
+  } from '../utils/instructionTemplates';
+  import InstructionTemplateForm from './InstructionTemplateForm.svelte';
+  import InstructionTemplateList from './InstructionTemplateList.svelte';
 
   interface Props {
     selectedTemplateId?: string | null;
@@ -48,51 +37,6 @@
     onInstructionChange,
   }: Props = $props();
 
-  // Default templates
-  const defaultTemplates: InstructionTemplate[] = [
-    {
-      id: 'default-1',
-      name: 'Standard Breakdown',
-      instruction:
-        'Break down into logical subtasks, prioritize developer-friendly descriptions, and estimate time for each subtask.',
-      isDefault: true,
-      createdAt: new Date(),
-    },
-    {
-      id: 'default-2',
-      name: 'Detailed Subtasks',
-      instruction:
-        'Create detailed subtasks with clear acceptance criteria. Focus on breaking down complex work into smaller, actionable items.',
-      isDefault: true,
-      createdAt: new Date(),
-    },
-    {
-      id: 'default-3',
-      name: 'API Focus',
-      instruction:
-        'Focus on API endpoints, request/response structures, and error handling. Break down by endpoint or resource.',
-      isDefault: true,
-      createdAt: new Date(),
-    },
-  ];
-
-  // Initialize templates - load from localStorage or use defaults
-  function loadTemplatesFromStorage(): InstructionTemplate[] {
-    try {
-      const stored = localStorage.getItem('task-instruction-templates');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return parsed.map((t: any) => ({
-          ...t,
-          createdAt: new Date(t.createdAt),
-        }));
-      }
-    } catch (error) {
-      console.error('Failed to load templates from localStorage:', error);
-    }
-    return [...defaultTemplates];
-  }
-
   let templates = $state<InstructionTemplate[]>(loadTemplatesFromStorage());
   let showTemplateManager = $state(false);
   let showNewTemplateForm = $state(false);
@@ -102,17 +46,13 @@
 
   onMount(() => {
     // Save defaults if they don't exist in localStorage
-    if (!localStorage.getItem('task-instruction-templates')) {
+    if (!hasStoredTemplates()) {
       saveTemplates();
     }
   });
 
   function saveTemplates() {
-    try {
-      localStorage.setItem('task-instruction-templates', JSON.stringify(templates));
-    } catch (error) {
-      console.error('Failed to save templates:', error);
-    }
+    saveTemplatesToStorage(templates);
   }
 
   function handleTemplateSelect(templateId: string) {
@@ -305,78 +245,20 @@
           </div>
 
           {#if showNewTemplateForm}
-            <Card>
-              <CardContent class="space-y-3 pt-4">
-                <div class="space-y-2">
-                  <Label for="template-name">Template Name</Label>
-                  <Input
-                    id="template-name"
-                    bind:value={newTemplateName}
-                    placeholder="e.g., API Development"
-                  />
-                </div>
-                <div class="space-y-2">
-                  <Label for="template-instruction">Instruction</Label>
-                  <Textarea
-                    id="template-instruction"
-                    bind:value={newTemplateInstruction}
-                    placeholder="Enter the instruction text..."
-                    rows={3}
-                  />
-                </div>
-                <div class="flex gap-2">
-                  <Button
-                    size="sm"
-                    onclick={editingTemplateId ? handleUpdateTemplate : handleCreateTemplate}
-                  >
-                    {editingTemplateId ? 'Update' : 'Create'} Template
-                  </Button>
-                  {#if editingTemplateId}
-                    <Button size="sm" variant="outline" onclick={handleCancelForm}>Cancel</Button>
-                  {/if}
-                </div>
-              </CardContent>
-            </Card>
+            <InstructionTemplateForm
+              bind:name={newTemplateName}
+              bind:instruction={newTemplateInstruction}
+              editing={!!editingTemplateId}
+              onSubmit={editingTemplateId ? handleUpdateTemplate : handleCreateTemplate}
+              onCancel={handleCancelForm}
+            />
           {/if}
 
-          <!-- Template List -->
-          <div class="max-h-48 space-y-2 overflow-y-auto">
-            {#each templates as template}
-              <div class="flex items-center justify-between rounded-lg border p-2">
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-2">
-                    <span class="truncate text-sm font-medium">{template.name}</span>
-                    {#if template.isDefault}
-                      <Badge variant="secondary" class="text-xs">Default</Badge>
-                    {/if}
-                  </div>
-                  <p class="truncate text-xs text-muted-foreground">
-                    {template.instruction}
-                  </p>
-                </div>
-                <div class="ml-2 flex items-center gap-1">
-                  {#if !template.isDefault}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onclick={() => handleEditTemplate(template.id)}
-                      class="h-7 w-7 p-0"
-                    >
-                      <FaPencil class="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onclick={() => handleDeleteTemplate(template.id)}
-                      class="h-7 w-7 p-0 text-destructive"
-                    >
-                      <FaTrash class="h-3 w-3" />
-                    </Button>
-                  {/if}
-                </div>
-              </div>
-            {/each}
-          </div>
+          <InstructionTemplateList
+            {templates}
+            onEdit={handleEditTemplate}
+            onDelete={handleDeleteTemplate}
+          />
         </div>
       </div>
     </CollapsibleContent>

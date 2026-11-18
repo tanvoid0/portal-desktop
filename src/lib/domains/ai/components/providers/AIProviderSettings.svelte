@@ -19,10 +19,9 @@
   import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
   import { Separator } from '$lib/components/ui/separator';
   import { toastActions } from '$lib/utils/toast';
-  import { openExternalUrl } from '$lib/utils/tauri';
   import { aiProviderService } from '../../services/aiProviderService.js';
-  import { aiPlatform, AGENT_PLATFORM_RELEASES_URL } from '../../state/aiPlatform.svelte.js';
-  import { formatModelMetadata, flattenCatalogModels, isAuthError } from '../../utils/catalog.js';
+  import { aiPlatform } from '../../state/aiPlatform.svelte.js';
+  import { flattenCatalogModels, isAuthError } from '../../utils/catalog.js';
   import type {
     ProviderConfig,
     ProviderType,
@@ -31,6 +30,9 @@
     CatalogProvider,
     CatalogModel,
   } from '../../types/index.js';
+  import PlatformHealthBar from './PlatformHealthBar.svelte';
+  import PlatformPairForm from './PlatformPairForm.svelte';
+  import CatalogModelPicker from './CatalogModelPicker.svelte';
   import Brain from '~icons/fa6-solid/brain';
   import CheckCircle2 from '~icons/fa6-solid/circle-check';
   import RefreshCw from '~icons/fa6-solid/rotate';
@@ -58,9 +60,6 @@
   let showApiKey = $state(false);
   let pairOpen = $state(false);
   let pairing = $state(false);
-  // The master key is only ever read from the DOM node inside pair(); it is
-  // never held in component state.
-  let masterKeyInput = $state<HTMLInputElement | null>(null);
   /** Real auth state of the saved token; `unknown` until a probe/test has run. */
   let connection = $state<'unknown' | 'ok' | 'unauthorized' | 'unreachable'>('unknown');
 
@@ -73,9 +72,7 @@
     void loadProvider();
   });
 
-  async function pair() {
-    const key = masterKeyInput?.value ?? '';
-    if (!key.trim()) return;
+  async function pair(key: string) {
     pairing = true;
     try {
       const res = await aiProviderService.pairPlatform(key);
@@ -89,7 +86,6 @@
     } catch (error) {
       toastActions.error('Pairing failed', error);
     } finally {
-      if (masterKeyInput) masterKeyInput.value = '';
       pairing = false;
       await aiPlatform.refresh();
     }
@@ -274,57 +270,7 @@
             <Badge class="ml-2 bg-green-500 hover:bg-green-600">Ready</Badge>
           {/if}
         </CardTitle>
-        <div
-          class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
-          data-testid="platform-health"
-        >
-          {#if aiPlatform.checking && !aiPlatform.known}
-            Checking {aiPlatform.baseUrl || 'platform'}…
-          {:else if aiPlatform.known}
-            <span>{aiPlatform.baseUrl}</span>
-            <Badge variant={aiPlatform.reachable ? 'secondary' : 'destructive'}>
-              {aiPlatform.reachable
-                ? 'reachable'
-                : aiPlatform.installed
-                  ? 'not running'
-                  : 'not installed'}
-            </Badge>
-            <Badge variant="secondary">
-              {aiPlatform.authRequired ? 'auth required' : 'no auth'}
-            </Badge>
-            {#if aiPlatform.reachable && aiPlatform.authRequired}
-              <Badge variant={aiPlatform.authenticated ? 'secondary' : 'destructive'}>
-                {aiPlatform.authenticated ? 'authenticated' : 'not authenticated'}
-              </Badge>
-            {/if}
-            {#if aiPlatform.detail}<span class="truncate">{aiPlatform.detail}</span>{/if}
-          {:else}
-            Platform health unavailable.
-          {/if}
-          {#if aiPlatform.known && !aiPlatform.reachable}
-            {#if aiPlatform.installed}
-              <Button
-                size="sm"
-                variant="outline"
-                class="h-6 text-xs"
-                disabled={aiPlatform.starting}
-                onclick={() => aiPlatform.start()}
-              >
-                {#if aiPlatform.starting}<Loader2 class="mr-1 h-3 w-3 animate-spin" />{/if}
-                {aiPlatform.starting ? 'Launching…' : 'Launch Agent Platform'}
-              </Button>
-            {:else}
-              <Button
-                size="sm"
-                variant="outline"
-                class="h-6 text-xs"
-                onclick={() => openExternalUrl(AGENT_PLATFORM_RELEASES_URL)}
-              >
-                Download latest release
-              </Button>
-            {/if}
-          {/if}
-        </div>
+        <PlatformHealthBar />
         <CardDescription>
           OpenAI-compatible proxy at <code>http://127.0.0.1:18410</code> by default. Use
           <strong>Load catalog</strong>
@@ -424,22 +370,7 @@
             </Button>
           </div>
           {#if pairOpen}
-            <div class="flex gap-2">
-              <Input
-                bind:ref={masterKeyInput}
-                type="password"
-                autocomplete="off"
-                spellcheck={false}
-                class="font-mono text-sm"
-                placeholder="Platform master key (used once, never stored)"
-                aria-label="Platform master key"
-                onkeydown={(e: KeyboardEvent) => e.key === 'Enter' && pair()}
-              />
-              <Button size="sm" type="button" disabled={pairing} onclick={pair}>
-                {#if pairing}<Loader2 class="mr-2 h-4 w-4 animate-spin" />{/if}
-                Pair
-              </Button>
-            </div>
+            <PlatformPairForm {pairing} onPair={pair} />
           {/if}
           <p class="text-xs text-muted-foreground">
             Hidden by default; use the eye button to reveal. Paste a scoped
@@ -491,78 +422,13 @@
             </Button>
           </div>
 
-          {#if catalog}
-            <p class="text-xs text-muted-foreground">
-              Platform defaults:
-              <code class="rounded bg-muted px-1">{catalog.resolved_defaults.provider}</code>
-              /
-              <code class="rounded bg-muted px-1">{catalog.resolved_defaults.model}</code>
-            </p>
-          {/if}
-
-          {#if catalogProviders.length > 0}
-            <div class="space-y-4 rounded-md border p-3">
-              {#each catalogProviders as provider (provider.id)}
-                <div class="space-y-2">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <span class="text-sm font-medium">{provider.label}</span>
-                    <Badge variant="outline" class="text-xs">{provider.id}</Badge>
-                    {#if provider.configured}
-                      <Badge class="bg-green-500 text-xs hover:bg-green-600">configured</Badge>
-                    {:else}
-                      <Badge variant="secondary" class="text-xs">not configured</Badge>
-                    {/if}
-                    {#if provider.reachable}
-                      <Badge variant="secondary" class="text-xs">reachable</Badge>
-                    {/if}
-                    {#if provider.default_model}
-                      <span class="text-xs text-muted-foreground">
-                        default: {provider.default_model}
-                      </span>
-                    {/if}
-                  </div>
-                  {#if provider.models.length > 0}
-                    <div class="flex flex-wrap gap-2">
-                      {#each provider.models as model (model.id)}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onclick={() => updateConfig({ model: model.id })}
-                          class={providerConfig.model === model.id
-                            ? 'bg-primary text-primary-foreground'
-                            : ''}
-                          title={formatModelMetadata(model)}
-                        >
-                          {model.id}
-                          {#if model.source === 'alias'}
-                            <Badge variant="secondary" class="ml-1 text-[10px]">alias</Badge>
-                          {/if}
-                        </Button>
-                      {/each}
-                    </div>
-                  {:else}
-                    <p class="text-xs text-muted-foreground">No models listed for this provider.</p>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          {:else if catalogModels.length > 0}
-            <div class="mt-2 flex flex-wrap gap-2">
-              {#each catalogModels as model (model.id)}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onclick={() => updateConfig({ model: model.id })}
-                  class={providerConfig.model === model.id
-                    ? 'bg-primary text-primary-foreground'
-                    : ''}
-                  title={formatModelMetadata(model)}
-                >
-                  {model.id}
-                </Button>
-              {/each}
-            </div>
-          {/if}
+          <CatalogModelPicker
+            {catalog}
+            providers={catalogProviders}
+            models={catalogModels}
+            selectedModel={providerConfig.model}
+            onSelect={(id) => updateConfig({ model: id })}
+          />
           <p class="text-xs text-muted-foreground">
             Model alias from the platform's <code class="rounded bg-muted px-1">config.yaml</code>,
             or a raw backend model id.

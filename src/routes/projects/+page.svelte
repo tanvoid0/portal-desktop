@@ -10,8 +10,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
-  import { Switch } from '$lib/components/ui/switch';
-  import { Label } from '$lib/components/ui/label';
   import FolderOpen from '~icons/fa6-solid/folder-open';
   import Activity from '~icons/fa6-solid/wave-square';
   import AlertTriangle from '~icons/fa6-solid/triangle-exclamation';
@@ -19,18 +17,17 @@
   import Archive from '~icons/fa6-solid/box-archive';
   import Plus from '~icons/fa6-solid/plus';
   import ScanSearch from '~icons/fa6-solid/magnifying-glass';
-  import ChevronRight from '~icons/fa6-solid/chevron-right';
-  import ListIcon from '~icons/fa6-solid/list';
-  import GridIcon from '~icons/fa6-solid/table-cells-large';
   import ProjectRow from '$lib/domains/projects/components/ProjectRow.svelte';
   import ProjectCard from '$lib/domains/projects/components/ProjectCard.svelte';
-  import { ToggleGroup, ToggleGroupItem } from '$lib/components/ui/toggle-group';
+  import ProjectsFilterBar from '$lib/domains/projects/components/ProjectsFilterBar.svelte';
+  import ProjectGroupList from '$lib/domains/projects/components/ProjectGroupList.svelte';
   import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-  } from '$lib/components/ui/collapsible';
-  import Select from '$lib/components/ui/select.svelte';
+    readOpenGroups,
+    saveOpenGroups,
+    readViewMode,
+    saveViewMode,
+    type ViewMode,
+  } from '$lib/domains/projects/utils/viewPrefs';
   import { projectService } from '$lib/domains/projects';
   import { createProjectsQuery } from '$lib/domains/projects/queries/projectQueries';
   import { createAllModulesQuery } from '$lib/domains/projects/queries/moduleQueries';
@@ -42,7 +39,7 @@
   import { queryClient } from '$lib/domains/shared/query';
   import { queryKeys } from '$lib/domains/shared/query/keys';
   import type { Project, ProjectStage } from '$lib/domains/projects/types';
-  import { PROJECT_STAGES } from '$lib/domains/projects/types';
+
   import {
     toggleProjectStar,
     setProjectStage,
@@ -53,14 +50,7 @@
   import { logger } from '$lib/domains/shared/services/logger';
   import { confirmAction } from '$lib/utils/confirm';
   import { breadcrumbActions } from '$lib/domains/shared/stores/breadcrumbStore';
-  import {
-    PageHeader,
-    PageLoading,
-    PageError,
-    PageEmpty,
-    PageStats,
-    PageFilters,
-  } from '$lib/components/shell';
+  import { PageHeader, PageLoading, PageError, PageEmpty, PageStats } from '$lib/components/shell';
   import type { PageStat } from '$lib/components/shell';
 
   const log = logger.createScoped('ProjectsPage');
@@ -150,42 +140,15 @@
   // as a root when its parent is filtered out.
   const groups = $derived(groupByArea(nestProjects(filteredProjects)));
 
-  // Groups collapse, so 184 rows aren't all in the DOM at once. Open/closed is
-  // remembered per group; localStorage can throw or hold junk, in which case the
-  // defaults below apply and the page still renders.
-  const OPEN_GROUPS_KEY = 'portal.projects.openGroups';
   const RECENT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
-  function readOpenGroups(): Record<string, boolean> {
-    if (typeof localStorage === 'undefined') return {};
-    try {
-      const parsed: unknown = JSON.parse(localStorage.getItem(OPEN_GROUPS_KEY) ?? 'null');
-      return parsed && typeof parsed === 'object' ? (parsed as Record<string, boolean>) : {};
-    } catch {
-      return {};
-    }
-  }
-
+  // Groups collapse, so 184 rows aren't all in the DOM at once. Open/closed is
+  // remembered per group.
   let openGroups = $state<Record<string, boolean>>(readOpenGroups());
 
   function setGroupOpen(key: string, open: boolean) {
     openGroups = { ...openGroups, [key]: open };
-    try {
-      localStorage?.setItem(OPEN_GROUPS_KEY, JSON.stringify(openGroups));
-    } catch {
-      // Quota or private mode — the choice still holds for this session.
-    }
-  }
-
-  const VIEW_MODE_KEY = 'portal.projects.viewMode';
-  type ViewMode = 'list' | 'grid';
-
-  function readViewMode(): ViewMode {
-    try {
-      return localStorage?.getItem(VIEW_MODE_KEY) === 'grid' ? 'grid' : 'list';
-    } catch {
-      return 'list';
-    }
+    saveOpenGroups(openGroups);
   }
 
   let viewMode = $state<ViewMode>(readViewMode());
@@ -193,11 +156,16 @@
   function setViewMode(mode: string) {
     if (mode !== 'list' && mode !== 'grid') return;
     viewMode = mode;
-    try {
-      localStorage?.setItem(VIEW_MODE_KEY, mode);
-    } catch {
-      // Quota or private mode — the choice still holds for this session.
-    }
+    saveViewMode(mode);
+  }
+
+  function clearFilters() {
+    searchQuery = '';
+    filterStack = null;
+    filterActivity = null;
+    filterStage = null;
+    starredOnly = false;
+    showArchived = false;
   }
 
   // Default open: groups holding something touched in the last 30 days, off the
@@ -347,95 +315,20 @@
   <!-- No fabricated zeros while the list is still loading. -->
   <PageStats stats={isLoading ? stats.map((s) => ({ ...s, value: '–' })) : stats} />
 
-  <PageFilters bind:searchQuery searchPlaceholder="Search projects...">
-    {#snippet filters()}
-      <Select
-        value={filterStack ?? ''}
-        placeholder="All stacks"
-        options={[
-          { value: '', label: 'All stacks' },
-          ...uniqueStacks.map((n) => ({ value: n, label: n })),
-        ]}
-        onSelect={(value) => (filterStack = value || null)}
-        class="w-[170px]"
-      />
-
-      <Select
-        value={filterActivity ?? ''}
-        placeholder="Any activity"
-        options={[
-          { value: '', label: 'Any activity' },
-          { value: 'active', label: 'Active' },
-          { value: 'recent', label: 'Recent' },
-          { value: 'dormant', label: 'Dormant' },
-          { value: 'stale', label: 'Stale' },
-        ]}
-        onSelect={(value) => (filterActivity = value || null)}
-        class="w-[150px]"
-      />
-
-      <Select
-        value={filterStage ?? ''}
-        placeholder="Any stage"
-        options={[
-          { value: '', label: 'Any stage' },
-          ...PROJECT_STAGES.map((s) => ({ value: s.value, label: s.label })),
-          { value: 'none', label: 'Not set' },
-        ]}
-        onSelect={(value) => (filterStage = value || null)}
-        class="w-[150px]"
-      />
-
-      <Select
-        value={sortBy}
-        options={[
-          { value: 'recent', label: 'Recently active' },
-          { value: 'name', label: 'Name' },
-        ]}
-        onSelect={(value) => (sortBy = value as typeof sortBy)}
-        class="w-[170px]"
-      />
-
-      <div class="flex items-center gap-2">
-        <Switch id="starred-only" bind:checked={starredOnly} />
-        <Label for="starred-only" class="text-sm">Starred only</Label>
-      </div>
-
-      <div class="flex items-center gap-2">
-        <Switch id="show-archived" bind:checked={showArchived} />
-        <Label for="show-archived" class="text-sm">Show archived</Label>
-      </div>
-    {/snippet}
-
-    {#snippet actions()}
-      {#if isFiltered}
-        <Button
-          variant="ghost"
-          size="sm"
-          onclick={() => {
-            searchQuery = '';
-            filterStack = null;
-            filterActivity = null;
-            filterStage = null;
-            starredOnly = false;
-            showArchived = false;
-          }}
-          class="text-muted-foreground"
-        >
-          Clear filters
-        </Button>
-      {/if}
-
-      <ToggleGroup type="single" value={viewMode} onValueChange={setViewMode} variant="outline">
-        <ToggleGroupItem value="list" aria-label="List view">
-          <ListIcon class="h-3.5 w-3.5" />
-        </ToggleGroupItem>
-        <ToggleGroupItem value="grid" aria-label="Grid view">
-          <GridIcon class="h-3.5 w-3.5" />
-        </ToggleGroupItem>
-      </ToggleGroup>
-    {/snippet}
-  </PageFilters>
+  <ProjectsFilterBar
+    bind:searchQuery
+    bind:filterStack
+    bind:filterActivity
+    bind:filterStage
+    bind:starredOnly
+    bind:showArchived
+    bind:sortBy
+    {viewMode}
+    {uniqueStacks}
+    {isFiltered}
+    onClear={clearFilters}
+    onViewModeChange={setViewMode}
+  />
 
   {#if isLoading}
     <PageLoading message="Loading projects..." />
@@ -488,60 +381,15 @@
       />
     {/snippet}
 
-    {#snippet cardGrid(items: ProjectGroup['items'])}
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {#each items as item (item.project.id)}
-          {@render card(item.project)}
-          {#each item.children as child (child.id)}
-            {@render card(child)}
-          {/each}
-        {/each}
-      </div>
-    {/snippet}
-
-    <div class="space-y-6">
-      {#each groups as group (group.key)}
-        {#if isLoneProject(group)}
-          {#if viewMode === 'grid'}
-            {@render cardGrid(group.items)}
-          {:else}
-            {@render row(group.items[0].project, false, group.title)}
-          {/if}
-        {:else}
-          <Collapsible
-            bind:open={() => isGroupOpen(group), (open) => setGroupOpen(group.key, open)}
-          >
-            <section>
-              <h2 class="mb-1 border-b px-3 pb-1">
-                <!-- While a filter is on, every match stays expanded, so the toggle is inert. -->
-                <CollapsibleTrigger
-                  disabled={isFiltered}
-                  class="group flex w-full items-baseline gap-2 rounded text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <ChevronRight
-                    class="h-3 w-3 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
-                  />
-                  <span class="truncate">{group.title}</span>
-                  <span class="text-xs font-normal text-muted-foreground">{group.items.length}</span
-                  >
-                </CollapsibleTrigger>
-              </h2>
-              <CollapsibleContent>
-                {#if viewMode === 'grid'}
-                  {@render cardGrid(group.items)}
-                {:else}
-                  {#each group.items as item (item.project.id)}
-                    {@render row(item.project, false, '')}
-                    {#each item.children as child (child.id)}
-                      {@render row(child, true, '')}
-                    {/each}
-                  {/each}
-                {/if}
-              </CollapsibleContent>
-            </section>
-          </Collapsible>
-        {/if}
-      {/each}
-    </div>
+    <ProjectGroupList
+      {groups}
+      {viewMode}
+      {isFiltered}
+      {isGroupOpen}
+      {isLoneProject}
+      onGroupOpenChange={setGroupOpen}
+      {row}
+      {card}
+    />
   {/if}
 </div>

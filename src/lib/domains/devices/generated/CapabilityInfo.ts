@@ -6,4 +6,4 @@
  * The approval checklist uses `is_sensitive` to keep its "Select all" from
  * sweeping in `terminal.exec`/`agents.exec`/`remote.input` and the like.
  */
-export type CapabilityInfo = { name: string; is_sensitive: boolean };
+export type CapabilityInfo = { name: string, is_sensitive: boolean, };

@@ -5,10 +5,4 @@
  * traffic (`cache_tokens` = cache read + creation) so the chart isn't
  * dominated by re-read context.
  */
-export type AgentUsageCell = {
-  day: string;
-  model: string;
-  tokens: number;
-  cache_tokens: number;
-  cost_usd: number;
-};
+export type AgentUsageCell = { day: string, model: string, tokens: number, cache_tokens: number, cost_usd: number, };

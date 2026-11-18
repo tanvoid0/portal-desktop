@@ -3,27 +3,24 @@
 /**
  * A key's value. `items`: hash [f,v] · list [v] · set [m] · zset [m, score].
  */
-export type RedisValue = {
-  /**
-   * "string" | "hash" | "list" | "set" | "zset" | other.
-   */
-  kind: string;
-  /**
-   * Seconds; -1 = no expiry.
-   */
-  ttl: number;
-  /**
-   * STRLEN / HLEN / LLEN / SCARD / ZCARD.
-   */
-  len: number;
-  /**
-   * String kind only.
-   */
-  text: string | null;
-  /**
-   * String was not UTF-8: shown lossy, not editable.
-   */
-  binary: boolean;
-  items: Array<Array<string>>;
-  truncated: boolean;
-};
+export type RedisValue = { 
+/**
+ * "string" | "hash" | "list" | "set" | "zset" | other.
+ */
+kind: string, 
+/**
+ * Seconds; -1 = no expiry.
+ */
+ttl: number, 
+/**
+ * STRLEN / HLEN / LLEN / SCARD / ZCARD.
+ */
+len: number, 
+/**
+ * String kind only.
+ */
+text: string | null, 
+/**
+ * String was not UTF-8: shown lossy, not editable.
+ */
+binary: boolean, items: Array<Array<string>>, truncated: boolean, };

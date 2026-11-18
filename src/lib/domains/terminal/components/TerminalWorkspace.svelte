@@ -122,9 +122,15 @@
       terminalActions.setActiveTab(tabId);
     }
 
-    if (command && activeTabId) {
-      // Pre-fill handled by session on next tick — store for injection
-      pendingCommand = command;
+    if (command) {
+      // Always a fresh tab: the active one may be busy (dev server, prompt). The
+      // session runs `initialCommand` once its PTY is ready.
+      const tabId = createNewTerminalTab();
+      if (tabId) {
+        terminalActions.setActiveTab(tabId);
+        pendingCommandTabId = tabId;
+        pendingCommand = command;
+      }
     }
   }
 
@@ -137,6 +143,8 @@
   });
 
   let pendingCommand = $state<string | null>(null);
+  /** Only this tab gets `pendingCommand`, or any tab first shown later would re-run it. */
+  let pendingCommandTabId = $state<string | null>(null);
   let sessionRefs = $state<Record<string, ReturnType<typeof TerminalSession> | null>>({});
 
   onMount(() => {
@@ -219,7 +227,7 @@
                         <TerminalSession
                           bind:this={sessionRefs[tab.id]}
                           tabId={tab.id}
-                          initialCommand={tab.id === activeTabId
+                          initialCommand={tab.id === pendingCommandTabId
                             ? (pendingCommand ?? undefined)
                             : undefined}
                           settings={sessionSettings}

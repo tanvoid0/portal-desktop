@@ -3,10 +3,8 @@
 /**
  * A table or view in a SQL source.
  */
-export type TableInfo = {
-  name: string;
-  /**
-   * "table" | "view".
-   */
-  kind: string;
-};
+export type TableInfo = { name: string, 
+/**
+ * "table" | "view".
+ */
+kind: string, };

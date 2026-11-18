@@ -7,24 +7,12 @@
   import * as Dialog from '$lib/components/ui/dialog';
   import { onMount, onDestroy } from 'svelte';
   import { Button } from '$lib/components/ui/button';
-  import { Input } from '$lib/components/ui/input';
-  import { Label } from '$lib/components/ui/label';
-  import { Switch } from '$lib/components/ui/switch';
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from '$lib/components/ui/card';
-  import { Badge } from '$lib/components/ui/badge';
   import X from '~icons/fa6-solid/xmark';
   import Play from '~icons/fa6-solid/play';
   import Square from '~icons/fa6-solid/square';
   import {
     CustomScriptService,
     type CustomScript,
-    type ScriptParameter,
   } from '$lib/domains/custom_scripts/services/customScriptService';
   import {
     TerminalService,
@@ -32,7 +20,9 @@
     type TerminalOutput,
   } from '$lib/domains/terminal';
   import { useRunningScripts } from '$lib/domains/custom_scripts/hooks/useRunningScripts';
-  import FilePicker from '$lib/components/ui/file-picker.svelte';
+  import ScriptParameterForm from './ScriptParameterForm.svelte';
+  import ScriptCommandPreview from './ScriptCommandPreview.svelte';
+  import ScriptOutputCard from './ScriptOutputCard.svelte';
 
   interface Props {
     script: CustomScript;
@@ -63,7 +53,6 @@
   let terminalOutput = $state<string>('');
   let isRunning = $state(false);
   let error = $state<string | null>(null);
-  let outputContainer = $state<HTMLDivElement | null>(null);
 
   // If viewing an existing running instance, load its state and subscribe to output
   $effect(() => {
@@ -131,6 +120,22 @@
     }
   });
 
+  // Boolean params are tracked separately and merged in as 'true'/'false'.
+  const command = $derived.by(() => {
+    const allValues = { ...parameterValues };
+    for (const param of parameters) {
+      if (param.parameter_type === 'boolean') {
+        allValues[param.name] = booleanValues[param.name] ? 'true' : 'false';
+      }
+    }
+    return CustomScriptService.buildCommand(
+      script.command,
+      parameters,
+      allValues,
+      script.requires_sudo
+    );
+  });
+
   async function handleRun() {
     // Validate required parameters
     for (const param of parameters) {
@@ -151,20 +156,6 @@
     terminalOutput = '';
 
     try {
-      // Build the command with parameter values (include boolean values)
-      const allValues = { ...parameterValues };
-      for (const param of parameters) {
-        if (param.parameter_type === 'boolean') {
-          allValues[param.name] = booleanValues[param.name] ? 'true' : 'false';
-        }
-      }
-      const command = CustomScriptService.buildCommand(
-        script.command,
-        parameters,
-        allValues,
-        script.requires_sudo
-      );
-
       // Record script run
       await CustomScriptService.recordScriptRun(script.id);
 
@@ -290,31 +281,6 @@
       TerminalService.sendInput(terminalProcess.id, input).catch(console.error);
     }
   }
-
-  // Auto-focus input when script starts running
-  $effect(() => {
-    if (isRunning) {
-      // Small delay to ensure the input is rendered
-      setTimeout(() => {
-        const input = document.getElementById('interactive-input') as HTMLInputElement;
-        if (input) {
-          input.focus();
-        }
-      }, 100);
-    }
-  });
-
-  // Auto-scroll output to bottom when new content arrives
-  $effect(() => {
-    if (outputContainer && terminalOutput) {
-      // Use requestAnimationFrame to ensure DOM is updated
-      requestAnimationFrame(() => {
-        if (outputContainer) {
-          outputContainer.scrollTop = outputContainer.scrollHeight;
-        }
-      });
-    }
-  });
 </script>
 
 <Dialog.Root
@@ -348,205 +314,18 @@
         </div>
       {/if}
 
-      <!-- Parameters Section -->
       {#if parameters.length > 0}
-        <Card>
-          <CardHeader>
-            <CardTitle>Parameters</CardTitle>
-            <CardDescription>Configure script parameters</CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-4">
-            {#each parameters as param (param.name)}
-              <div class="space-y-2">
-                <Label>
-                  {param.label}
-                  {#if param.required}
-                    <span class="text-red-500">*</span>
-                  {/if}
-                </Label>
-                {#if param.description}
-                  <p class="text-sm text-muted-foreground">
-                    {param.description}
-                  </p>
-                {/if}
-
-                {#if param.parameter_type === 'file'}
-                  <FilePicker
-                    value={parameterValues[param.name] || ''}
-                    label=""
-                    description=""
-                    filters={param.file_filters
-                      ? [{ name: 'Files', extensions: param.file_filters }]
-                      : []}
-                    selectFolder={false}
-                    required={param.required}
-                    onChange={(path) => {
-                      parameterValues = {
-                        ...parameterValues,
-                        [param.name]: path,
-                      };
-                    }}
-                  />
-                {:else if param.parameter_type === 'folder'}
-                  <FilePicker
-                    value={parameterValues[param.name] || ''}
-                    label=""
-                    description=""
-                    selectFolder={true}
-                    required={param.required}
-                    onChange={(path) => {
-                      parameterValues = {
-                        ...parameterValues,
-                        [param.name]: path,
-                      };
-                    }}
-                  />
-                {:else if param.parameter_type === 'boolean'}
-                  {@const boolKey = param.name}
-                  <div class="flex items-center gap-2">
-                    <Switch
-                      checked={booleanValues[boolKey] ?? false}
-                      onCheckedChange={(checked) => {
-                        booleanValues = {
-                          ...booleanValues,
-                          [boolKey]: checked,
-                        };
-                      }}
-                    />
-                    <span class="text-sm text-muted-foreground">
-                      {booleanValues[boolKey] ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </div>
-                {:else if param.parameter_type === 'password'}
-                  <Input
-                    type="password"
-                    value={parameterValues[param.name] || ''}
-                    oninput={(e) => {
-                      parameterValues = {
-                        ...parameterValues,
-                        [param.name]: (e.target as HTMLInputElement).value,
-                      };
-                    }}
-                    placeholder={param.default_value || `Enter ${param.label.toLowerCase()}`}
-                    required={param.required}
-                  />
-                {:else if param.parameter_type === 'number'}
-                  <Input
-                    type="number"
-                    value={parameterValues[param.name] || ''}
-                    oninput={(e) => {
-                      parameterValues = {
-                        ...parameterValues,
-                        [param.name]: (e.target as HTMLInputElement).value,
-                      };
-                    }}
-                    placeholder={param.default_value || `Enter ${param.label.toLowerCase()}`}
-                    required={param.required}
-                  />
-                {:else}
-                  <Input
-                    type="text"
-                    value={parameterValues[param.name] || ''}
-                    oninput={(e) => {
-                      parameterValues = {
-                        ...parameterValues,
-                        [param.name]: (e.target as HTMLInputElement).value,
-                      };
-                    }}
-                    placeholder={param.default_value || `Enter ${param.label.toLowerCase()}`}
-                    required={param.required}
-                  />
-                {/if}
-              </div>
-            {/each}
-          </CardContent>
-        </Card>
+        <ScriptParameterForm
+          {parameters}
+          bind:values={parameterValues}
+          bind:booleans={booleanValues}
+        />
       {/if}
 
-      <!-- Command Preview -->
-      <Card>
-        <CardHeader>
-          <CardTitle>Command Preview</CardTitle>
-        </CardHeader>
-        <CardContent class="space-y-2">
-          <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-sm">
-{(() => {
-              const allValues = { ...parameterValues };
-              for (const param of parameters) {
-                if (param.parameter_type === 'boolean') {
-                  allValues[param.name] = booleanValues[param.name] ? 'true' : 'false';
-                }
-              }
-              return CustomScriptService.buildCommand(
-                script.command,
-                parameters,
-                allValues,
-                script.requires_sudo
-              );
-            })()}</pre>
-          {#if script.requires_sudo}
-            {@const isWindows = navigator.userAgent.includes('Windows')}
-            {#if isWindows}
-              <div
-                class="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950"
-              >
-                <p class="text-sm text-amber-800 dark:text-amber-200">
-                  <strong>Windows Admin Required:</strong> This command requires administrator privileges.
-                  Make sure the terminal is running as administrator, or the command may fail.
-                </p>
-              </div>
-            {:else}
-              <div
-                class="rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950"
-              >
-                <p class="text-sm text-blue-800 dark:text-blue-200">
-                  <strong>Note:</strong> This command will prompt for your password to run with sudo privileges.
-                </p>
-              </div>
-            {/if}
-          {/if}
-        </CardContent>
-      </Card>
+      <ScriptCommandPreview {command} requiresSudo={script.requires_sudo} />
 
-      <!-- Terminal Output -->
       {#if isRunning || terminalOutput}
-        <Card>
-          <CardHeader>
-            <div class="flex items-center justify-between">
-              <CardTitle>Output</CardTitle>
-              {#if isRunning}
-                <Badge variant="outline">Interactive - Type below to send input</Badge>
-              {/if}
-            </div>
-          </CardHeader>
-          <CardContent class="space-y-4">
-            <div
-              bind:this={outputContainer}
-              class="h-64 overflow-y-auto rounded-md bg-black p-4 font-mono text-sm text-green-400"
-            >
-              {terminalOutput || 'Waiting for output...'}
-            </div>
-
-            {#if isRunning}
-              <div class="flex gap-2">
-                <Input
-                  id="interactive-input"
-                  type="text"
-                  placeholder="Type input and press Enter (e.g., password for sudo)..."
-                  class="flex-1"
-                  autofocus
-                  onkeydown={(e) => {
-                    if (e.key === 'Enter') {
-                      const input = (e.target as HTMLInputElement).value + '\n';
-                      sendInput(input);
-                      (e.target as HTMLInputElement).value = '';
-                    }
-                  }}
-                />
-              </div>
-            {/if}
-          </CardContent>
-        </Card>
+        <ScriptOutputCard output={terminalOutput} {isRunning} onSendInput={sendInput} />
       {/if}
     </div>
 

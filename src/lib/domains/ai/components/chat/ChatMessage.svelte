@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { provideChatRunHandler } from '$lib/components/ui/chat-markdown/linkContext.js';
   import ChatUserBubble from './ChatUserBubble.svelte';
   import ChatAssistantTurn from './ChatAssistantTurn.svelte';
   import type { ChatMessage as ChatMessageType } from '../../types/index.js';
@@ -21,6 +23,11 @@
     modelLabel = null,
     children,
   }: Props = $props();
+
+  /** Shell code block "Run" → a fresh tab in the main terminal (see TerminalWorkspace deep links). */
+  provideChatRunHandler((command) => {
+    void goto(`/terminal?command=${encodeURIComponent(command)}`);
+  });
 
   const isUser = $derived(message.role === 'user');
   const stats = $derived(message.stats ?? null);

@@ -1,10 +1,11 @@
+<script module lang="ts">
+  import type { AIErrorInfo as ErrorInfo } from './aiGenerationErrors';
+  export type AIErrorInfo = ErrorInfo;
+</script>
+
 <script lang="ts">
   import FaCode from '~icons/fa6-solid/code';
   import FaWandMagicSparkles from '~icons/fa6-solid/wand-magic-sparkles';
-  import FaCircleInfo from '~icons/fa6-solid/circle-info';
-  import FaTriangleExclamation from '~icons/fa6-solid/triangle-exclamation';
-  import FaGear from '~icons/fa6-solid/gear';
-  import FaBoxOpen from '~icons/fa6-solid/box-open';
   import FaRotate from '~icons/fa6-solid/rotate';
 
   import * as Dialog from '$lib/components/ui/dialog';
@@ -14,13 +15,9 @@
   import { toastActions } from '$lib/utils/toast';
   import { goto } from '$app/navigation';
   import { AI_PROVIDER_SETTINGS_PATH } from '$lib/config/ai-nav';
-
-  export interface AIErrorInfo {
-    message: string;
-    type: 'configuration' | 'provider_unavailable' | 'network' | 'model_not_found' | 'unknown';
-    actionable: boolean;
-    settingsPath?: string;
-  }
+  import { defaultParseError } from './aiGenerationErrors';
+  import AIGenerationNotices from './AIGenerationNotices.svelte';
+  import AIRegenerateDialog from './AIRegenerateDialog.svelte';
 
   export interface AIGenerationConfig<TInput = string, TOutput = unknown> {
     /** Title for the dialog */
@@ -77,100 +74,6 @@
   let showRegenerateDialog = $state(false);
   let regenerateInstructions = $state('');
   let isRegenerating = $state(false);
-
-  const defaultParseError = (err: unknown): AIErrorInfo => {
-    const errorMessage =
-      err instanceof Error
-        ? err.message
-        : typeof err === 'string'
-          ? err
-          : 'An error occurred during AI generation';
-
-    // Check for configuration issues
-    if (
-      errorMessage.includes('No default provider') ||
-      errorMessage.includes('No default provider set') ||
-      errorMessage.includes('Configuration incomplete') ||
-      errorMessage.includes('provider configuration') ||
-      errorMessage.includes('Missing fields') ||
-      errorMessage.includes('not configured') ||
-      errorMessage.includes('Provider not found') ||
-      errorMessage.includes('Provider not registered')
-    ) {
-      return {
-        message:
-          'AI provider is not configured. Please set up Agent Platform in Settings → AI Providers.',
-        type: 'configuration',
-        actionable: true,
-        settingsPath: AI_PROVIDER_SETTINGS_PATH,
-      };
-    }
-
-    // Check for model not found errors
-    if (
-      errorMessage.includes('model') &&
-      (errorMessage.includes('not found') ||
-        errorMessage.includes('404') ||
-        errorMessage.includes('does not exist') ||
-        errorMessage.includes('not installed'))
-    ) {
-      let modelMatch = errorMessage.match(/model\s+['"]([^'"]+)['"]/);
-      if (!modelMatch) {
-        modelMatch = errorMessage.match(/model\s+['"]([^'"]+?)['"]/);
-      }
-      if (!modelMatch) {
-        modelMatch = errorMessage.match(/"error":\s*"model\s+['"]([^'"]+?)['"]/);
-      }
-      if (!modelMatch) {
-        modelMatch = errorMessage.match(/\{"error":\s*"model\s+['"]([^'"]+?)['"]/);
-      }
-
-      const modelName = modelMatch ? modelMatch[1] : 'the specified model';
-
-      return {
-        message: `Model "${modelName}" is not available on agent-platform. Check the model alias in Settings → AI Providers.`,
-        type: 'model_not_found',
-        actionable: true,
-        settingsPath: AI_PROVIDER_SETTINGS_PATH,
-      };
-    }
-
-    // Check for provider unavailable
-    if (
-      errorMessage.includes('Provider not available') ||
-      errorMessage.includes('service is not running') ||
-      errorMessage.includes('failed to connect')
-    ) {
-      return {
-        message:
-          'AI provider is not available. Please check that your AI service is running and properly configured.',
-        type: 'provider_unavailable',
-        actionable: true,
-        settingsPath: AI_PROVIDER_SETTINGS_PATH,
-      };
-    }
-
-    // Check for network issues
-    if (
-      errorMessage.includes('Network error') ||
-      errorMessage.includes('timeout') ||
-      errorMessage.includes('connection')
-    ) {
-      return {
-        message:
-          'Network error connecting to AI provider. Please check your connection and try again.',
-        type: 'network',
-        actionable: false,
-      };
-    }
-
-    // Default unknown error
-    return {
-      message: errorMessage,
-      type: 'unknown',
-      actionable: false,
-    };
-  };
 
   function showErrorToast(errorInfo: AIErrorInfo) {
     if (errorInfo.actionable && errorInfo.settingsPath) {
@@ -393,81 +296,11 @@
         </div>
       {/if}
 
-      {#if config.infoContent}
-        <div class="rounded-lg border bg-muted/50 p-4">
-          <div class="flex gap-2">
-            <FaCircleInfo class="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
-            <div class="space-y-1 text-sm text-muted-foreground">
-              {#if typeof config.infoContent === 'string'}
-                <p>{config.infoContent}</p>
-              {:else}
-                <p class="font-medium">{config.infoContent.title}</p>
-                <ul class="ml-2 list-inside list-disc space-y-0.5">
-                  {#each config.infoContent.items as item}
-                    <li>{item}</li>
-                  {/each}
-                </ul>
-              {/if}
-            </div>
-          </div>
-        </div>
-      {/if}
-
-      {#if error && error.includes('not configured')}
-        <div
-          class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20"
-        >
-          <div class="flex gap-2">
-            <FaTriangleExclamation
-              class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400"
-            />
-            <div class="flex-1 space-y-2 text-sm">
-              <p class="font-medium text-amber-900 dark:text-amber-100">
-                AI Provider Not Configured
-              </p>
-              <p class="text-amber-800 dark:text-amber-200">
-                To use AI features, configure Agent Platform under Settings → AI Providers.
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onclick={handleOpenSettings}
-                class="mt-2 border-amber-300 text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900/40"
-              >
-                <FaGear class="mr-2 h-4 w-4" />
-                Configure AI Provider
-              </Button>
-            </div>
-          </div>
-        </div>
-      {/if}
-
-      {#if error && (error.includes('not installed') || (error.includes('model') && error.includes('not found')))}
-        <div
-          class="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20"
-        >
-          <div class="flex gap-2">
-            <FaBoxOpen class="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
-            <div class="flex-1 space-y-2 text-sm">
-              <p class="font-medium text-blue-900 dark:text-blue-100">Model Not Installed</p>
-              <p class="text-blue-800 dark:text-amber-200">{error}</p>
-              <p class="text-xs text-blue-700 dark:text-blue-300">
-                You can install the model in the terminal or use the "Load Models" button in
-                Settings to see available models.
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onclick={handleOpenSettings}
-                class="mt-2 border-blue-300 text-blue-900 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-100 dark:hover:bg-blue-900/40"
-              >
-                <FaGear class="mr-2 h-4 w-4" />
-                Open Settings
-              </Button>
-            </div>
-          </div>
-        </div>
-      {/if}
+      <AIGenerationNotices
+        infoContent={config.infoContent}
+        {error}
+        onOpenSettings={handleOpenSettings}
+      />
     </div>
 
     <Dialog.Footer>
@@ -490,64 +323,18 @@
   </Dialog.Content>
 </Dialog.Root>
 
-{#if showRegenerateDialog && previousResult}
-  <Dialog.Root bind:open={showRegenerateDialog}>
-    <Dialog.Content class="max-h-[90vh] max-w-2xl overflow-y-auto">
-      <Dialog.Header>
-        <Dialog.Title>Regenerate with Instructions</Dialog.Title>
-        <Dialog.Description>
-          Provide instructions on how to modify the previous generation. The AI will use the
-          previous result and your instructions to create an improved version.
-        </Dialog.Description>
-      </Dialog.Header>
-
-      <div class="space-y-4 py-4">
-        <div class="space-y-2">
-          <Label>Previous Result (Reference)</Label>
-          <div class="max-h-[300px] overflow-y-auto rounded-lg border bg-muted/50 p-4">
-            <pre class="font-mono text-xs whitespace-pre-wrap">{getResultPreview()}</pre>
-          </div>
-        </div>
-
-        <div class="space-y-2">
-          <Label for="regenerate-instructions">Instructions for Regeneration</Label>
-          <Textarea
-            id="regenerate-instructions"
-            bind:value={regenerateInstructions}
-            placeholder="e.g., Make the titles more concise, add 2 more subtasks, change priority to high..."
-            rows={6}
-            class={error ? 'border-destructive' : ''}
-            disabled={isRegenerating}
-          />
-          <p class="text-xs text-muted-foreground">
-            Describe what changes you'd like to make to the previous generation.
-          </p>
-          {#if error}
-            <p class="text-sm text-destructive">{error}</p>
-          {/if}
-        </div>
-      </div>
-
-      <Dialog.Footer>
-        <Button
-          variant="outline"
-          onclick={() => {
-            showRegenerateDialog = false;
-            regenerateInstructions = '';
-            error = null;
-          }}
-          disabled={isRegenerating}
-        >
-          Cancel
-        </Button>
-        <Button
-          onclick={handleRegenerate}
-          disabled={isRegenerating || !regenerateInstructions.trim()}
-        >
-          <FaRotate class="mr-2 h-4 w-4" />
-          Regenerate
-        </Button>
-      </Dialog.Footer>
-    </Dialog.Content>
-  </Dialog.Root>
+{#if previousResult}
+  <AIRegenerateDialog
+    bind:open={showRegenerateDialog}
+    preview={getResultPreview()}
+    bind:instructions={regenerateInstructions}
+    {error}
+    {isRegenerating}
+    onCancel={() => {
+      showRegenerateDialog = false;
+      regenerateInstructions = '';
+      error = null;
+    }}
+    onRegenerate={handleRegenerate}
+  />
 {/if}

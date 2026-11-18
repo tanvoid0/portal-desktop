@@ -1,20 +1,8 @@
 <script lang="ts">
-  import FaPlus from '~icons/fa6-solid/plus';
-  import FaXmark from '~icons/fa6-solid/xmark';
-  import FaGear from '~icons/fa6-solid/gear';
-  import FaChevronDown from '~icons/fa6-solid/chevron-down';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Card, CardContent } from '$lib/components/ui/card';
-  import { Label } from '$lib/components/ui/label';
   import { Textarea } from '$lib/components/ui/textarea';
-  import { Badge } from '$lib/components/ui/badge';
-  import { Separator } from '$lib/components/ui/separator';
-  import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-  } from '$lib/components/ui/collapsible';
   import Select from '$lib/components/ui/select.svelte';
   import { toastActions } from '$lib/utils/toast';
   import { taskActions } from '../stores/taskStore';
@@ -25,17 +13,14 @@
     TaskStatus,
     TaskPriority,
   } from '../types';
-  import {
-    TASK_STATUS_OPTIONS,
-    TASK_PRIORITY_OPTIONS,
-    TASK_TYPE_OPTIONS,
-    RecurringPatternEnum,
-  } from '../types';
+  import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS, TASK_TYPE_OPTIONS } from '../types';
   import { ResourceType } from '$lib/domains/shared/types/resourceType';
-  import { documentActions, documents } from '$lib/domains/documents';
+  import { documentActions } from '$lib/domains/documents';
   import DocumentLinkSelector from '$lib/domains/documents/components/DocumentLinkSelector.svelte';
-  import type { Document } from '$lib/domains/documents/types';
   import { goto } from '$app/navigation';
+  import TaskFormField from './TaskFormField.svelte';
+  import TaskTagInput from './TaskTagInput.svelte';
+  import TaskFormAdvanced from './TaskFormAdvanced.svelte';
 
   interface Props {
     task?: Task;
@@ -79,33 +64,9 @@
     documentActions.loadDocuments();
   });
 
-  // Using enums for recurring patterns
-  const RECURRING_PATTERNS = Object.values(RecurringPatternEnum);
-
   // UI state
-  let newTag = $state('');
-  let showAdvanced = $state(false);
   let isSubmitting = $state(false);
   let errors = $state<Record<string, string>>({});
-
-  // Helper functions
-  function addTag() {
-    if (newTag.trim() && !tags.includes(newTag.trim())) {
-      tags = [...tags, newTag.trim()];
-      newTag = '';
-    }
-  }
-
-  function removeTag(tagToRemove: string) {
-    tags = tags.filter((tag) => tag !== tagToRemove);
-  }
-
-  function handleTagKeydown(event: KeyboardEvent) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      addTag();
-    }
-  }
 
   // Validation
   function validateForm(): boolean {
@@ -207,23 +168,16 @@
 
 <Card class="mx-auto max-w-2xl">
   <CardContent class="space-y-6" onkeydown={handleKeydown}>
-    <!-- Title -->
-    <div class="space-y-2">
-      <Label for="title">Title *</Label>
+    <TaskFormField label="Title *" for="title" error={errors.title}>
       <Input
         id="title"
         bind:value={title}
         placeholder="Enter task title..."
         class={errors.title ? 'border-destructive' : ''}
       />
-      {#if errors.title}
-        <p class="text-sm text-destructive">{errors.title}</p>
-      {/if}
-    </div>
+    </TaskFormField>
 
-    <!-- Description -->
-    <div class="space-y-2">
-      <Label for="description">Description</Label>
+    <TaskFormField label="Description" for="description" error={errors.description}>
       <Textarea
         id="description"
         bind:value={description}
@@ -231,56 +185,47 @@
         rows={3}
         class={errors.description ? 'border-destructive' : ''}
       />
-      {#if errors.description}
-        <p class="text-sm text-destructive">{errors.description}</p>
-      {/if}
-    </div>
+    </TaskFormField>
 
-    <!-- Status and Priority -->
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <div class="space-y-2">
-        <Label for="status">Status</Label>
+      <TaskFormField label="Status" for="status">
         <Select
           options={TASK_STATUS_OPTIONS}
           defaultValue={status}
           placeholder="Select status..."
           onSelect={(value) => (status = value as TaskStatus)}
         />
-      </div>
-
-      <div class="space-y-2">
-        <Label for="priority">Priority</Label>
+      </TaskFormField>
+      <TaskFormField label="Priority" for="priority">
         <Select
           options={TASK_PRIORITY_OPTIONS}
           defaultValue={priority}
           placeholder="Select priority..."
           onSelect={(value) => (priority = value as TaskPriority)}
         />
-      </div>
+      </TaskFormField>
     </div>
 
-    <!-- Type and Due Date -->
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <div class="space-y-2">
-        <Label for="type">Type</Label>
+      <TaskFormField label="Type" for="type">
         <Select
           options={TASK_TYPE_OPTIONS}
           defaultValue={type}
           placeholder="Select type..."
           onSelect={(value) => (type = value)}
         />
-      </div>
-
-      <div class="space-y-2">
-        <Label for="dueDate">Due Date</Label>
+      </TaskFormField>
+      <TaskFormField label="Due Date" for="dueDate">
         <Input id="dueDate" type="date" bind:value={dueDate} />
-      </div>
+      </TaskFormField>
     </div>
 
-    <!-- Time Estimates -->
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <div class="space-y-2">
-        <Label for="estimatedTime">Estimated Time (minutes)</Label>
+      <TaskFormField
+        label="Estimated Time (minutes)"
+        for="estimatedTime"
+        error={errors.estimatedTime}
+      >
         <Input
           id="estimatedTime"
           type="number"
@@ -289,13 +234,8 @@
           placeholder="e.g., 120 for 2 hours"
           class={errors.estimatedTime ? 'border-destructive' : ''}
         />
-        {#if errors.estimatedTime}
-          <p class="text-sm text-destructive">{errors.estimatedTime}</p>
-        {/if}
-      </div>
-
-      <div class="space-y-2">
-        <Label for="actualTime">Actual Time (minutes)</Label>
+      </TaskFormField>
+      <TaskFormField label="Actual Time (minutes)" for="actualTime" error={errors.actualTime}>
         <Input
           id="actualTime"
           type="number"
@@ -304,48 +244,17 @@
           placeholder="e.g., 90 for 1.5 hours"
           class={errors.actualTime ? 'border-destructive' : ''}
         />
-        {#if errors.actualTime}
-          <p class="text-sm text-destructive">{errors.actualTime}</p>
-        {/if}
-      </div>
+      </TaskFormField>
     </div>
 
-    <!-- Tags -->
-    <div class="space-y-2">
-      <Label>Tags</Label>
-      <div class="flex gap-2">
-        <Input placeholder="Add a tag..." bind:value={newTag} onkeydown={handleTagKeydown} />
-        <Button type="button" variant="outline" onclick={addTag}>
-          <FaPlus class="h-4 w-4" />
-        </Button>
-      </div>
-      {#if tags.length > 0}
-        <div class="flex flex-wrap gap-2">
-          {#each tags as tag}
-            <Badge variant="secondary" class="flex items-center gap-1">
-              {tag}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onclick={() => removeTag(tag)}
-                class="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
-              >
-                <FaXmark class="h-3 w-3" />
-              </Button>
-            </Badge>
-          {/each}
-        </div>
-      {/if}
-    </div>
+    <TaskFormField label="Tags">
+      <TaskTagInput bind:tags />
+    </TaskFormField>
 
-    <!-- Assignee -->
-    <div class="space-y-2">
-      <Label for="assignee">Assignee</Label>
+    <TaskFormField label="Assignee" for="assignee">
       <Input id="assignee" bind:value={assignee} placeholder="Enter assignee name or email..." />
-    </div>
+    </TaskFormField>
 
-    <!-- Document Link -->
     <div class="space-y-2">
       <DocumentLinkSelector
         selectedDocumentId={linkedDocumentId}
@@ -361,86 +270,13 @@
       />
     </div>
 
-    <!-- Advanced Settings -->
-    <Collapsible bind:open={showAdvanced}>
-      <CollapsibleTrigger>
-        <Button variant="outline" class="w-full">
-          <FaGear class="mr-2 h-4 w-4" />
-          Advanced Settings
-          <FaChevronDown class="ml-auto h-4 w-4" />
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent class="mt-4 space-y-4">
-        <Separator />
-
-        <!-- Recurring Task Settings -->
-        <div class="space-y-4">
-          <h4 class="text-sm font-medium">Recurring Task</h4>
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div class="space-y-2">
-              <Label for="recurringPattern">Pattern</Label>
-              <Select
-                options={['', ...RECURRING_PATTERNS]}
-                defaultValue={recurringPattern}
-                placeholder="Select pattern..."
-                onSelect={(value) => (recurringPattern = value)}
-              />
-            </div>
-            <div class="space-y-2">
-              <Label for="recurringInterval">Interval</Label>
-              <Input
-                id="recurringInterval"
-                type="number"
-                min="1"
-                bind:value={recurringInterval}
-                placeholder="1"
-              />
-            </div>
-            <div class="space-y-2">
-              <Label for="recurringEndDate">End Date</Label>
-              <Input id="recurringEndDate" type="date" bind:value={recurringEndDate} />
-            </div>
-          </div>
-        </div>
-
-        <!-- Dependencies -->
-        <div class="space-y-4">
-          <h4 class="text-sm font-medium">Dependencies</h4>
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div class="space-y-2">
-              <Label>Blocked By (Task IDs)</Label>
-              <Textarea
-                placeholder="Enter task IDs separated by commas..."
-                rows={3}
-                value={blockedBy.join(', ')}
-                oninput={(e) => {
-                  const target = e.target as HTMLTextAreaElement;
-                  blockedBy = target.value
-                    .split(',')
-                    .map((id: string) => id.trim())
-                    .filter((id: string) => id);
-                }}
-              />
-            </div>
-            <div class="space-y-2">
-              <Label>Blocks (Task IDs)</Label>
-              <Textarea
-                placeholder="Enter task IDs separated by commas..."
-                rows={3}
-                value={blocks.join(', ')}
-                oninput={(e) => {
-                  const target = e.target as HTMLTextAreaElement;
-                  blocks = target.value
-                    .split(',')
-                    .map((id: string) => id.trim())
-                    .filter((id: string) => id);
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+    <TaskFormAdvanced
+      bind:recurringPattern
+      bind:recurringInterval
+      bind:recurringEndDate
+      bind:blockedBy
+      bind:blocks
+    />
 
     <!-- Actions -->
     <div class="divider-edge-t divider-edge-full flex justify-end gap-3 pt-4">

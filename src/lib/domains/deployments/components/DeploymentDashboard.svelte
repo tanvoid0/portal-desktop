@@ -7,63 +7,35 @@
   import { goto } from '$app/navigation';
   import {
     deploymentActions,
-    deployments,
-    deploymentStats,
     isLoadingDeployments,
     deploymentError,
-    containers,
     isDockerOffline,
     dockerStatus,
   } from '../stores/deploymentStore';
-  import { deploymentService } from '../services/deploymentService';
   import { logger } from '$lib/domains/shared';
   import { toast } from '$lib/utils/toast';
-  import { confirmAction } from '$lib/utils/confirm';
-  import DeploymentCard from './DeploymentCard.svelte';
-  import ContainerOverview from './ContainerOverview.svelte';
   import DockerStatusBanner from './DockerStatusBanner.svelte';
-  import WorkloadList from './WorkloadList.svelte';
+  import ContainersTab from './ContainersTab.svelte';
+  import DeploymentsTab from './DeploymentsTab.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { Card, CardContent, CardHeader } from '$lib/components/ui/card';
-  import { Input } from '$lib/components/ui/input';
-  import { PageHeader, PageStats } from '$lib/components/shell';
-  import Select from '$lib/components/ui/select.svelte';
-  import { Badge } from '$lib/components/ui/badge';
+  import { PageHeader } from '$lib/components/shell';
   import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import Plus from '~icons/fa6-solid/plus';
-  import Search from '~icons/fa6-solid/magnifying-glass';
   import Rocket from '~icons/fa6-solid/rocket';
-  import ContainerIcon from '~icons/fa6-solid/cube';
-  import Play from '~icons/fa6-solid/play';
-  import Square from '~icons/fa6-solid/square';
   import AlertCircle from '~icons/fa6-solid/circle-exclamation';
   import Loader2 from '~icons/fa6-solid/spinner';
   import RefreshCw from '~icons/fa6-solid/rotate';
   import Box from '~icons/fa6-solid/box';
-  import Hammer from '~icons/fa6-solid/hammer';
-  import type { DeploymentStatus, DockerContainer } from '../types';
-  import type { GroupByMode } from '../utils/workloadGrouping';
-  import { groupWorkloads } from '../utils/workloadGrouping';
-  import { containerStatusGroup } from '../utils/format';
 
   type TabValue = 'deployments' | 'containers';
-  type ContainerStatusTab = 'running' | 'stopped' | 'other';
 
   let activeTab = $state<TabValue>('containers');
-  let containerStatusTab = $state<ContainerStatusTab>('running');
-  let searchQuery = $state('');
-  let selectedStatus = $state<DeploymentStatus | null>(null);
-  let containerSearchQuery = $state('');
-  let groupByMode = $state<GroupByMode>('stack');
   let isLoadingContainers = $state(false);
 
-  // Reactive stores
-  let deploymentList = $derived($deployments);
-  let stats = $derived($deploymentStats);
-  let loading = $derived($isLoadingDeployments);
-  let errorMessage = $derived($deploymentError);
-  let dockerOffline = $derived($isDockerOffline);
+  const loading = $derived($isLoadingDeployments);
+  const errorMessage = $derived($deploymentError);
+  const dockerOffline = $derived($isDockerOffline);
   // Docker health lives in the header badge; the banner only appears when it is down.
   const dockerBadge = $derived(
     $dockerStatus?.running
@@ -72,9 +44,6 @@
         : 'Running'
       : undefined
   );
-
-  // Reactive stores
-  let containerList = $derived($containers);
 
   onMount(async () => {
     await loadDeployments();
@@ -108,28 +77,6 @@
     }
   }
 
-  function handleSearch() {
-    // Filter logic would be implemented here
-    // For now, we'll just log the search
-    logger.info('Searching deployments', {
-      context: 'DeploymentDashboard',
-      query: searchQuery,
-    });
-  }
-
-  function handleStatusFilter(status: DeploymentStatus | null) {
-    selectedStatus = status;
-    // Filter logic would be implemented here
-    logger.info('Filtering by status', {
-      context: 'DeploymentDashboard',
-      status,
-    });
-  }
-
-  function handleCreateDeployment() {
-    goto('/deployments/new');
-  }
-
   async function handleRefresh() {
     if (activeTab === 'containers') {
       await loadContainers();
@@ -146,134 +93,6 @@
         toast.error('Failed to refresh deployment statuses');
       }
     }
-  }
-
-  async function handleContainerStart(containerId: string) {
-    try {
-      await deploymentService.startContainer(containerId);
-      toast.success('Container started');
-      await loadContainers();
-    } catch (err) {
-      logger.error('Failed to start container', {
-        context: 'DeploymentDashboard',
-        error: err,
-      });
-      toast.error(err instanceof Error ? err.message : 'Failed to start container');
-    }
-  }
-
-  async function handleContainerStop(containerId: string) {
-    try {
-      await deploymentService.stopContainer(containerId);
-      toast.success('Container stopped');
-      await loadContainers();
-    } catch (err) {
-      logger.error('Failed to stop container', {
-        context: 'DeploymentDashboard',
-        error: err,
-      });
-      toast.error(err instanceof Error ? err.message : 'Failed to stop container');
-    }
-  }
-
-  async function handleContainerRemove(containerId: string) {
-    const confirmed = await confirmAction(
-      'Are you sure you want to remove this container? This action cannot be undone.',
-      'Remove container'
-    );
-    if (!confirmed) return;
-    try {
-      await deploymentService.removeContainer(containerId);
-      toast.success('Container removed');
-      await loadContainers();
-    } catch (err) {
-      logger.error('Failed to remove container', {
-        context: 'DeploymentDashboard',
-        error: err,
-      });
-      toast.error(err instanceof Error ? err.message : 'Failed to remove container');
-    }
-  }
-
-  function filterContainers(list: DockerContainer[]): DockerContainer[] {
-    if (!containerSearchQuery) return list;
-    const query = containerSearchQuery.toLowerCase();
-    return list.filter(
-      (c) =>
-        c.name?.toLowerCase().includes(query) ||
-        c.image?.toLowerCase().includes(query) ||
-        c.id?.toLowerCase().includes(query)
-    );
-  }
-
-  function containersForStatus(
-    list: DockerContainer[],
-    status: ContainerStatusTab
-  ): DockerContainer[] {
-    return filterContainers(list)
-      .filter((c) => containerStatusGroup(c.status) === status)
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }
-
-  let containerStatusCounts = $derived({
-    running: containersForStatus(containerList, 'running').length,
-    stopped: containersForStatus(containerList, 'stopped').length,
-    other: containersForStatus(containerList, 'other').length,
-  });
-
-  let visibleContainers = $derived(containersForStatus(containerList, containerStatusTab));
-
-  let visibleWorkloadGroups = $derived(
-    groupWorkloads(containerList, deploymentList, groupByMode, {
-      statusFilter: containerStatusTab,
-      searchQuery: containerSearchQuery,
-    })
-  );
-
-  let hasVisibleWorkloads = $derived(
-    groupByMode === 'flat' ? visibleContainers.length > 0 : visibleWorkloadGroups.length > 0
-  );
-
-  const containerStatusLabels: Record<ContainerStatusTab, string> = {
-    running: 'Running',
-    stopped: 'Stopped',
-    other: 'Other',
-  };
-
-  async function handleDeploymentStart(deploymentId: string) {
-    try {
-      await deploymentActions.startDeployment(deploymentId);
-      toast.success('Deployment started');
-      await loadContainers();
-    } catch (err) {
-      logger.error('Failed to start deployment', {
-        context: 'DeploymentDashboard',
-        error: err,
-      });
-      toast.error(err instanceof Error ? err.message : 'Failed to start deployment');
-    }
-  }
-
-  async function handleDeploymentStop(deploymentId: string) {
-    try {
-      await deploymentActions.stopDeployment(deploymentId);
-      toast.success('Deployment stopped');
-      await loadContainers();
-    } catch (err) {
-      logger.error('Failed to stop deployment', {
-        context: 'DeploymentDashboard',
-        error: err,
-      });
-      toast.error(err instanceof Error ? err.message : 'Failed to stop deployment');
-    }
-  }
-
-  function getStatusColor(status: DeploymentStatus): string {
-    return deploymentService.getStatusColor(status);
-  }
-
-  function getStatusIcon(status: DeploymentStatus): string {
-    return deploymentService.getStatusIcon(status);
   }
 </script>
 
@@ -298,7 +117,7 @@
         Refresh
       </Button>
       {#if activeTab === 'deployments'}
-        <Button size="sm" onclick={handleCreateDeployment}>
+        <Button size="sm" onclick={() => goto('/deployments/new')}>
           <Plus class="mr-2 h-4 w-4" />
           New Deployment
         </Button>
@@ -308,7 +127,6 @@
 
   <DockerStatusBanner onReady={loadContainers} />
 
-  <!-- Error Alert -->
   {#if errorMessage && !dockerOffline}
     <Alert variant="destructive">
       <AlertCircle class="h-4 w-4" />
@@ -319,7 +137,6 @@
     </Alert>
   {/if}
 
-  <!-- Tabs -->
   <Tabs bind:value={activeTab} class="w-full">
     <TabsList>
       <TabsTrigger value="containers">
@@ -332,211 +149,12 @@
       </TabsTrigger>
     </TabsList>
 
-    <!-- Containers Tab -->
     <TabsContent value="containers" class="mt-6 space-y-6">
-      <ContainerOverview containers={containerList} />
-
-      <!-- Container Search + Status Tabs -->
-      <div class="flex flex-col gap-4">
-        <div class="relative">
-          <Search
-            class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
-          />
-          <Input
-            placeholder="Search containers by name, image, or ID..."
-            bind:value={containerSearchQuery}
-            class="pl-10"
-          />
-        </div>
-
-        {#if !isLoadingContainers && containerList.length > 0}
-          <Tabs bind:value={containerStatusTab} class="w-full">
-            <TabsList>
-              <TabsTrigger value="running" class="gap-2">
-                <Play class="h-4 w-4" />
-                Running
-                <Badge variant="outline" class="tabular-nums">
-                  {containerStatusCounts.running}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="stopped" class="gap-2">
-                <Square class="h-4 w-4" />
-                Stopped
-                <Badge variant="outline" class="tabular-nums">
-                  {containerStatusCounts.stopped}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="other" class="gap-2">
-                <Box class="h-4 w-4" />
-                Other
-                <Badge variant="outline" class="tabular-nums">
-                  {containerStatusCounts.other}
-                </Badge>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        {/if}
-      </div>
-
-      <!-- Loading State -->
-      {#if isLoadingContainers}
-        <div class="grid gap-4 md:grid-cols-2">
-          {#each Array(4) as _}
-            <Card>
-              <CardHeader>
-                <div class="h-4 animate-pulse rounded bg-muted"></div>
-                <div class="h-3 w-2/3 animate-pulse rounded bg-muted"></div>
-              </CardHeader>
-              <CardContent>
-                <div class="space-y-2">
-                  <div class="h-3 animate-pulse rounded bg-muted"></div>
-                  <div class="h-3 w-1/2 animate-pulse rounded bg-muted"></div>
-                </div>
-              </CardContent>
-            </Card>
-          {/each}
-        </div>
-      {/if}
-
-      <!-- Container List -->
-      {#if !isLoadingContainers && hasVisibleWorkloads}
-        <WorkloadList
-          containers={containerList}
-          deployments={deploymentList}
-          groupBy={groupByMode}
-          statusFilter={containerStatusTab}
-          searchQuery={containerSearchQuery}
-          onGroupByChange={(mode) => (groupByMode = mode)}
-          onStart={handleContainerStart}
-          onStop={handleContainerStop}
-          onRemove={handleContainerRemove}
-          onStartDeployment={handleDeploymentStart}
-          onStopDeployment={handleDeploymentStop}
-        />
-      {/if}
-
-      <!-- Empty State -->
-      {#if !isLoadingContainers && containerList.length === 0}
-        <Card>
-          <CardContent class="flex flex-col items-center justify-center py-12">
-            <ContainerIcon class="mb-4 h-12 w-12 text-muted-foreground" />
-            <h3 class="mb-2 text-lg font-semibold">
-              {dockerOffline ? 'Docker Is Offline' : 'No Containers Found'}
-            </h3>
-            <p class="mb-4 text-center text-muted-foreground">
-              {#if dockerOffline}
-                Start Docker Desktop using the banner above, then retry.
-              {:else if containerSearchQuery}
-                Try adjusting your search
-              {:else}
-                No Docker containers are running or stopped
-              {/if}
-            </p>
-          </CardContent>
-        </Card>
-      {:else if !isLoadingContainers && containerList.length > 0 && !hasVisibleWorkloads}
-        <Card>
-          <CardContent class="flex flex-col items-center justify-center py-8">
-            <p class="text-muted-foreground">
-              {#if containerSearchQuery}
-                No {containerStatusLabels[containerStatusTab].toLowerCase()} containers match "{containerSearchQuery}"
-              {:else}
-                No {containerStatusLabels[containerStatusTab].toLowerCase()} containers
-              {/if}
-            </p>
-          </CardContent>
-        </Card>
-      {/if}
+      <ContainersTab isLoading={isLoadingContainers} onReload={loadContainers} />
     </TabsContent>
 
-    <!-- Deployments Tab -->
     <TabsContent value="deployments" class="mt-6 space-y-6">
-      <PageStats
-        stats={[
-          { label: 'Running', value: stats.running, icon: Play },
-          { label: 'Stopped', value: stats.stopped, icon: Square },
-          { label: 'Building', value: stats.building, icon: Hammer },
-        ]}
-      />
-
-      <!-- Filters -->
-      <div class="flex flex-col gap-4 sm:flex-row">
-        <div class="flex-1">
-          <div class="relative">
-            <Search
-              class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
-            />
-            <Input
-              placeholder="Search deployments..."
-              bind:value={searchQuery}
-              oninput={handleSearch}
-              class="pl-10"
-            />
-          </div>
-        </div>
-        <Select
-          options={[
-            { value: '', label: 'All Statuses' },
-            { value: 'Running', label: 'Running' },
-            { value: 'Stopped', label: 'Stopped' },
-            { value: 'Building', label: 'Building' },
-            { value: 'Error', label: 'Error' },
-          ]}
-          defaultValue={selectedStatus || ''}
-          placeholder="Filter by status"
-          onSelect={(value) => handleStatusFilter(value ? (value as DeploymentStatus) : null)}
-          class="w-[200px]"
-        />
-      </div>
-
-      <!-- Loading State -->
-      {#if loading}
-        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {#each Array(6) as _}
-            <Card>
-              <CardHeader>
-                <div class="h-4 animate-pulse rounded bg-muted"></div>
-                <div class="h-3 w-2/3 animate-pulse rounded bg-muted"></div>
-              </CardHeader>
-              <CardContent>
-                <div class="space-y-2">
-                  <div class="h-3 animate-pulse rounded bg-muted"></div>
-                  <div class="h-3 w-1/2 animate-pulse rounded bg-muted"></div>
-                </div>
-              </CardContent>
-            </Card>
-          {/each}
-        </div>
-      {/if}
-
-      <!-- Deployments Grid -->
-      {#if !loading && deploymentList.length > 0}
-        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {#each deploymentList as deployment}
-            <DeploymentCard
-              {deployment}
-              onStart={() => deploymentActions.startDeployment(deployment.id)}
-              onStop={() => deploymentActions.stopDeployment(deployment.id)}
-              onDelete={() => deploymentActions.deleteDeployment(deployment.id)}
-            />
-          {/each}
-        </div>
-      {/if}
-
-      <!-- Empty State -->
-      {#if !loading && deploymentList.length === 0}
-        <Card>
-          <CardContent class="flex flex-col items-center justify-center py-12">
-            <ContainerIcon class="mb-4 h-12 w-12 text-muted-foreground" />
-            <h3 class="mb-2 text-lg font-semibold">No Deployments Found</h3>
-            <p class="mb-4 text-center text-muted-foreground">
-              {searchQuery || selectedStatus
-                ? 'Try adjusting your filters'
-                : 'Create your first deployment to get started'}
-            </p>
-          </CardContent>
-        </Card>
-      {/if}
+      <DeploymentsTab />
     </TabsContent>
   </Tabs>
 </div>

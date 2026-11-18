@@ -1,27 +1,9 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
-  import { Badge } from '$lib/components/ui/badge';
-  import { Checkbox } from '$lib/components/ui/checkbox';
-  import { Textarea } from '$lib/components/ui/textarea';
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from '$lib/components/ui/card';
-  import { PageEmpty, PageLoading } from '$lib/components/shell';
+  import { Card, CardContent } from '$lib/components/ui/card';
   import { toast } from '$lib/utils/toast';
   import Play from '~icons/fa6-solid/play';
   import RefreshCw from '~icons/fa6-solid/rotate';
-  import Workflow from '~icons/fa6-solid/diagram-project';
-  import Terminal from '~icons/fa6-solid/terminal';
-  import GitBranch from '~icons/fa6-solid/code-branch';
-  import Layers from '~icons/fa6-solid/layer-group';
-  import History from '~icons/fa6-solid/clock-rotate-left';
-  import Stethoscope from '~icons/fa6-solid/stethoscope';
-  import Copy from '~icons/fa6-solid/copy';
-  import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
   import type { Project } from '$lib/domains/projects/types';
   import {
     actions,
@@ -33,12 +15,16 @@
   import { GitHubProjectActionsPanel } from '$lib/domains/github';
   import ReleaseCard from './ReleaseCard.svelte';
   import ActionRunDetail from './ActionRunDetail.svelte';
-  import WorkflowTree from './WorkflowTree.svelte';
+  import ActionCatalogSidebar from './ActionCatalogSidebar.svelte';
+  import PipelineGeneratorCard from './PipelineGeneratorCard.svelte';
+  import DoctorFailureCard from './DoctorFailureCard.svelte';
+  import DoctorProposalCard from './DoctorProposalCard.svelte';
+  import DoctorReportCard from './DoctorReportCard.svelte';
+  import LastRunCard from './LastRunCard.svelte';
+  import RunHistoryCard from './RunHistoryCard.svelte';
   import { pickRunSelection } from '../stepGraph';
-  import { dedupePlan } from '../stepGraph';
   import { queryClient } from '$lib/domains/shared/query';
   import { queryKeys } from '$lib/domains/shared/query/keys';
-  import ActionRunList from './ActionRunList.svelte';
   import PipelineRunDetail from '$lib/domains/projects/pipelines/components/PipelineRunDetail.svelte';
   import { getRecentRuns, getRunningRuns, onRunUpdates } from '../runsService';
   import type { RunSummary } from '../types';
@@ -55,8 +41,6 @@
     dismissReviewPointer,
     verifyProposal,
   } from '../state/doctor.svelte';
-  import { aiPlatform } from '$lib/domains/ai/state/aiPlatform.svelte.js';
-  import type { PipelineFixReport } from '../state/doctor.svelte';
 
   interface Props {
     project: Project;
@@ -119,6 +103,21 @@
     void goto('/ai/coder');
   }
 
+  async function diagnoseFailure(f: NonNullable<typeof shownFailure>) {
+    const verify = await diagnose(project, f);
+    if (verify) {
+      // Reflect the verify run as the latest result; on success the
+      // "Run failed" card clears because verify.failure is undefined.
+      lastResult = verify;
+      const ls = verify.steps.find((s) => s.executionId);
+      if (ls?.executionId) openExecution(ls.executionId);
+      if (verify.success) toast.success('Doctor fixed it — review the changes in Coder');
+    }
+    const after = getDoctorRun(project.id);
+    if (after.unavailable && after.message) toast.error(after.message);
+    await loadHistory();
+  }
+
   async function verifyFix() {
     const verify = await verifyProposal(project);
     if (verify) {
@@ -128,31 +127,6 @@
       if (verify.success) toast.success('Verified — review the changes in Coder');
     }
     await loadHistory();
-  }
-
-  function reportMarkdown(r: PipelineFixReport): string {
-    const profile = r.frameworks.length
-      ? `${r.packageManager} · ${r.frameworks.join(', ')}`
-      : r.packageManager;
-    return [
-      `Portal default needs a fix — action \`${r.actionId}\``,
-      '',
-      `- Profile: ${profile}`,
-      `- Portal default command (failed): \`${r.defaultCommand}\``,
-      `- Command that passed: \`${r.greenCommand}\``,
-      '',
-      'Portal generated the wrong default for this profile. Update `buildDefaultActions`',
-      'in `src/lib/domains/actions/defaults.ts` so this profile maps to the passing command.',
-    ].join('\n');
-  }
-
-  async function copyReport(r: PipelineFixReport) {
-    try {
-      await navigator.clipboard.writeText(reportMarkdown(r));
-      toast.success('Report copied to clipboard');
-    } catch {
-      toast.error('Could not copy report');
-    }
   }
 
   function normalizePath(path: string): string {
@@ -165,14 +139,6 @@
     return normalizePath(exec.workingDirectory) === normalizePath(project.path);
   }
 
-  const FILTERS: { id: SourceFilter; label: string }[] = [
-    { id: 'all', label: 'All' },
-    { id: 'local', label: 'Local' },
-    { id: 'file', label: 'File' },
-    { id: 'github', label: 'GitHub' },
-    { id: 'n8n', label: 'n8n' },
-  ];
-
   const filteredActions = $derived(
     sourceFilter === 'all' ? actionsList : actionsList.filter((a) => a.source === sourceFilter)
   );
@@ -180,13 +146,6 @@
   const filteredWorkflows = $derived(
     sourceFilter === 'all' ? workflows : workflows.filter((w) => w.source === sourceFilter)
   );
-
-  function sourceIcon(source: ActionSource) {
-    if (source === 'github') return GitBranch;
-    if (source === 'n8n') return Layers;
-    if (source === 'file') return Workflow;
-    return Terminal;
-  }
 
   async function loadCatalog(opts?: { silent?: boolean }) {
     if (!enabled) return;
@@ -385,362 +344,47 @@
     </div>
   </div>
 
-  {#snippet platformDownActions()}
-    {#if aiPlatform.status === 'unreachable'}
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        disabled={aiPlatform.starting}
-        onclick={() => void aiPlatform.start()}
-      >
-        {aiPlatform.starting ? 'Launching…' : 'Launch Agent Platform'}
-      </Button>
-    {/if}
-  {/snippet}
-
   <div class="flex flex-col gap-6 xl:flex-row xl:items-start">
-    <!-- Actions sidebar -->
-    <aside
-      class="w-full shrink-0 space-y-4 xl:sticky xl:top-4 xl:max-h-[calc(100vh-8rem)] xl:w-80 xl:overflow-y-auto 2xl:w-96"
-    >
-      <div class="flex flex-wrap gap-2">
-        {#each FILTERS as filter (filter.id)}
-          <Button
-            size="sm"
-            variant={sourceFilter === filter.id ? 'default' : 'outline'}
-            onclick={() => (sourceFilter = filter.id)}
-          >
-            {filter.label}
-          </Button>
-        {/each}
-      </div>
-
-      {#if warnings.length > 0}
-        <div class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
-          {#each warnings as warning (warning)}
-            <p>{warning}</p>
-          {/each}
-        </div>
-      {/if}
-
-      {#if loading}
-        <PageLoading message="Loading actions catalog…" />
-      {:else if filteredActions.length === 0 && filteredWorkflows.length === 0}
-        <PageEmpty
-          title="No actions available"
-          description="Add framework/package manager metadata, or create a .portal/pipeline.yml in the project root."
-          icon={Workflow}
-        />
-      {:else}
-        {#if filteredWorkflows.length > 0}
-          <div class="space-y-2">
-            <h3 class="text-sm font-medium text-muted-foreground">Workflows</h3>
-            <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-1">
-              {#each filteredWorkflows as workflow (workflow.id)}
-                {@const Icon = sourceIcon(workflow.source)}
-                <Card>
-                  <CardHeader class="pb-2">
-                    <div class="flex items-start justify-between gap-2">
-                      <CardTitle class="text-sm">{workflow.name}</CardTitle>
-                      <Badge variant="secondary">{workflow.source}</Badge>
-                    </div>
-                    {#if workflow.description}
-                      <CardDescription class="text-xs">
-                        {workflow.description}
-                      </CardDescription>
-                    {/if}
-                  </CardHeader>
-                  <CardContent class="space-y-2">
-                    {#if workflow.steps.length > 0}
-                      <WorkflowTree
-                        plan={dedupePlan(
-                          workflow.steps.map((s) => ({
-                            id: s.action,
-                            name: s.action,
-                            needs: s.needs ?? [],
-                          }))
-                        )}
-                      />
-                    {:else}
-                      <p
-                        class="flex min-w-0 items-center gap-1 truncate text-xs text-muted-foreground"
-                      >
-                        <Icon class="h-3.5 w-3.5 shrink-0" />
-                        {workflow.runner}
-                      </p>
-                    {/if}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      class="gap-1"
-                      disabled={running}
-                      onclick={(e) => void runTarget(workflow.id, e)}
-                    >
-                      <Play class="h-3.5 w-3.5" />
-                      Run
-                    </Button>
-                  </CardContent>
-                </Card>
-              {/each}
-            </div>
-          </div>
-        {/if}
-
-        <div class="space-y-2">
-          <h3 class="text-sm font-medium text-muted-foreground">Actions</h3>
-          <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-1">
-            {#each filteredActions as action (action.id)}
-              {@const Icon = sourceIcon(action.source)}
-              <Card>
-                <CardHeader class="pb-2">
-                  <div class="flex items-start gap-2">
-                    <Checkbox
-                      checked={selected.has(action.id)}
-                      onCheckedChange={() => toggleSelect(action.id)}
-                      class="mt-1"
-                    />
-                    <div class="min-w-0 flex-1">
-                      <div class="flex items-start justify-between gap-2">
-                        <CardTitle class="text-sm">{action.name}</CardTitle>
-                        <Badge variant="outline">{action.source}</Badge>
-                      </div>
-                      {#if action.description}
-                        <CardDescription class="text-xs">
-                          {action.description}
-                        </CardDescription>
-                      {/if}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent class="space-y-2">
-                  {#if action.command}
-                    <code class="block truncate rounded bg-muted px-2 py-1 text-xs">
-                      {action.command}
-                    </code>
-                  {:else}
-                    <p class="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Icon class="h-3.5 w-3.5" />
-                      {action.runner} runner
-                    </p>
-                  {/if}
-                  <Button
-                    type="button"
-                    size="sm"
-                    class="w-full gap-1"
-                    disabled={running}
-                    onclick={(e) => void runTarget(action.id, e)}
-                  >
-                    <Play class="h-3.5 w-3.5" />
-                    Run
-                  </Button>
-                </CardContent>
-              </Card>
-            {/each}
-          </div>
-        </div>
-      {/if}
-    </aside>
+    <ActionCatalogSidebar
+      actions={filteredActions}
+      workflows={filteredWorkflows}
+      {warnings}
+      {loading}
+      {running}
+      {selected}
+      bind:sourceFilter
+      onToggleSelect={toggleSelect}
+      onRun={(id, e) => void runTarget(id, e)}
+    />
 
     <!-- Run details + history -->
     <div class="min-w-0 flex-1 space-y-4">
-      <Card>
-        <CardHeader class="pb-2">
-          <CardTitle class="flex items-center gap-2 text-base">
-            <Sparkles class="h-4 w-4" />
-            Generate a pipeline
-          </CardTitle>
-          <CardDescription>
-            Describe what you want and an agent writes or extends
-            <code class="text-xs">.portal/pipeline.yml</code> for this project's stack. Nothing is committed
-            — review the changes in Coder.
-          </CardDescription>
-        </CardHeader>
-        <CardContent class="space-y-2">
-          <Textarea
-            bind:value={requirement}
-            rows={3}
-            placeholder="e.g. Add a lint + typecheck gate and a release workflow that builds then tests."
-            disabled={genRunning}
-          />
-          <div class="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              class="gap-1"
-              disabled={genRunning || running || doctorBusy || !requirement.trim()}
-              onclick={() => void generate()}
-            >
-              <Sparkles class="h-3.5 w-3.5" />
-              {genRunning ? 'Generating…' : 'Generate'}
-            </Button>
-            {#if genRun.status !== 'idle'}
-              <span class="text-xs text-muted-foreground">
-                {genRun.status === 'generating'
-                  ? 'Generating…'
-                  : genRun.status === 'validating'
-                    ? 'Validating…'
-                    : genRun.status === 'previewing'
-                      ? 'Dry-checking…'
-                      : genRun.status === 'done'
-                        ? 'Done'
-                        : 'Failed'}
-                {#if genRun.message}· {genRun.message}{/if}
-              </span>
-            {/if}
-            {#if genRun.waiting}
-              <span class="text-xs text-amber-600 dark:text-amber-400">
-                Waiting for your approval in Coder
-              </span>
-            {/if}
-            {#if genRun.unavailable}
-              {@render platformDownActions()}
-            {/if}
-            {#if genRun.threadId}
-              <Button
-                type="button"
-                size="sm"
-                variant="link"
-                onclick={() => void openThread(genRun.threadId!)}
-              >
-                {genRunning ? 'Open in Coder' : 'Review changes in Coder'}
-              </Button>
-            {/if}
-          </div>
-        </CardContent>
-      </Card>
+      <PipelineGeneratorCard
+        bind:requirement
+        run={genRun}
+        running={genRunning}
+        blocked={running || doctorBusy}
+        onGenerate={() => void generate()}
+        onOpenThread={(id) => void openThread(id)}
+      />
 
       {#if shownFailure}
-        {@const f = shownFailure}
-        {@const run = doctorRun}
-        <Card class="border-destructive/40">
-          <CardHeader class="pb-2">
-            <div class="flex items-center justify-between gap-2">
-              <CardTitle class="text-base text-destructive">Run failed</CardTitle>
-              <Badge variant="outline" class="capitalize">{f.kind}</Badge>
-            </div>
-            {#if f.hint}
-              <CardDescription>{f.hint}</CardDescription>
-            {/if}
-          </CardHeader>
-          <CardContent class="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              class="gap-1"
-              disabled={doctorBusy || genRunning || run.status === 'awaiting-verify'}
-              onclick={async () => {
-                const verify = await diagnose(project, f);
-                if (verify) {
-                  // Reflect the verify run as the latest result; on success the
-                  // "Run failed" card clears because verify.failure is undefined.
-                  lastResult = verify;
-                  const ls = verify.steps.find((s) => s.executionId);
-                  if (ls?.executionId) openExecution(ls.executionId);
-                  if (verify.success)
-                    toast.success('Doctor fixed it — review the changes in Coder');
-                }
-                const after = getDoctorRun(project.id);
-                if (after.unavailable && after.message) toast.error(after.message);
-                await loadHistory();
-              }}
-            >
-              <Stethoscope class="h-3.5 w-3.5" />
-              Diagnose & fix
-            </Button>
-            {#if run.status !== 'idle'}
-              <span class="text-xs text-muted-foreground">
-                {run.status === 'diagnosing'
-                  ? 'Diagnosing…'
-                  : run.status === 'verifying'
-                    ? 'Verifying…'
-                    : run.status === 'fixed'
-                      ? 'Fixed'
-                      : run.status === 'awaiting-verify'
-                        ? 'Fix proposed'
-                        : run.unavailable
-                          ? 'Could not start'
-                          : 'Gave up'}
-                {#if run.message}· {run.message}{/if}
-              </span>
-            {/if}
-            {#if run.waiting}
-              <span class="text-xs text-amber-600 dark:text-amber-400">
-                Waiting for your approval in Coder
-              </span>
-            {/if}
-            {#if run.unavailable}
-              {@render platformDownActions()}
-            {/if}
-            {#if run.threadId}
-              <Button
-                type="button"
-                size="sm"
-                variant="link"
-                onclick={() => void openThread(run.threadId!)}
-              >
-                {run.status === 'diagnosing' ? 'Open in Coder' : 'Review changes in Coder'}
-              </Button>
-            {/if}
-          </CardContent>
-        </Card>
+        <DoctorFailureCard
+          failure={shownFailure}
+          run={doctorRun}
+          busy={doctorBusy || genRunning}
+          onDiagnose={() => void diagnoseFailure(shownFailure)}
+          onOpenThread={(id) => void openThread(id)}
+        />
       {/if}
 
       {#if doctorRun.proposal}
-        {@const pr = doctorRun.proposal}
-        <Card class="border-amber-500/40">
-          <CardHeader class="pb-2">
-            <CardTitle class="text-base">Review the agent's change</CardTitle>
-            <CardDescription>
-              Nothing has run. {pr.note ?? 'The agent changed what this action runs.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-2">
-            <div>
-              <p class="mb-1 text-xs font-medium text-muted-foreground">Was</p>
-              <code class="block rounded bg-muted px-2 py-1 text-xs break-all">
-                {pr.oldCommand || '—'}
-              </code>
-            </div>
-            <div>
-              <p class="mb-1 text-xs font-medium text-muted-foreground">
-                Agent wrote (not run yet)
-              </p>
-              <code class="block rounded bg-muted px-2 py-1 text-xs break-all">
-                {pr.newCommand || '—'}
-              </code>
-            </div>
-            {#if pr.scriptChanges.length}
-              <div>
-                <p class="mb-1 text-xs font-medium text-muted-foreground">
-                  package.json scripts changed
-                </p>
-                {#each pr.scriptChanges as line (line)}
-                  <code class="mb-1 block rounded bg-muted px-2 py-1 text-xs break-all">{line}</code
-                  >
-                {/each}
-              </div>
-            {/if}
-            <div class="flex flex-wrap items-center gap-2">
-              <Button type="button" size="sm" class="gap-1" onclick={() => void verifyFix()}>
-                <Play class="h-3.5 w-3.5" />
-                Verify
-              </Button>
-              {#if doctorRun.reviewThreadId}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="link"
-                  onclick={() => void openThread(doctorRun.reviewThreadId!)}
-                >
-                  Review changes in Coder
-                </Button>
-              {/if}
-            </div>
-          </CardContent>
-        </Card>
+        <DoctorProposalCard
+          proposal={doctorRun.proposal}
+          reviewThreadId={doctorRun.reviewThreadId}
+          onVerify={() => void verifyFix()}
+          onOpenThread={(id) => void openThread(id)}
+        />
       {/if}
 
       {#if doctorRun.reviewThreadId && !shownFailure && !doctorRun.proposal}
@@ -771,49 +415,7 @@
       {/if}
 
       {#if doctorRun.report}
-        {@const r = doctorRun.report}
-        <Card class="border-amber-500/40">
-          <CardHeader class="pb-2">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle class="text-base">Portal default needs a fix</CardTitle>
-              <Badge variant="outline" class="shrink-0">suggestion</Badge>
-            </div>
-            <CardDescription>
-              A <code class="text-xs">.portal/pipeline.yml</code> override fixed the
-              <code class="text-xs">{r.actionId}</code> action. Portal's built-in default was wrong for
-              this profile — review it, nothing was changed in Portal.
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-2">
-            <p class="text-xs text-muted-foreground">
-              Profile: {r.packageManager}{r.frameworks.length
-                ? ` · ${r.frameworks.join(', ')}`
-                : ''}
-            </p>
-            <div>
-              <p class="mb-1 text-xs font-medium text-muted-foreground">Portal default (failed)</p>
-              <code class="block rounded bg-muted px-2 py-1 text-xs break-all">
-                {r.defaultCommand || '—'}
-              </code>
-            </div>
-            <div>
-              <p class="mb-1 text-xs font-medium text-muted-foreground">Command that passed</p>
-              <code class="block rounded bg-muted px-2 py-1 text-xs break-all">
-                {r.greenCommand || '—'}
-              </code>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              class="gap-1"
-              onclick={() => void copyReport(r)}
-            >
-              <Copy class="h-3.5 w-3.5" />
-              Copy report
-            </Button>
-          </CardContent>
-        </Card>
+        <DoctorReportCard report={doctorRun.report} />
       {/if}
 
       <div class="grid gap-4 min-[2200px]:grid-cols-2 min-[2200px]:items-start">
@@ -835,109 +437,24 @@
             onClose={() => (selectedRunId = null)}
           />
         {:else if lastResult}
-          <Card>
-            <CardHeader>
-              <CardTitle class="text-base">Last run</CardTitle>
-              <CardDescription>
-                {lastResult.success ? 'Succeeded' : 'Failed'} · {lastResult.cwd}
-              </CardDescription>
-            </CardHeader>
-            <CardContent class="space-y-3">
-              {#each lastResult.steps as step (step.actionId + step.name)}
-                <div class="space-y-1 rounded border p-2">
-                  <div class="flex items-center justify-between gap-2 text-sm">
-                    <span class="font-medium">{step.name}</span>
-                    <Badge
-                      variant={step.status === 'success'
-                        ? 'default'
-                        : step.status === 'skipped' || step.status === 'cancelled'
-                          ? 'secondary'
-                          : 'destructive'}
-                    >
-                      {step.status}
-                    </Badge>
-                  </div>
-                  {#if step.command}
-                    <code class="block truncate text-xs text-muted-foreground">
-                      {step.command}
-                    </code>
-                  {/if}
-                  {#if step.exitCode != null}
-                    <p class="text-xs text-muted-foreground">
-                      Exit code {step.exitCode}
-                    </p>
-                  {/if}
-                  {#if step.error}
-                    <pre
-                      class="max-h-32 overflow-auto text-xs whitespace-pre-wrap text-destructive">{step.error}</pre>
-                  {/if}
-                  {#if step.output?.trim()}
-                    <pre
-                      class="max-h-40 overflow-auto rounded bg-muted px-2 py-1 text-xs whitespace-pre-wrap">{step.output}</pre>
-                  {/if}
-                  {#if step.executionId}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      class="mt-1"
-                      onclick={() => openExecution(step.executionId!)}
-                    >
-                      View full details
-                    </Button>
-                  {/if}
-                </div>
-              {/each}
-            </CardContent>
-          </Card>
+          <LastRunCard result={lastResult} onOpenExecution={(id) => openExecution(id)} />
         {/if}
 
-        <Card>
-          <CardHeader>
-            <div class="flex items-center justify-between gap-2">
-              <div>
-                <CardTitle class="flex items-center gap-2 text-base">
-                  <History class="h-5 w-5" />
-                  Local run history
-                </CardTitle>
-                <CardDescription>Script executions for this project (Actions runs)</CardDescription>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onclick={() => void loadHistory()}
-                disabled={historyLoading}
-              >
-                <RefreshCw class="h-4 w-4 {historyLoading ? 'animate-spin' : ''}" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {#if historyLoading && runHistory.length === 0}
-              <PageLoading message="Loading history…" />
-            {:else if runHistory.length === 0}
-              <PageEmpty
-                title="No action runs yet"
-                description="Run an action to see command output and exit details here."
-                icon={History}
-              />
-            {:else}
-              <ActionRunList
-                executions={runHistory}
-                selectedId={selectedRunId}
-                onSelect={(e, opts) => openExecution(e.id, opts)}
-                onStarted={(id) => {
-                  openExecution(id);
-                  void loadHistory();
-                }}
-                onChanged={(deletedId) => {
-                  if (deletedId && deletedId === selectedRunId) selectedRunId = null;
-                  void loadHistory();
-                }}
-              />
-            {/if}
-          </CardContent>
-        </Card>
+        <RunHistoryCard
+          runs={runHistory}
+          loading={historyLoading}
+          selectedId={selectedRunId}
+          onRefresh={() => void loadHistory()}
+          onSelect={(e, opts) => openExecution(e.id, opts)}
+          onStarted={(id) => {
+            openExecution(id);
+            void loadHistory();
+          }}
+          onChanged={(deletedId) => {
+            if (deletedId && deletedId === selectedRunId) selectedRunId = null;
+            void loadHistory();
+          }}
+        />
       </div>
     </div>
   </div>

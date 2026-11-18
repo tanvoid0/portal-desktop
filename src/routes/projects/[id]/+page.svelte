@@ -8,28 +8,13 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { buildTabUrl, resolveUrlTab } from '$lib/utils/url-tabs';
-  import { Button, buttonVariants } from '$lib/components/ui/button';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import Edit from '~icons/fa6-solid/pen-to-square';
   import FolderOpen from '~icons/fa6-solid/folder-open';
-  import Star from '~icons/fa6-solid/star';
   import Terminal from '~icons/fa6-solid/terminal';
-  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
   import Info from '~icons/fa6-solid/circle-info';
-  import RefreshCw from '~icons/fa6-solid/rotate';
-  import Ellipsis from '~icons/fa6-solid/ellipsis';
   import Layers from '~icons/fa6-solid/layer-group';
-  import Loader2 from '~icons/fa6-solid/spinner';
   import Workflow from '~icons/fa6-solid/diagram-project';
-  import Rocket from '~icons/fa6-solid/rocket';
-  import Code from '~icons/fa6-solid/code';
   import FileKey from '~icons/fa6-solid/key';
-  import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-  } from '$lib/components/ui/dropdown-menu';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { ProjectTerminal } from '$lib/domains/terminal';
   import { projectService, createProjectQuery, createProjectsQuery } from '$lib/domains/projects';
@@ -68,9 +53,9 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { agentSessionsQuery } from '$lib/domains/agents/queries/agentsQueries';
   import { groupSessionsByProject } from '$lib/domains/agents/utils/groupSessions';
-  import { openAgentsSessionById } from '$lib/domains/agents/utils/launch';
-  import { launchInAgents } from '$lib/domains/projects/utils/launch';
-  import Bolt from '~icons/fa6-solid/bolt';
+  import ProjectHeaderActions from '$lib/domains/projects/components/ProjectHeaderActions.svelte';
+  import ProjectAgentSessionsCard from '$lib/domains/projects/components/ProjectAgentSessionsCard.svelte';
+  import { toGitHubUrl, timeAgo } from '$lib/domains/projects/utils/detailFormat';
 
   const log = logger.createScoped('ProjectDetailsPage');
 
@@ -227,36 +212,6 @@
 
   async function reloadProject() {
     await projectQuery.refetch();
-  }
-
-  function toGitHubUrl(remote?: string): string | null {
-    if (!remote) return null;
-    const trimmed = remote.trim().replace(/\.git$/, '');
-    if (trimmed.startsWith('https://github.com/')) {
-      return trimmed;
-    }
-    if (trimmed.startsWith('git@github.com:')) {
-      return `https://github.com/${trimmed.slice('git@github.com:'.length)}`;
-    }
-    return null;
-  }
-
-  const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
-    ['year', 31536000],
-    ['month', 2592000],
-    ['day', 86400],
-    ['hour', 3600],
-    ['minute', 60],
-  ];
-
-  /** "3 days ago" style text for the footer line. */
-  function timeAgo(date: Date | string): string {
-    const seconds = (new Date(date).getTime() - Date.now()) / 1000;
-    const fmt = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-    for (const [unit, size] of RELATIVE_UNITS) {
-      if (Math.abs(seconds) >= size) return fmt.format(Math.round(seconds / size), unit);
-    }
-    return 'just now';
   }
 
   function handleEdit() {
@@ -425,69 +380,20 @@
         <ProjectSummary project={currentProject} />
       {/snippet}
       {#snippet actions()}
-        <Button
-          variant="outline"
-          size="icon"
-          onclick={() => (factsOpen = true)}
-          class="md:hidden"
-          aria-label="Project details"
-        >
-          <Info class="h-4 w-4" />
-        </Button>
-        <Button onclick={handleOpenInEditor} class="gap-2">
-          <Code class="h-4 w-4" />
-          Open in editor
-        </Button>
-        <Button variant="outline" onclick={handleOpenInExplorer} class="gap-2">
-          <FolderOpen class="h-4 w-4" />
-          Open folder
-        </Button>
-        <Button variant="outline" onclick={switchToTerminal} class="gap-2">
-          <Terminal class="h-4 w-4" />
-          Terminal
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            class={buttonVariants({ variant: 'outline' })}
-            aria-label="More actions"
-          >
-            <Ellipsis class="h-4 w-4" />
-            More
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={handleEdit}>
-              <Edit class="h-4 w-4" />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={handleDeploy} disabled={isDeploying}>
-              {#if isDeploying}
-                <Loader2 class="h-4 w-4 animate-spin" />
-                Deploying…
-              {:else}
-                <Rocket class="h-4 w-4" />
-                Deploy
-              {/if}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={handleToggleStar}>
-              <Star class="h-4 w-4 {currentProject.starred ? 'fill-current' : ''}" />
-              {currentProject.starred ? 'Unstar' : 'Star'}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={handleRedetect} disabled={refreshing}>
-              <RefreshCw class="h-4 w-4 {refreshing ? 'animate-spin' : ''}" />
-              Re-detect stack
-            </DropdownMenuItem>
-            {#if githubUrl}
-              <DropdownMenuItem>
-                {#snippet child({ props })}
-                  <a {...props} href={githubUrl} target="_blank" rel="noreferrer">
-                    <ExternalLink class="h-4 w-4" />
-                    GitHub
-                  </a>
-                {/snippet}
-              </DropdownMenuItem>
-            {/if}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <ProjectHeaderActions
+          starred={!!currentProject.starred}
+          {githubUrl}
+          {isDeploying}
+          {refreshing}
+          onShowDetails={() => (factsOpen = true)}
+          onOpenEditor={handleOpenInEditor}
+          onOpenFolder={handleOpenInExplorer}
+          onTerminal={switchToTerminal}
+          onEdit={handleEdit}
+          onDeploy={handleDeploy}
+          onToggleStar={handleToggleStar}
+          onRedetect={handleRedetect}
+        />
       {/snippet}
     </PageHeader>
 
@@ -601,39 +507,7 @@
             {refreshing}
             onRedetect={handleRedetect}
           />
-          <Card>
-            <CardHeader>
-              <CardTitle class="flex items-center gap-2">
-                <Bolt class="h-5 w-5" />
-                Agent sessions
-              </CardTitle>
-            </CardHeader>
-            <CardContent class="space-y-1.5">
-              {#if agentSessionsForProject.length === 0}
-                <p class="text-sm text-muted-foreground">No runs yet.</p>
-              {:else}
-                {#each agentSessionsForProject as session (session.id)}
-                  <Button
-                    variant="link"
-                    size="sm"
-                    class="h-auto w-full justify-start truncate p-0 text-left font-normal"
-                    onclick={() => openAgentsSessionById(session.id)}
-                  >
-                    {session.title || session.backend_id}
-                  </Button>
-                {/each}
-              {/if}
-              <Button
-                variant="outline"
-                size="sm"
-                class="mt-2 gap-2"
-                onclick={() => launchInAgents(currentProject)}
-              >
-                <Bolt class="h-3.5 w-3.5" />
-                New run
-              </Button>
-            </CardContent>
-          </Card>
+          <ProjectAgentSessionsCard project={currentProject} sessions={agentSessionsForProject} />
         </div>
       </ResponsivePanel>
     </div>

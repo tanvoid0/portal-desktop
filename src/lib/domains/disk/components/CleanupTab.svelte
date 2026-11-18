@@ -19,35 +19,20 @@
     folderPaths,
     fmtBytes,
     fmtDate,
-    fmtAgo,
-    leafIds,
-    RISK_BADGE,
-    VERDICT_BADGE,
     verdictMap,
-    DISK_STAT_GRID_FOUR,
     type TreeNode,
   } from '../utils';
   import ScanProgressCard from './shared/ScanProgressCard.svelte';
   import TaskProgressCard from './shared/TaskProgressCard.svelte';
-  import StatTiles from './shared/StatTiles.svelte';
+  import CleanupStats from './CleanupStats.svelte';
   import TargetPicker from './shared/TargetPicker.svelte';
   import SelectionBar from './shared/SelectionBar.svelte';
+  import PermanentDeleteToggle from './shared/PermanentDeleteToggle.svelte';
+  import CleanupSavedScanCard from './CleanupSavedScanCard.svelte';
+  import CleanupVerifyCards from './CleanupVerifyCards.svelte';
+  import CleanupProposalTable from './CleanupProposalTable.svelte';
   import { confirmAction } from '$lib/utils/confirm';
   import { Button } from '$lib/components/ui/button';
-  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import { Badge } from '$lib/components/ui/badge';
-  import { Checkbox } from '$lib/components/ui/checkbox';
-  import { Label } from '$lib/components/ui/label';
-  import { Progress } from '$lib/components/ui/progress';
-  import { Alert, AlertDescription } from '$lib/components/ui/alert';
-  import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-  } from '$lib/components/ui/table';
 
   let { pending }: { pending: { tab: string; path?: string; seq: number } | null } = $props();
 
@@ -86,23 +71,6 @@
   const selectedBytes = $derived.by(() => {
     if (!summary) return 0;
     return summary.proposals.filter((p) => selected.has(p.id)).reduce((a, p) => a + p.sizeBytes, 0);
-  });
-
-  const stats = $derived.by(() => {
-    if (!summary) return null;
-    const byRisk: Record<string, { n: number; b: number }> = {
-      Safe: { n: 0, b: 0 },
-      Review: { n: 0, b: 0 },
-      Danger: { n: 0, b: 0 },
-    };
-    let total = 0;
-    for (const p of summary.proposals) {
-      const rr = byRisk[p.risk] ?? (byRisk[p.risk] = { n: 0, b: 0 });
-      rr.n++;
-      rr.b += p.sizeBytes;
-      total += p.sizeBytes;
-    }
-    return { total, byRisk, count: summary.proposals.length };
   });
 
   const tree = $derived(summary ? buildTree(summary.proposals, summary.root) : []);
@@ -215,12 +183,6 @@
     selected = new Set(summary.proposals.filter((p) => p.risk === 'Safe').map((p) => p.id));
   }
 
-  function rowSel(node: TreeNode) {
-    const ids = leafIds(node);
-    const sel = ids.filter((id) => selected.has(id)).length;
-    return { ids, all: sel === ids.length && ids.length > 0, some: sel > 0 && sel !== ids.length };
-  }
-
   async function verifyWithAi() {
     if (!summary) return;
     const toVerify =
@@ -297,26 +259,6 @@
       qProgress = null;
     }
   }
-
-  const restorePct = $derived(
-    cached && cached.status === 'partial' && cached.totalFiles > 0
-      ? Math.min(100, Math.round((cached.scannedFiles / cached.totalFiles) * 100))
-      : 100
-  );
-  const restoreReclaimable = $derived(
-    cached ? cached.summary.proposals.reduce((a, p) => a + p.sizeBytes, 0) : 0
-  );
-  const verifyCounts = $derived.by(() => {
-    const c = { safe: 0, review: 0, dangerous: 0 };
-    verification?.verdicts.forEach((v) => {
-      // `verdict` is a plain String on the Rust side — the synthesizer's output
-      // is model text, so the parser stays tolerant and normalizes anything it
-      // does not recognise to "review". The type cannot say that, so do it here.
-      if (v.verdict in c) c[v.verdict as keyof typeof c]++;
-      else c.review++;
-    });
-    return c;
-  });
 </script>
 
 <TargetPicker
@@ -330,60 +272,12 @@
 />
 
 {#if cached && !summary && !busy}
-  {@const partial = cached.status === 'partial'}
-  <Card class="mb-4 gap-0 {partial ? 'border-status-warning/30' : ''}">
-    <CardContent class="flex items-start gap-3 px-4 py-3.5">
-      <div
-        class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm {partial
-          ? 'bg-status-warning-bg text-status-warning'
-          : 'bg-status-success-bg text-status-success'}"
-      >
-        {partial ? '◴' : '↻'}
-      </div>
-      <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-2">
-          <span class="text-sm font-medium text-foreground"
-            >{partial ? 'Interrupted scan can be restored' : 'Saved scan available'}</span
-          >
-          <Badge
-            variant="outline"
-            class={partial
-              ? 'border-status-warning/30 bg-status-warning-bg text-status-warning'
-              : 'border-status-success/30 bg-status-success-bg text-status-success'}
-          >
-            {partial ? `stopped at ${restorePct}%` : 'complete'}
-          </Badge>
-        </div>
-        <div class="mt-1 text-xs text-muted-foreground">
-          {fmtAgo(cached.ts)} · {fmtDate(cached.ts)} · {cached.scannedFiles.toLocaleString()}{partial &&
-          cached.totalFiles > 0
-            ? ` / ${cached.totalFiles.toLocaleString()}`
-            : ''} files · {fmtBytes(restoreReclaimable)} reclaimable
-        </div>
-        {#if partial}
-          <Progress
-            value={restorePct}
-            class="mt-2 h-1.5 [&>[data-slot=progress-indicator]]:bg-status-warning"
-          />
-        {/if}
-        <div class="mt-3 flex flex-wrap items-center gap-2">
-          {#if partial}
-            <Button size="sm" onclick={() => scan()}>Resume — full scan</Button>
-            <Button variant="outline" size="sm" onclick={loadCached}>Load partial results</Button>
-          {:else}
-            <Button size="sm" onclick={loadCached}>Load saved scan</Button>
-            <Button variant="outline" size="sm" onclick={() => scan()}>Rescan fresh</Button>
-          {/if}
-          <Button
-            variant="outline"
-            size="sm"
-            onclick={discardCached}
-            class="text-destructive hover:text-destructive">Discard</Button
-          >
-        </div>
-      </div>
-    </CardContent>
-  </Card>
+  <CleanupSavedScanCard
+    {cached}
+    onload={loadCached}
+    onrescan={() => scan()}
+    ondiscard={discardCached}
+  />
 {/if}
 
 <ScanProgressCard progress={busy ? progress : null} />
@@ -394,49 +288,8 @@
   <div class="mb-4 text-sm text-muted-foreground">{status}</div>
 {/if}
 
-{#if summary && stats}
-  <StatTiles
-    grid={DISK_STAT_GRID_FOUR}
-    tiles={[
-      {
-        label: 'Reclaimable',
-        value: fmtBytes(stats.total),
-        sub: `${stats.count} proposal${stats.count === 1 ? '' : 's'}`,
-      },
-      {
-        label: 'Safe',
-        value: fmtBytes(stats.byRisk.Safe.b),
-        sub: `${stats.byRisk.Safe.n} items — rebuilt or re-downloadable`,
-        accent: 'text-status-success',
-      },
-      {
-        label: 'Review',
-        value: fmtBytes(stats.byRisk.Review.b),
-        sub: `${stats.byRisk.Review.n} items — check before ticking`,
-        accent: 'text-status-warning',
-      },
-      {
-        label: 'Danger',
-        value: fmtBytes(stats.byRisk.Danger.b),
-        sub: `${stats.byRisk.Danger.n} items — could be the only copy`,
-        accent: 'text-status-error',
-      },
-    ]}
-  />
-
-  {#if stats.total > 0}
-    <div class="mb-6 flex h-2 w-full overflow-hidden rounded-full bg-muted">
-      {#each [['Safe', stats.byRisk.Safe.b, 'bg-status-success'], ['Review', stats.byRisk.Review.b, 'bg-status-warning'], ['Danger', stats.byRisk.Danger.b, 'bg-status-error']] as [risk, bytes, color]}
-        {#if (bytes as number) > 0}
-          <div
-            class={color as string}
-            style="width: {((bytes as number) / stats.total) * 100}%"
-            title={String(risk)}
-          ></div>
-        {/if}
-      {/each}
-    </div>
-  {/if}
+{#if summary}
+  <CleanupStats proposals={summary.proposals} />
 
   <SelectionBar
     count={selected.size}
@@ -448,12 +301,11 @@
     {#snippet tools()}
       <Button variant="outline" size="sm" onclick={selectSafe}>Select all Safe</Button>
       <Button variant="outline" size="sm" onclick={() => (selected = new Set())}>Clear</Button>
-      <div class="flex items-center gap-1.5">
-        <Checkbox bind:checked={permanentDelete} id="cleanup-permanent" />
-        <Label for="cleanup-permanent" class="text-xs font-normal text-muted-foreground">
-          Delete Safe items permanently
-        </Label>
-      </div>
+      <PermanentDeleteToggle
+        bind:checked={permanentDelete}
+        id="cleanup-permanent"
+        label="Delete Safe items permanently"
+      />
       <Button variant="outline" size="sm" onclick={() => (expanded = new Set(folderPaths(tree)))}>
         Expand all
       </Button>
@@ -473,207 +325,26 @@
     {/snippet}
   </SelectionBar>
 
-  {#if verifying && verifyProgress}
-    <Card class="mb-4 gap-0 overflow-hidden py-0">
-      <CardHeader
-        class="divider-edge-b divider-edge-full bg-muted/40 px-4 py-2.5 [.border-b]:pb-2.5"
-      >
-        <div class="flex items-center gap-2">
-          <CardTitle class="text-sm font-medium">AI verification</CardTitle>
-          <span class="text-xs text-muted-foreground"
-            >process #{verifyProgress.processId} · {verifyProgress.status.replace(/_/g, ' ')}</span
-          >
-          <Button variant="outline" size="sm" onclick={cancelVerify} class="ml-auto">Stop</Button>
-        </div>
-      </CardHeader>
-      <CardContent class="px-4 py-3">
-        {#if verifyProgress.tasks.length === 0}
-          <div class="flex items-center gap-2 text-sm text-muted-foreground">
-            <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-primary"></span>Planning the
-            review…
-          </div>
-        {:else}
-          <ul class="space-y-1.5">
-            {#each verifyProgress.tasks as t, i (i)}
-              <li class="flex items-center gap-2 text-sm text-foreground">
-                <span
-                  class="h-1.5 w-1.5 rounded-full {t.status === 'completed'
-                    ? 'bg-status-success'
-                    : t.status === 'failed'
-                      ? 'bg-status-error'
-                      : t.status.includes('progress') || t.status === 'running'
-                        ? 'animate-pulse bg-primary'
-                        : 'bg-muted-foreground'}"
-                ></span>
-                <span>{t.role}</span>
-                <span class="text-xs text-muted-foreground">{t.status.replace(/_/g, ' ')}</span>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </CardContent>
-    </Card>
-  {/if}
+  <CleanupVerifyCards
+    {verifying}
+    progress={verifyProgress}
+    {verification}
+    error={verifyErr}
+    oncancel={cancelVerify}
+    ondismiss={() => {
+      verification = null;
+      verifyErr = '';
+    }}
+    ondeselectFlagged={deselectFlagged}
+  />
 
-  {#if verifyErr || verification}
-    <Card class="mb-4 gap-0 overflow-hidden py-0">
-      <CardHeader
-        class="divider-edge-b divider-edge-full bg-muted/40 px-4 py-2.5 [.border-b]:pb-2.5"
-      >
-        <div class="flex items-center gap-2">
-          <CardTitle class="text-sm font-medium">AI verification</CardTitle>
-          {#if verification}
-            <span class="text-xs text-muted-foreground"
-              >process #{verification.processId} · {verification.status}</span
-            >
-          {/if}
-          {#if verification?.gated}
-            <Badge
-              variant="outline"
-              class="border-status-warning/30 bg-status-warning-bg text-status-warning"
-              >paused at a review gate</Badge
-            >
-          {/if}
-          <Button
-            variant="outline"
-            size="sm"
-            onclick={() => {
-              verification = null;
-              verifyErr = '';
-            }}
-            class="ml-auto">Dismiss</Button
-          >
-        </div>
-      </CardHeader>
-      <CardContent class="px-4 py-3">
-        <p class="mb-3 text-xs text-muted-foreground">
-          Advisory only — the agents review deletion candidates but never delete or change risk. You
-          still tick every item.
-        </p>
-        {#if verification && verification.verdicts.length > 0}
-          <div class="mb-3 flex flex-wrap items-center gap-3">
-            <span class="text-sm text-foreground">
-              <span class="text-status-success">{verifyCounts.safe} safe</span> ·
-              <span class="text-status-warning">{verifyCounts.review} review</span>
-              · <span class="text-status-error">{verifyCounts.dangerous} dangerous</span>
-            </span>
-            {#if verifyCounts.review + verifyCounts.dangerous > 0}
-              <Button variant="outline" size="sm" onclick={deselectFlagged}
-                >Deselect {verifyCounts.review + verifyCounts.dangerous} flagged</Button
-              >
-            {/if}
-          </div>
-        {/if}
-        {#if verifyErr}
-          <Alert variant="destructive" class="mb-3">
-            <AlertDescription class="whitespace-pre-wrap">{verifyErr}</AlertDescription>
-          </Alert>
-        {/if}
-        {#if verification}
-          {#if verification.notes.length === 0}
-            <div class="text-sm text-muted-foreground">
-              No agent notes returned{verification.gated ? ' before the gate.' : '.'}
-            </div>
-          {:else}
-            <div class="space-y-3">
-              {#each verification.notes as n (n.taskId)}
-                <Card class="gap-0 py-3">
-                  <CardContent class="px-3">
-                    <div class="mb-1.5 flex items-center gap-2">
-                      <span class="text-xs font-medium text-foreground">{n.role}</span>
-                      <span class="text-xs text-muted-foreground">#{n.taskId} · {n.status}</span>
-                    </div>
-                    <div class="text-sm break-words whitespace-pre-wrap text-muted-foreground">
-                      {n.output}
-                    </div>
-                  </CardContent>
-                </Card>
-              {/each}
-            </div>
-          {/if}
-        {/if}
-      </CardContent>
-    </Card>
-  {/if}
-
-  <Card class="gap-0 overflow-hidden py-0">
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead class="w-8"></TableHead>
-          <TableHead>Path</TableHead>
-          <TableHead>Kind</TableHead>
-          <TableHead>Reason</TableHead>
-          <TableHead class="text-right">Size</TableHead>
-          <TableHead>Risk</TableHead>
-          {#if verdictByPath.size > 0}<TableHead>AI</TableHead>{/if}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {#each rows as { node, depth, isFolder } (node.fullPath + (node.proposal?.id ?? ''))}
-          {@const sel = rowSel(node)}
-          {@const p = node.proposal}
-          <TableRow>
-            <TableCell class="align-top">
-              <Checkbox
-                checked={sel.all}
-                indeterminate={sel.some}
-                onCheckedChange={() => toggleSel(sel.ids, !sel.all)}
-              />
-            </TableCell>
-            <TableCell class="align-top font-mono text-xs break-all">
-              <div class="flex items-start" style="padding-left: {depth * 16}px">
-                {#if isFolder}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    class="mt-px mr-1.5 h-4 w-4 shrink-0 p-0 text-muted-foreground"
-                    onclick={() => toggleExp(node.fullPath)}
-                    >{expanded.has(node.fullPath) ? '▾' : '▸'}</Button
-                  >
-                {:else}
-                  <span class="mr-1.5 w-4 shrink-0 text-muted-foreground/50">·</span>
-                {/if}
-                <span class={isFolder ? 'text-foreground' : ''}>
-                  {node.name}
-                  {#if isFolder}<span class="ml-2 text-muted-foreground"
-                      >{node.count} item{node.count === 1 ? '' : 's'}</span
-                    >{/if}
-                </span>
-              </div>
-            </TableCell>
-            <TableCell class="align-top text-muted-foreground">{p ? p.kind : ''}</TableCell>
-            <TableCell class="align-top text-muted-foreground">{p ? p.reason : ''}</TableCell>
-            <TableCell class="text-right align-top whitespace-nowrap"
-              >{fmtBytes(node.sizeBytes)}</TableCell
-            >
-            <TableCell class="align-top">
-              {#if p}<Badge variant="outline" class={RISK_BADGE[p.risk]}>{p.risk}</Badge>{/if}
-            </TableCell>
-            {#if verdictByPath.size > 0}
-              <TableCell class="align-top">
-                {#if p && verdictByPath.has(p.path)}
-                  {@const v = verdictByPath.get(p.path)!}
-                  <Badge variant="outline" class={VERDICT_BADGE[v.verdict]} title={v.reason}
-                    >{v.verdict}</Badge
-                  >
-                {/if}
-              </TableCell>
-            {/if}
-          </TableRow>
-        {/each}
-        {#if summary.proposals.length === 0}
-          <TableRow>
-            <TableCell
-              colspan={verdictByPath.size > 0 ? 7 : 6}
-              class="py-10 text-center text-muted-foreground"
-            >
-              No cleanup proposals. Disk looks tidy.
-            </TableCell>
-          </TableRow>
-        {/if}
-      </TableBody>
-    </Table>
-  </Card>
+  <CleanupProposalTable
+    {rows}
+    {selected}
+    {expanded}
+    {verdictByPath}
+    empty={summary.proposals.length === 0}
+    ontoggleSel={toggleSel}
+    ontoggleExp={toggleExp}
+  />
 {/if}

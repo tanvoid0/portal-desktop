@@ -1,35 +1,24 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import { beforeNavigate, goto } from '$app/navigation';
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
-  import { Input } from '$lib/components/ui/input';
-  import { Textarea } from '$lib/components/ui/textarea';
-  import { Label } from '$lib/components/ui/label';
   import { Badge } from '$lib/components/ui/badge';
   import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-  import Plus from '~icons/fa6-solid/plus';
-  import Trash2 from '~icons/fa6-solid/trash';
   import Save from '~icons/fa6-solid/floppy-disk';
   import RefreshCw from '~icons/fa6-solid/rotate';
   import Shield from '~icons/fa6-solid/shield';
   import ShieldAlert from '~icons/fa6-solid/shield-halved';
-  import Search from '~icons/fa6-solid/magnifying-glass';
   import Loader2 from '~icons/fa6-solid/spinner';
   import Variable from '~icons/fa6-solid/square-root-variable';
   import User from '~icons/fa6-solid/user';
   import Monitor from '~icons/fa6-solid/desktop';
-  import ListIcon from '~icons/fa6-solid/list';
   import { toast } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
   import { isTauriEnvironment } from '$lib/utils/tauri';
+  import EnvVariableRow from './EnvVariableRow.svelte';
+  import EnvScopeCard from './EnvScopeCard.svelte';
+  import { hasMultipleSegments } from '../utils/envSegments';
   import type { EnvPermissions, EnvRow, EnvVariable } from '../types';
   import {
     applyEnvironmentChanges,
@@ -53,14 +42,6 @@
   let rows = $state<EnvRow[]>([]);
   let nextId = 1;
   let expandedValues = $state<Set<string>>(new Set());
-
-  function segments(value: string): string[] {
-    return value.split(';');
-  }
-
-  function hasMultipleSegments(value: string): boolean {
-    return segments(value).filter((s) => s.trim() !== '').length > 1;
-  }
 
   function toggleExpanded(id: string) {
     const next = new Set(expandedValues);
@@ -248,76 +229,13 @@
     </p>
   {:else}
     {#each sectionRows as row (row.id)}
-      <div class="grid gap-3 rounded-lg border p-3 md:grid-cols-[1fr_1.5fr_auto]">
-        <div>
-          <Label for="name-{row.id}" class="mb-1.5 block text-xs">Name</Label>
-          <Input
-            id="name-{row.id}"
-            value={row.name}
-            disabled={!row.isNew}
-            placeholder="VARIABLE_NAME"
-            oninput={(e) =>
-              updateRow(row.id, {
-                name: (e.currentTarget as HTMLInputElement).value,
-              })}
-          />
-        </div>
-        <div>
-          <div class="mb-1.5 flex items-center justify-between">
-            <Label for="value-{row.id}" class="block text-xs">Value</Label>
-            {#if hasMultipleSegments(row.value)}
-              <Button
-                variant="ghost"
-                size="icon"
-                class="h-5 w-5 {expandedValues.has(row.id) ? 'text-primary' : ''}"
-                onclick={() => toggleExpanded(row.id)}
-                aria-pressed={expandedValues.has(row.id)}
-                aria-label={expandedValues.has(row.id)
-                  ? 'Collapse to single line'
-                  : 'Split ; separated value into lines'}
-                title={expandedValues.has(row.id)
-                  ? 'Collapse to single line'
-                  : 'Split into one entry per line'}
-              >
-                <ListIcon class="h-3 w-3" />
-              </Button>
-            {/if}
-          </div>
-          {#if expandedValues.has(row.id)}
-            <Textarea
-              id="value-{row.id}"
-              value={segments(row.value).join('\n')}
-              placeholder="value"
-              rows={Math.min(Math.max(segments(row.value).length, 2), 10)}
-              class="font-mono text-sm"
-              oninput={(e) =>
-                updateRow(row.id, {
-                  value: (e.currentTarget as HTMLTextAreaElement).value.split('\n').join(';'),
-                })}
-            />
-          {:else}
-            <Input
-              id="value-{row.id}"
-              value={row.value}
-              placeholder="value"
-              oninput={(e) =>
-                updateRow(row.id, {
-                  value: (e.currentTarget as HTMLInputElement).value,
-                })}
-            />
-          {/if}
-        </div>
-        <div class="flex items-end">
-          <Button
-            variant="ghost"
-            size="icon"
-            onclick={() => removeRow(row.id)}
-            aria-label="Remove variable"
-          >
-            <Trash2 class="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      <EnvVariableRow
+        {row}
+        expanded={expandedValues.has(row.id)}
+        ontoggle={() => toggleExpanded(row.id)}
+        onupdate={(patch) => updateRow(row.id, patch)}
+        onremove={() => removeRow(row.id)}
+      />
     {/each}
   {/if}
 {/snippet}
@@ -399,78 +317,39 @@
       </div>
 
       <TabsContent value="user">
-        <Card>
-          <CardHeader class="gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div class="space-y-1">
-              <CardTitle>User variables</CardTitle>
-              <CardDescription>
-                Persistent for your account / user profile. Changes apply immediately without
-                elevation.
-              </CardDescription>
-            </div>
-            <div class="flex w-full flex-wrap gap-2 sm:w-auto">
-              <div class="relative min-w-[12rem] flex-1 sm:flex-none">
-                <Search
-                  class="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input bind:value={userSearch} placeholder="Search user variables…" class="pl-8" />
-              </div>
-              <Button
-                variant="outline"
-                onclick={() => addRow('user')}
-                disabled={saving || permissions?.canEditUser === false}
-              >
-                <Plus class="mr-2 h-4 w-4" />
-                Add variable
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent class="space-y-3">
-            {@render variableList(userRows, userSearch)}
-          </CardContent>
-        </Card>
+        <EnvScopeCard
+          title="User variables"
+          description="Persistent for your account / user profile. Changes apply immediately without elevation."
+          bind:search={userSearch}
+          searchPlaceholder="Search user variables…"
+          addDisabled={saving || permissions?.canEditUser === false}
+          onadd={() => addRow('user')}
+        >
+          {@render variableList(userRows, userSearch)}
+        </EnvScopeCard>
       </TabsContent>
 
       <TabsContent value="system">
-        <Card>
-          <CardHeader class="gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div class="space-y-1">
-              <CardTitle>System variables</CardTitle>
-              <CardDescription>
-                Machine-wide variables visible to all users and services.
-              </CardDescription>
-            </div>
-            <div class="flex w-full flex-wrap gap-2 sm:w-auto">
-              <div class="relative min-w-[12rem] flex-1 sm:flex-none">
-                <Search
-                  class="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  bind:value={systemSearch}
-                  placeholder="Search system variables…"
-                  class="pl-8"
-                />
-              </div>
-              <Button variant="outline" onclick={() => addRow('system')} disabled={saving}>
-                <Plus class="mr-2 h-4 w-4" />
-                Add variable
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent class="space-y-3">
-            {#if permissions && !permissions.canEditSystem}
-              <Alert>
-                <ShieldAlert class="h-4 w-4" />
-                <AlertTitle>Administrator approval required</AlertTitle>
-                <AlertDescription>
-                  Saving changes in this tab will open a UAC / administrator prompt. Portal stays
-                  open and picks up the new values when you approve.
-                </AlertDescription>
-              </Alert>
-            {/if}
-            {@render variableList(systemRows, systemSearch)}
-          </CardContent>
-        </Card>
+        <EnvScopeCard
+          title="System variables"
+          description="Machine-wide variables visible to all users and services."
+          bind:search={systemSearch}
+          searchPlaceholder="Search system variables…"
+          addDisabled={saving}
+          onadd={() => addRow('system')}
+        >
+          {#if permissions && !permissions.canEditSystem}
+            <Alert>
+              <ShieldAlert class="h-4 w-4" />
+              <AlertTitle>Administrator approval required</AlertTitle>
+              <AlertDescription>
+                Saving changes in this tab will open a UAC / administrator prompt. Portal stays open
+                and picks up the new values when you approve.
+              </AlertDescription>
+            </Alert>
+          {/if}
+          {@render variableList(systemRows, systemSearch)}
+        </EnvScopeCard>
       </TabsContent>
     </Tabs>
 

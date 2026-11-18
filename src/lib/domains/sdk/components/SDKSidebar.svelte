@@ -10,13 +10,6 @@
 <script lang="ts">
   import { ScrollArea } from '$lib/components/ui/scroll-area';
   import { Separator } from '$lib/components/ui/separator';
-  import Settings from '~icons/fa6-solid/gear';
-  import Database from '~icons/fa6-solid/database';
-  import Code from '~icons/fa6-solid/code';
-  import Globe from '~icons/fa6-solid/globe';
-  import Container from '~icons/fa6-solid/cube';
-  import Package from '~icons/fa6-solid/box-open';
-  import Download from '~icons/fa6-solid/download';
   import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import { invoke } from '@tauri-apps/api/core';
   import { logger } from '$lib/domains/shared';
@@ -25,9 +18,11 @@
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { queryKeys } from '$lib/domains/shared/query/keys';
   import { goto } from '$app/navigation';
-  import { page } from '$app/state';
   import { useSidebar, MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
 
+  import { getSDKIconColor } from '../utils/sdkIcons';
+  import { buildSDKCategories, type SDKCategory, type SDKManager } from '../utils/sdkSidebarItems';
+  import SDKSidebarNav from './sidebar/SDKSidebarNav.svelte';
   import SDKCategorySection from './sidebar/SDKCategorySection.svelte';
   import type { SDKItem } from './sidebar/sdkSidebarTypes';
 
@@ -37,22 +32,9 @@
     onSDKSelect?: (sdk: SDKItem) => void;
   }
 
-  interface SDKManager {
-    id: string;
-    name: string;
-    display_name: string;
-    installed: boolean;
-    version: string | null;
-    supports_installation: boolean;
-    supports_version_switching: boolean;
-    install_command: string | null;
-    website: string | null;
-  }
-
   const { selectedSDK, navigationItemIds, onSDKSelect }: Props = $props();
 
   // State
-  const currentPath = $derived(page.url.pathname);
   const sidebar = useSidebar();
   // The rail only exists on the desktop sidebar; the mobile sheet is always full width.
   const railMode = $derived(sidebar.state === 'collapsed' && !sidebar.isMobile);
@@ -78,141 +60,7 @@
     return queryClient.invalidateQueries({ queryKey: queryKeys.sdk.configs });
   }
 
-  // Navigation items - using actual routes
-  type NavigationItem = {
-    id: string;
-    name: string;
-    icon: typeof Settings;
-    description: string;
-  };
-
-  const navigationItems: NavigationItem[] = [
-    {
-      id: '/sdk',
-      name: 'Overview',
-      icon: Settings,
-      description: 'SDK overview and statistics',
-    },
-    {
-      id: '/sdk/managers',
-      name: 'SDK Managers',
-      icon: Settings,
-      description: 'Manage SDK version managers',
-    },
-    {
-      id: '/sdk/services',
-      name: 'Services',
-      icon: Package,
-      description: 'Start and stop SDK services',
-    },
-    {
-      id: '/sdk/versions',
-      name: 'Versions',
-      icon: Download,
-      description: 'Install and switch SDK versions',
-    },
-  ];
-
-  // Allow the parent layout to trim the sidebar navigation per-section.
-  // This keeps the sidebar reusable and avoids page-specific nav markup.
-  const resolvedNavigationItems = $derived.by((): NavigationItem[] =>
-    navigationItemIds?.length
-      ? navigationItems.filter((item) => navigationItemIds.includes(item.id))
-      : navigationItems
-  );
-
-  function isNavigationItemActive(itemId: string) {
-    const normalizedCurrentPath =
-      currentPath.endsWith('/') && currentPath !== '/' ? currentPath.slice(0, -1) : currentPath;
-
-    const normalizedItemId = itemId.endsWith('/') && itemId !== '/' ? itemId.slice(0, -1) : itemId;
-
-    // Mark the parent route as active for nested SDK-manager pages.
-    if (normalizedItemId === '/sdk/managers') {
-      return (
-        normalizedCurrentPath === normalizedItemId ||
-        normalizedCurrentPath.startsWith(`${normalizedItemId}/`)
-      );
-    }
-
-    return normalizedCurrentPath === normalizedItemId;
-  }
-
-  /**
-   * Convert SDK configs to SDKItem format. Languages are the one category that
-   * can report a version through an installed SDK manager.
-   */
-  function toSDKItems(category: string, viaManagers = false): SDKItem[] {
-    return sdkConfigs
-      .filter((config) => config.category === category)
-      .map((config) => {
-        const rawVersion =
-          config.sdk_version ||
-          (viaManagers ? config.sdk_managers.find((m) => m.installed)?.version : null);
-
-        return {
-          id: config.id,
-          name: config.name,
-          displayName: config.display_name,
-          icon: config.icon,
-          category,
-          installed:
-            config.sdk_installed ||
-            (viaManagers && config.sdk_managers.some((m) => m.installed)) ||
-            false,
-          enabled: true,
-          version: (rawVersion ?? '').trim().replace(/^v/, '') || undefined,
-          description: config.description,
-          hasToggle: true,
-          hasService: config.service_config != null,
-          serviceRunning: config.service_running ?? null,
-          port: config.service_port ?? null,
-        } satisfies SDKItem;
-      });
-  }
-
-  type SDKCategory = { key: string; title: string; icon: typeof Settings; items: SDKItem[] };
-
-  const categories = $derived.by((): SDKCategory[] => [
-    {
-      key: 'manager',
-      title: 'SDK Managers',
-      icon: Settings,
-      items: sdkManagers.map(
-        (m) =>
-          ({
-            id: m.id,
-            name: m.name ?? m.id,
-            displayName: m.display_name ?? m.name ?? m.id,
-            icon: getSDKIcon(m.id),
-            category: 'manager',
-            installed: m.installed,
-            enabled: true,
-            version: (m.version ?? '').trim().replace(/^v/, '') || undefined,
-            description: undefined,
-            hasToggle: false,
-            hasService: false,
-            serviceRunning: null,
-            port: null,
-          }) satisfies SDKItem
-      ),
-    },
-    {
-      key: 'language',
-      title: 'Language & Runtime',
-      icon: Code,
-      items: toSDKItems('language', true),
-    },
-    { key: 'database', title: 'Database Server', icon: Database, items: toSDKItems('database') },
-    { key: 'web', title: 'Web Server', icon: Globe, items: toSDKItems('server') },
-    {
-      key: 'container',
-      title: 'Container Platform',
-      icon: Container,
-      items: toSDKItems('container'),
-    },
-    { key: 'ai', title: 'AI SDKs', icon: Code, items: toSDKItems('ai') },
-  ]);
+  const categories = $derived(buildSDKCategories(sdkConfigs, sdkManagers));
 
   const visibleCategories = $derived(categories.filter((c) => c.items.length > 0));
   const allSDKs = $derived(categories.flatMap((c) => c.items));
@@ -323,117 +171,6 @@
       },
     });
   }
-
-  function getSDKIcon(sdkType: string): string {
-    const iconMap: Record<string, string> = {
-      // Language & Runtime
-      java: 'devicon-java-plain',
-      node: 'devicon-nodejs-plain',
-      python: 'devicon-python-plain',
-      rust: 'devicon-rust-plain',
-      go: 'devicon-go-plain',
-      php: 'devicon-php-plain',
-      ruby: 'devicon-ruby-plain',
-      bun: 'devicon-bun-plain',
-      deno: 'devicon-deno-plain',
-      gradle: 'devicon-gradle-plain',
-      kotlin: 'devicon-kotlin-plain',
-      scala: 'devicon-scala-plain',
-      erlang: 'devicon-erlang-plain',
-      perl: 'devicon-perl-plain',
-
-      // Database
-      mysql: 'devicon-mysql-plain',
-      postgresql: 'devicon-postgresql-plain',
-      mongodb: 'devicon-mongodb-plain',
-      mariadb: 'devicon-mariadb-plain',
-
-      // Web Server
-      nginx: 'devicon-nginx-original',
-      apache: 'devicon-apache-plain',
-      caddy: 'devicon-caddy-plain',
-
-      // Container
-      docker: 'devicon-docker-plain',
-      kubernetes: 'devicon-kubernetes-plain',
-      podman: 'devicon-podman-plain',
-
-      // Package Managers
-      npm: 'devicon-npm-original-wordmark',
-      yarn: 'devicon-yarn-plain',
-      pip: 'devicon-python-plain',
-      cargo: 'devicon-rust-plain',
-      composer: 'devicon-composer-plain',
-      gem: 'devicon-ruby-plain',
-
-      // SDK Managers
-      nvm: 'devicon-nodejs-plain',
-      pyenv: 'devicon-python-plain',
-      rustup: 'devicon-rust-plain',
-      sdkman: 'devicon-sdkman-plain',
-      goenv: 'devicon-go-plain',
-      rbenv: 'devicon-ruby-plain',
-      phpenv: 'devicon-php-plain',
-    };
-
-    return iconMap[sdkType.toLowerCase()] || 'devicon-devicon-plain';
-  }
-
-  function getSDKIconColor(sdkId: string): string {
-    const colorMap: Record<string, string> = {
-      // Language & Runtime - colored icons
-      java: 'text-orange-600',
-      node: 'text-green-600',
-      nodejs: 'text-green-600',
-      python: 'text-blue-600',
-      rust: 'text-orange-600',
-      go: 'text-blue-500',
-      php: 'text-purple-600',
-      ruby: 'text-red-600',
-      bun: 'text-yellow-600',
-      deno: 'text-gray-800',
-      gradle: 'text-blue-500',
-      kotlin: 'text-purple-600',
-      scala: 'text-red-600',
-      erlang: 'text-red-500',
-      perl: 'text-blue-700',
-
-      // Database
-      mysql: 'text-blue-600',
-      postgresql: 'text-blue-700',
-      mongodb: 'text-green-600',
-      mariadb: 'text-blue-500',
-
-      // Web Server
-      nginx: 'text-green-600',
-      apache: 'text-red-600',
-      caddy: 'text-blue-600',
-
-      // Container
-      docker: 'text-blue-500',
-      kubernetes: 'text-blue-600',
-      podman: 'text-blue-600',
-
-      // Package Managers
-      npm: 'text-red-600',
-      yarn: 'text-blue-600',
-      pip: 'text-blue-600',
-      cargo: 'text-orange-600',
-      composer: 'text-gray-700',
-      gem: 'text-red-600',
-
-      // SDK Managers
-      nvm: 'text-green-600',
-      pyenv: 'text-blue-600',
-      rustup: 'text-orange-600',
-      sdkman: 'text-blue-600',
-      goenv: 'text-blue-500',
-      rbenv: 'text-red-600',
-      phpenv: 'text-purple-600',
-    };
-
-    return colorMap[sdkId.toLowerCase()] || '';
-  }
 </script>
 
 <div class="flex h-full min-h-0 flex-col overflow-hidden">
@@ -462,30 +199,7 @@
     <div
       class="space-y-4 p-3 group-data-[collapsible=icon]:space-y-3 group-data-[collapsible=icon]:p-1"
     >
-      <!-- Navigation Section -->
-      <div class="space-y-2">
-        <h3 class="text-xs font-medium text-muted-foreground group-data-[collapsible=icon]:hidden">
-          Navigation
-        </h3>
-        <div class="space-y-0.5">
-          {#each resolvedNavigationItems as item}
-            {@const Icon = item.icon}
-            <SidebarMenuButton
-              size="sm"
-              class="h-auto"
-              isActive={isNavigationItemActive(item.id)}
-              tooltipContent={item.name}
-              onclick={() => goto(item.id)}
-            >
-              <Icon class="h-4 w-4" />
-              <span class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                <span class="block truncate text-xs font-medium">{item.name}</span>
-                <span class="block truncate text-xs text-muted-foreground">{item.description}</span>
-              </span>
-            </SidebarMenuButton>
-          {/each}
-        </div>
-      </div>
+      <SDKSidebarNav {navigationItemIds} />
 
       <Separator />
 

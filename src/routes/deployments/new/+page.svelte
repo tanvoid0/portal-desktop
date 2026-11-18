@@ -11,6 +11,9 @@
   import { Label } from '$lib/components/ui/label';
   import { Textarea } from '$lib/components/ui/textarea';
   import Select from '$lib/components/ui/select.svelte';
+  import DockerConfigFields from '$lib/domains/deployments/components/DockerConfigFields.svelte';
+  import CliConfigFields from '$lib/domains/deployments/components/CliConfigFields.svelte';
+  import EnvVarsEditor from '$lib/domains/deployments/components/EnvVarsEditor.svelte';
   import {
     DeploymentType,
     ProjectType,
@@ -188,25 +191,6 @@
       isSubmitting = false;
     }
   }
-
-  function addEnvVar() {
-    envVars = { ...envVars, '': '' };
-  }
-
-  function removeEnvVar(key: string) {
-    const newEnvVars = { ...envVars };
-    delete newEnvVars[key];
-    envVars = newEnvVars;
-  }
-
-  function updateEnvVar(oldKey: string, newKey: string, value: string) {
-    const newEnvVars = { ...envVars };
-    if (oldKey !== newKey) {
-      delete newEnvVars[oldKey];
-    }
-    newEnvVars[newKey] = value;
-    envVars = newEnvVars;
-  }
 </script>
 
 <svelte:head>
@@ -307,142 +291,21 @@
           <Input id="sdkVersion" bind:value={sdkVersion} placeholder="latest" />
         </div>
 
-        <!-- Docker-specific fields -->
         {#if deploymentType === DeploymentType.DOCKER}
-          <div class="divider-edge-t divider-edge-full space-y-4 pt-6">
-            <h3 class="text-lg font-semibold">Docker Configuration</h3>
-
-            <div>
-              <Label for="dockerImageName">Docker Image Name</Label>
-              <Input
-                id="dockerImageName"
-                bind:value={dockerImageName}
-                placeholder="my-app:latest (auto-generated if empty)"
-              />
-              <p class="mt-1 text-xs text-muted-foreground">
-                Leave empty to auto-generate based on deployment name
-              </p>
-            </div>
-
-            <div>
-              <Label for="dockerfilePath">Dockerfile Path</Label>
-              <Input
-                id="dockerfilePath"
-                bind:value={dockerfilePath}
-                placeholder="{projectPath}/Dockerfile (auto-generated if empty)"
-              />
-              <p class="mt-1 text-xs text-muted-foreground">
-                Leave empty to auto-generate Dockerfile
-              </p>
-            </div>
-
-            <div>
-              <Label for="exposedPort">Exposed Port</Label>
-              <Input
-                id="exposedPort"
-                type="number"
-                min="1"
-                max="65535"
-                bind:value={exposedPort}
-                placeholder="3000"
-                aria-invalid={!portValid}
-              />
-              {#if !portValid}
-                <p class="mt-1 text-xs text-destructive">Port must be between 1 and 65535</p>
-              {/if}
-            </div>
-          </div>
+          <DockerConfigFields
+            bind:dockerImageName
+            bind:dockerfilePath
+            bind:exposedPort
+            {projectPath}
+            {portValid}
+          />
         {/if}
 
-        <!-- CLI-specific fields -->
         {#if deploymentType === DeploymentType.CLI}
-          <div class="divider-edge-t divider-edge-full space-y-4 pt-6">
-            <h3 class="text-lg font-semibold">CLI Configuration</h3>
-
-            <div>
-              <Label for="command">Command *</Label>
-              <Input id="command" bind:value={command} placeholder="npm start" required />
-              <p class="mt-1 text-xs text-muted-foreground">
-                Enter the command to run (e.g., "npm start", "python app.py", "cargo run")
-              </p>
-            </div>
-
-            <div>
-              <Label for="workingDirectory">Working Directory</Label>
-              <Input
-                id="workingDirectory"
-                bind:value={workingDirectory}
-                placeholder="{projectPath} (defaults to project path)"
-              />
-            </div>
-          </div>
+          <CliConfigFields bind:command bind:workingDirectory {projectPath} />
         {/if}
 
-        <!-- Environment Variables -->
-        <div class="divider-edge-t divider-edge-full pt-6">
-          <div class="mb-4 flex items-center justify-between">
-            <div>
-              <h3 class="text-lg font-semibold">Environment Variables</h3>
-              <p class="text-sm text-muted-foreground">
-                Optional environment variables for your deployment
-              </p>
-            </div>
-            <Button type="button" variant="outline" size="sm" onclick={addEnvVar}>
-              Add Variable
-            </Button>
-          </div>
-          {#if envFiles.length > 0}
-            <div class="mb-3">
-              <Label for="envFile">Load from .env file</Label>
-              <Select
-                options={[
-                  { value: '', label: 'None (manual)' },
-                  ...envFiles.map((f) => ({
-                    value: f.name,
-                    label: `${f.name} — ${f.vars.length} var${f.vars.length === 1 ? '' : 's'}`,
-                  })),
-                ]}
-                defaultValue={selectedEnvFile}
-                onSelect={(value) => applyEnvFile(value)}
-              />
-              <p class="mt-1 text-xs text-muted-foreground">
-                Fills the list below from the chosen file. Injected at run time, not baked into the
-                image.
-              </p>
-            </div>
-          {/if}
-          <div class="space-y-2">
-            {#each Object.entries(envVars) as [key, value]}
-              <div class="flex gap-2">
-                <Input
-                  placeholder="Variable name"
-                  value={key}
-                  oninput={(e) => {
-                    const input = e.target as HTMLInputElement;
-                    updateEnvVar(key, input.value, value);
-                  }}
-                  class="flex-1"
-                />
-                <Input
-                  placeholder="Value"
-                  {value}
-                  oninput={(e) => {
-                    const input = e.target as HTMLInputElement;
-                    updateEnvVar(key, key, input.value);
-                  }}
-                  class="flex-1"
-                />
-                <Button type="button" variant="outline" size="sm" onclick={() => removeEnvVar(key)}>
-                  Remove
-                </Button>
-              </div>
-            {:else}
-              <p class="py-4 text-center text-sm text-muted-foreground">
-                No environment variables added
-              </p>
-            {/each}
-          </div>
-        </div>
+        <EnvVarsEditor bind:envVars {envFiles} {selectedEnvFile} onSelectFile={applyEnvFile} />
       </form>
     </CardContent>
   </Card>

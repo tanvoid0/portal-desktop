@@ -7,6 +7,7 @@
   import { createProjectEnvQuery } from '../queries/projectEnvQueries';
   import { linkProjectEnv, unlinkProjectEnv, resyncProjectEnvLink } from '../api/projectEnvApi';
   import type { EnvLinkView, EnvVarView } from '../generated';
+  import ProjectEnvRow from './ProjectEnvRow.svelte';
   import LinkCredentialDialog from './LinkCredentialDialog.svelte';
   import { queryClient } from '$lib/domains/shared/query/queryClient';
   import { queryKeys } from '$lib/domains/shared/query/keys';
@@ -15,34 +16,11 @@
   import { confirmAction } from '$lib/utils/confirm';
   import { toast } from '$lib/utils/toast';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-  } from '$lib/components/ui/table';
-  import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
+  import { Table, TableBody, TableHead, TableHeader, TableRow } from '$lib/components/ui/table';
   import { Button } from '$lib/components/ui/button';
-  import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-  } from '$lib/components/ui/dropdown-menu';
   import { PageEmpty, PageError, PageLoading } from '$lib/components/shell';
-  import Eye from '~icons/fa6-solid/eye';
-  import EyeOff from '~icons/fa6-solid/eye-slash';
   import RefreshCw from '~icons/fa6-solid/rotate';
-  import Ellipsis from '~icons/fa6-solid/ellipsis';
-  import Copy from '~icons/fa6-solid/copy';
-  import LinkIcon from '~icons/fa6-solid/link';
   import UnlinkIcon from '~icons/fa6-solid/link-slash';
-  import Plus from '~icons/fa6-solid/plus';
-  import Check from '~icons/fa6-solid/check';
-  import PenToSquare from '~icons/fa6-solid/pen-to-square';
   import FileKey from '~icons/fa6-solid/key';
 
   interface Props {
@@ -57,29 +35,6 @@
     () => enabled
   );
   const projectEnv = $derived(envQuery.data);
-
-  const WARNING_BADGE = 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400';
-
-  function driftBadge(state: EnvLinkView['state']): {
-    label: string;
-    variant: BadgeVariant;
-    class?: string;
-  } {
-    switch (state) {
-      case 'inSync':
-        return { label: 'Linked', variant: 'outline' };
-      case 'fileChanged':
-        return { label: 'Changed on disk', variant: 'outline', class: WARNING_BADGE };
-      case 'credentialChanged':
-        return { label: 'Shared value updated', variant: 'outline', class: WARNING_BADGE };
-      case 'differs':
-        return { label: 'Differs from shared', variant: 'destructive' };
-      case 'notInFile':
-        return { label: 'Not in file', variant: 'outline', class: 'text-muted-foreground' };
-      case 'unknown':
-        return { label: 'Unlock to compare', variant: 'outline', class: 'text-muted-foreground' };
-    }
-  }
 
   let revealed = $state<Set<string>>(new Set());
   function toggleReveal(id: string) {
@@ -213,113 +168,19 @@
                 {#each file.vars as envVar, i (envVar.key + ':' + i)}
                   {@const id = `${file.name}:${envVar.key}`}
                   {@const isRevealed = revealed.has(id)}
-                  <TableRow>
-                    <TableCell class="font-mono">{envVar.key}</TableCell>
-                    <TableCell>
-                      <div class="flex items-center gap-2">
-                        {#if isRevealed}
-                          <span class="font-mono tabular-nums">{envVar.value}</span>
-                        {:else}
-                          <span class="font-mono text-muted-foreground">••••••••</span>
-                        {/if}
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={isRevealed
-                            ? `Hide value of ${envVar.key}`
-                            : `Reveal value of ${envVar.key}`}
-                          onclick={() => toggleReveal(id)}
-                        >
-                          {#if isRevealed}
-                            <EyeOff class="h-3.5 w-3.5" />
-                          {:else}
-                            <Eye class="h-3.5 w-3.5" />
-                          {/if}
-                        </Button>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {#if envVar.link}
-                        {@const badge = driftBadge(envVar.link.state)}
-                        <div class="flex flex-wrap items-center gap-1.5">
-                          <Badge variant="secondary">→ {envVar.link.credentialName}</Badge>
-                          {#if envVar.link.state === 'unknown'}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              class="h-auto gap-1 p-0"
-                              onclick={handleUnlockToCompare}
-                            >
-                              <Badge variant={badge.variant} class={badge.class}>
-                                {badge.label}
-                              </Badge>
-                            </Button>
-                          {:else}
-                            <Badge variant={badge.variant} class={badge.class}>{badge.label}</Badge>
-                          {/if}
-                        </div>
-                      {/if}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger>
-                          {#snippet child({ props })}
-                            <Button
-                              {...props}
-                              variant="ghost"
-                              size="icon-lg"
-                              aria-label={`Actions for ${envVar.key}`}
-                            >
-                              <Ellipsis class="h-4 w-4" />
-                            </Button>
-                          {/snippet}
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {#if envVar.link}
-                            <DropdownMenuItem onclick={() => handleCopyShared(envVar.link!)}>
-                              <Copy class="mr-2 h-4 w-4" />
-                              Copy shared value
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onclick={() => handleUpdateSharedFromFile(envVar)}>
-                              <PenToSquare class="mr-2 h-4 w-4" />
-                              Update shared credential from this file value
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onclick={() => handleResync(envVar.link!)}>
-                              <Check class="mr-2 h-4 w-4" />
-                              Acknowledge (re-sync)
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              variant="destructive"
-                              onclick={() => handleUnlink(envVar.link!, envVar.key)}
-                            >
-                              <UnlinkIcon class="mr-2 h-4 w-4" />
-                              Unlink
-                            </DropdownMenuItem>
-                          {:else}
-                            <DropdownMenuItem
-                              onclick={() =>
-                                (linkDialogTarget = { envKey: envVar.key, fileName: file.name })}
-                            >
-                              <LinkIcon class="mr-2 h-4 w-4" />
-                              Link to shared credential…
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onclick={() =>
-                                (createFor = {
-                                  envKey: envVar.key,
-                                  fileName: file.name,
-                                  value: envVar.value,
-                                })}
-                            >
-                              <Plus class="mr-2 h-4 w-4" />
-                              Create shared credential from this value…
-                            </DropdownMenuItem>
-                          {/if}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
+                  <ProjectEnvRow
+                    {envVar}
+                    fileName={file.name}
+                    {isRevealed}
+                    onToggleReveal={() => toggleReveal(id)}
+                    onUnlockToCompare={handleUnlockToCompare}
+                    onCopyShared={handleCopyShared}
+                    onUpdateShared={handleUpdateSharedFromFile}
+                    onResync={handleResync}
+                    onUnlink={handleUnlink}
+                    onLink={(t) => (linkDialogTarget = t)}
+                    onCreate={(t) => (createFor = t)}
+                  />
                 {/each}
               </TableBody>
             </Table>

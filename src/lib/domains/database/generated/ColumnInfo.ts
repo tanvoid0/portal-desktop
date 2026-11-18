@@ -3,10 +3,4 @@
 /**
  * One column of a table.
  */
-export type ColumnInfo = {
-  name: string;
-  dataType: string;
-  notNull: boolean;
-  pk: boolean;
-  defaultValue: string | null;
-};
+export type ColumnInfo = { name: string, dataType: string, notNull: boolean, pk: boolean, defaultValue: string | null, };

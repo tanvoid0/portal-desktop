@@ -4,24 +4,13 @@
 
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { page } from '$app/state';
-  import { goto, afterNavigate } from '$app/navigation';
+  import { afterNavigate } from '$app/navigation';
   import type { Snippet } from 'svelte';
-  import { notify, initNotify } from '$lib/utils/notify';
   import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
-  import { agentsApi } from '$lib/domains/agents/api/agentsApi';
-  import { Button } from '$lib/components/ui/button';
-  import ThemeToggle from '$lib/components/ui/theme-toggle.svelte';
-  import Breadcrumb from '$lib/components/ui/breadcrumb.svelte';
   import { createDashboardOverviewQuery } from '$lib/domains/dashboard/queries/dashboardQueries';
   import { logger, themeStore, resolvedTheme } from '$lib/domains/shared';
-  import {
-    breadcrumbItems,
-    breadcrumbSettings,
-    homeItem,
-    showHome,
-  } from '$lib/domains/shared/stores/breadcrumbStore';
+  import { breadcrumbItems } from '$lib/domains/shared/stores/breadcrumbStore';
   import { terminalActions } from '$lib/domains/terminal';
   import { learningService } from '$lib/domains/learning';
   import { settingsActions } from '$lib/domains/settings/stores/settingsStore';
@@ -32,30 +21,19 @@
   import { runStartupUpdateCheck } from '$lib/domains/updates/services/startupUpdate';
   import { getCurrentVersion } from '$lib/domains/updates/services/updateService';
   import { getIdentifier } from '@tauri-apps/api/app';
-  import { Badge } from '$lib/components/ui/badge';
-  import { cn } from '$lib/utils';
   import DeviceAuthGuard from '$lib/components/DeviceAuthGuard.svelte';
+  import AppTopBar from './app-top-bar.svelte';
+  import AppSidebarHeader from './app-sidebar-header.svelte';
+  import AppSidebarFooter from './app-sidebar-footer.svelte';
+  import { startAppNotifications } from './appNotifications';
   import InterruptedMoveBanner from '$lib/domains/projects/components/InterruptedMoveBanner.svelte';
-  import ArrowLeft from '~icons/fa6-solid/arrow-left';
-  import ArrowRight from '~icons/fa6-solid/arrow-right';
-  import RefreshCw from '~icons/fa6-solid/rotate';
-  import Gear from '~icons/fa6-solid/gear';
-  import Unplug from '~icons/fa6-solid/link-slash';
-  import {
-    Provider as SidebarProvider,
-    Trigger as SidebarTrigger,
-    Sidebar as SidebarRoot,
-  } from '$lib/components/ui/sidebar';
+  import { Provider as SidebarProvider, Sidebar as SidebarRoot } from '$lib/components/ui/sidebar';
   import { SIDEBAR_COOKIE_NAME } from '$lib/components/ui/sidebar/constants';
   import type { NavSection } from '$lib/components/shell/nav-types';
   import NavSectionList from '$lib/components/shell/nav-section-list.svelte';
-  import SidebarTooltip from '$lib/components/shell/sidebar-tooltip.svelte';
   import PageContainer from '$lib/components/shell/page-container.svelte';
   import { buildMainNavSections } from '$lib/config/main-nav';
-  import { agentTabPath } from '$lib/config/agents-tabs';
-  import { agentRuns } from '$lib/domains/agents/state/agentRuns.svelte.js';
   import AgentApprovalStack from '$lib/domains/agents/components/AgentApprovalStack.svelte';
-  import type { PipelineExecution } from '$lib/domains/projects/pipelines';
   import { isMobileShell } from '$lib/domains/mobile/shell';
   import { mobileConnection } from '$lib/domains/mobile/connection.svelte';
   import { filterNavForCaps } from '$lib/domains/mobile/navCaps';
@@ -99,47 +77,7 @@
   );
 
   let unsubscribe: (() => void) | undefined;
-  let popStateHandler: (() => void) | undefined;
-  let unlistenPairing: UnlistenFn | undefined;
-  let unlistenNotify: (() => void) | undefined;
-  let unlistenAgentEvents: UnlistenFn | undefined;
-  let unlistenPipelineEvents: UnlistenFn | undefined;
-  // One notification per execution per terminal status — the backend emits
-  // this event on every step tick, not just on success/failed.
-  const notifiedExecutions = new Set<string>();
-
-  // Browser navigation state
-  let canGoBack = $state(false);
-  let canGoForward = $state(false);
-
-  function updateNavigationState() {
-    if (typeof window !== 'undefined') {
-      // Navigation API (Chromium/WebView2) reports real back/forward availability
-      const nav = (
-        window as unknown as { navigation?: { canGoBack: boolean; canGoForward: boolean } }
-      ).navigation;
-      canGoBack = nav ? nav.canGoBack : window.history.length > 1;
-      canGoForward = nav?.canGoForward ?? false;
-    }
-  }
-
-  function goBack() {
-    if (typeof window !== 'undefined' && canGoBack) {
-      window.history.back();
-    }
-  }
-
-  function goForward() {
-    if (typeof window !== 'undefined' && canGoForward) {
-      window.history.forward();
-    }
-  }
-
-  function refresh() {
-    if (typeof window !== 'undefined') {
-      window.location.reload();
-    }
-  }
+  let stopNotifications: (() => void) | undefined;
 
   function handleSidebarOpenChange(open: boolean) {
     sidebarOpen = open;
@@ -185,90 +123,7 @@
       // Initialize backend log listener to receive logs from Rust backend
       logger.initBackendLogListener();
 
-      // Initialize navigation state
-      updateNavigationState();
-
-      // Listen to popstate events to track forward/back navigation
-      if (typeof window !== 'undefined') {
-        popStateHandler = updateNavigationState;
-        window.addEventListener('popstate', popStateHandler);
-      }
-
-      // A phone pairing over discovery/manual-IP blocks server-side for up to
-      // ~170s waiting for a human to click Allow on /devices — but that page
-      // is the only place that heard this event before, so a request nobody
-      // is currently looking at timed out unnoticed (QA-121). Surface it
-      // app-wide; the Devices page keeps its own listener for the refetch.
-      // Desktop-only: pairing approval happens on the PC.
-      if (!isMobileShell)
-        listen<{ device_id: string; device_name: string }>('device://pending', (event) => {
-          notify({
-            title: 'A phone wants to pair',
-            body: `${event.payload.device_name} is waiting for approval.`,
-            route: '/devices',
-            actionLabel: 'Review',
-            duration: 0,
-          });
-        }).then((fn) => {
-          unlistenPairing = fn;
-        });
-
-      // Native banner when unfocused + always-on toast for turn/permission/exit
-      // events from any running agent — see domains/agents/service.rs. On
-      // mobile the backend posts the native notification itself
-      // (Mobile::notify in mobile/src-tauri/src/lib.rs) — initNotify() here
-      // only wires tap-to-navigate, via the plugin's cross-platform onAction
-      // event (#641).
-      initNotify().then((fn) => {
-        unlistenNotify = fn;
-      });
-      void agentRuns.ensureInit();
-      agentsApi
-        .onEvent(({ run_id, event }) => {
-          const route = `${agentTabPath()}?session=${run_id}`;
-          if (event.type === 'turn_done' && !event.is_error) {
-            // Errored turns are reported by the `exited` branch below instead —
-            // skip here so the user doesn't see "finished" then "failed".
-            notify({ title: 'Agent finished', body: event.final_text?.slice(0, 120), route });
-          } else if (event.type === 'permission_request') {
-            notify({
-              title: 'Agent needs your approval',
-              body: `Wants to run ${event.tool_name}`,
-              route,
-              duration: 0,
-            });
-          } else if (event.type === 'exited' && event.code) {
-            notify({
-              title: 'Agent run failed',
-              body: `Exited with code ${event.code}`,
-              type: 'error',
-              route,
-            });
-          }
-        })
-        .then((fn) => {
-          unlistenAgentEvents = fn;
-        });
-
-      // Toast when a pipeline run finishes — same event the execution monitor
-      // listens to, so this reaches desktop and a phone that's in the foreground.
-      // Action runs (and every workflow step, which is one) share this event but
-      // have their own UI; toasting them would announce each as a pipeline.
-      listen<PipelineExecution>('pipeline-execution-update', (event) => {
-        const execution = event.payload;
-        if (execution.kind === 'action') return;
-        if (execution.status !== 'success' && execution.status !== 'failed') return;
-        if (notifiedExecutions.has(execution.id)) return;
-        notifiedExecutions.add(execution.id);
-        notify({
-          title: execution.status === 'success' ? 'Pipeline run finished' : 'Pipeline run failed',
-          body: execution.error,
-          type: execution.status === 'failed' ? 'error' : undefined,
-          route: `/pipeline-runs?run=${execution.id}`,
-        });
-      }).then((fn) => {
-        unlistenPipelineEvents = fn;
-      });
+      stopNotifications = startAppNotifications();
 
       // Initialize theme first (now synchronous)
       themeStore.initialize();
@@ -307,23 +162,9 @@
     });
   });
 
-  // Update navigation state when page changes
-  $effect(() => {
-    void page.url.href;
-    updateNavigationState();
-  });
-
   onDestroy(() => {
-    if (unsubscribe) {
-      unsubscribe();
-    }
-    if (typeof window !== 'undefined' && popStateHandler) {
-      window.removeEventListener('popstate', popStateHandler);
-    }
-    unlistenPairing?.();
-    unlistenNotify?.();
-    unlistenAgentEvents?.();
-    unlistenPipelineEvents?.();
+    unsubscribe?.();
+    stopNotifications?.();
   });
 </script>
 
@@ -350,55 +191,7 @@
         ? 'pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]'
         : ''}"
     >
-      <!-- Top Bar -->
-      <header
-        class="divider-edge-b divider-edge-full flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
-      >
-        <div class="flex h-10 items-center gap-2 px-3 md:px-4 3xl:px-6">
-          <SidebarTrigger />
-          <!-- Navigation Buttons -->
-          <div class="divider-edge-r mr-2 flex items-center gap-1 pr-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-7 w-7"
-              disabled={!canGoBack}
-              onclick={goBack}
-              title="Go back"
-              aria-label="Go back"
-            >
-              <ArrowLeft class="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-7 w-7"
-              disabled={!canGoForward}
-              onclick={goForward}
-              title="Go forward"
-              aria-label="Go forward"
-            >
-              <ArrowRight class="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-7 w-7"
-              onclick={refresh}
-              title="Refresh page"
-              aria-label="Refresh page"
-            >
-              <RefreshCw class="h-3.5 w-3.5" />
-            </Button>
-          </div>
-          <Breadcrumb
-            items={$breadcrumbItems}
-            showHome={$showHome}
-            homeItem={$homeItem}
-            class="flex-1"
-          />
-        </div>
-      </header>
+      <AppTopBar />
 
       {#if !isMobileShell}
         <InterruptedMoveBanner />
@@ -410,64 +203,7 @@
         {#if !hideMainSidebar}
           <SidebarRoot collapsible="icon">
             <div class="flex h-full min-h-0 min-w-0 flex-col">
-              <!-- Sidebar Header -->
-              <SidebarTooltip
-                label={`${isSdkPage ? 'SDK Manager' : 'Portal Desktop'}${appVersion ? ` v${appVersion}` : ''}${isDebugBuild ? ' (debug build)' : ''}`}
-              >
-                {#snippet trigger({ props })}
-                  <Button
-                    {...props}
-                    type="button"
-                    variant="ghost"
-                    class="divider-edge-b divider-edge-full divider-edge-sidebar h-auto w-full justify-start gap-3 px-4 py-4 text-left transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 hover:bg-sidebar-accent/50"
-                    onclick={() => goto('/')}
-                  >
-                    <!-- Debug builds tint the logo tile so the rail says so even collapsed. -->
-                    <div
-                      class={cn(
-                        'flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary',
-                        isDebugBuild && 'bg-destructive/15 text-destructive ring-2 ring-destructive'
-                      )}
-                    >
-                      {#if isSdkPage}
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-                          />
-                        </svg>
-                      {:else}
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                      {/if}
-                    </div>
-                    <div class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                      <span class="flex items-center gap-1.5">
-                        <span class="truncate text-sm font-semibold text-sidebar-foreground">
-                          {isSdkPage ? 'SDK Manager' : 'Portal Desktop'}
-                        </span>
-                        {#if isDebugBuild}
-                          <Badge variant="destructive" class="px-1.5 py-0 text-[10px]">DEBUG</Badge>
-                        {/if}
-                      </span>
-                      <span class="block truncate text-xs text-sidebar-foreground/60">
-                        <!-- Version first: the 16rem rail truncates the tagline, not it. -->
-                        {appVersion ? `v${appVersion} · ` : ''}{isSdkPage
-                          ? 'Development Tools'
-                          : 'Development Environment'}
-                      </span>
-                    </div>
-                  </Button>
-                {/snippet}
-              </SidebarTooltip>
+              <AppSidebarHeader {isSdkPage} {isDebugBuild} {appVersion} />
 
               <!-- Sidebar Content — nav renders immediately; the dashboard
                    query only supplies badge counts, so there is nothing to
@@ -476,50 +212,7 @@
                 <NavSectionList sections={navigationSections} currentPath={page.url.pathname} />
               </div>
 
-              <!-- Sidebar Footer — stacks into a single icon column when collapsed,
-                   otherwise the row overflows the 3rem rail and clips the buttons. -->
-              <div
-                class="divider-edge-t divider-edge-full divider-edge-sidebar flex-shrink-0 p-4 group-data-[collapsible=icon]:p-2"
-              >
-                <div
-                  class="flex items-center justify-between gap-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1"
-                >
-                  <ThemeToggle />
-                  <div
-                    class="flex items-center gap-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1"
-                  >
-                    {#if isMobileShell}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        class="h-8 gap-2 px-2"
-                        onclick={() => mobileConnection.disconnect()}
-                        aria-label="Disconnect"
-                      >
-                        <Unplug class="h-4 w-4" />
-                        <span class="max-w-32 truncate text-xs">
-                          Disconnect {mobileConnection.status?.name ?? ''}
-                        </span>
-                      </Button>
-                    {:else}
-                      <SidebarTooltip label="Settings">
-                        {#snippet trigger({ props })}
-                          <Button
-                            {...props}
-                            variant="ghost"
-                            size="sm"
-                            class="h-8 w-8 px-0"
-                            onclick={() => goto('/settings')}
-                            aria-label="Settings"
-                          >
-                            <Gear class="h-4 w-4" />
-                          </Button>
-                        {/snippet}
-                      </SidebarTooltip>
-                    {/if}
-                  </div>
-                </div>
-              </div>
+              <AppSidebarFooter />
             </div>
           </SidebarRoot>
         {/if}

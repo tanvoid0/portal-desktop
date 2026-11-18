@@ -11,20 +11,11 @@
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Badge } from '$lib/components/ui/badge';
-  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import { Progress } from '$lib/components/ui/progress';
-  import { Checkbox } from '$lib/components/ui/checkbox';
   import * as Tabs from '$lib/components/ui/tabs';
   import { PageStats, ResponsivePanel, type PageStat } from '$lib/components/shell';
-  import FolderOpen from '~icons/fa6-solid/folder-open';
   import RefreshCw from '~icons/fa6-solid/rotate';
-  import ShieldAlert from '~icons/fa6-solid/shield-halved';
-  import Copy from '~icons/fa6-solid/copy';
-  import ChevronRight from '~icons/fa6-solid/chevron-right';
-  import ChevronDown from '~icons/fa6-solid/chevron-down';
   import HardDrive from '~icons/fa6-solid/hard-drive';
   import Download from '~icons/fa6-solid/download';
-  import X from '~icons/fa6-solid/xmark';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { save as saveDialog } from '@tauri-apps/plugin-dialog';
   import { onDestroy, onMount } from 'svelte';
@@ -51,22 +42,22 @@
     type TriageDecision,
   } from '$lib/domains/projects/api/discoveryApi';
   import { toCsv } from '$lib/domains/projects/utils/auditCsv';
+  import { DECISIONS } from '$lib/domains/projects/utils/auditFormat';
   import type { DiscoveryProgress } from '$lib/domains/projects/generated/DiscoveryProgress';
   import type { DiscoveredProject } from '$lib/domains/projects/generated/DiscoveredProject';
   import type { DiscoveryReport } from '$lib/domains/projects/generated/DiscoveryReport';
   import type { DiscoveryChange } from '$lib/domains/projects/generated/DiscoveryChange';
+  import AuditProjectCard from './AuditProjectCard.svelte';
+  import AuditChangesList from './AuditChangesList.svelte';
+  import AuditDuplicateSets from './AuditDuplicateSets.svelte';
+  import AuditTree from './AuditTree.svelte';
+  import AuditScanPanel from './AuditScanPanel.svelte';
+  import AuditFocusedDetail from './AuditFocusedDetail.svelte';
+  import AuditMarkedActions from './AuditMarkedActions.svelte';
 
   const log = logger.createScoped('ProjectAudit');
 
   type Tab = 'triage' | 'risk' | 'duplicates' | 'tree' | 'changes';
-
-  const DECISIONS: TriageDecision[] = ['keep', 'archive', 'delete', 'review'];
-
-  /**
-   * `delete` sat in a row of four identical ghost buttons — the confirm dialog
-   * only fires after the misclick, so the button has to read as dangerous first.
-   */
-  const DESTRUCTIVE_CLASS = 'text-destructive hover:text-destructive hover:bg-destructive/10';
 
   let roots = $state<{ name: string; path: string }[]>([]);
   let newRootPath = $state('');
@@ -83,7 +74,6 @@
   let selected = $state<DiscoveredProject | null>(null);
   let decisions = $state<Record<string, TriageDecision | null>>({});
   let idByPath = $state<Record<string, number>>({});
-  let expanded = $state<Record<string, boolean>>({});
   let importSummary = $state<string | null>(null);
   let exportedTo = $state<string | null>(null);
   /** Saved roots arrive async; without this the card claims "no folders yet" first. */
@@ -474,41 +464,6 @@
       toast.error('Could not open that folder', e);
     }
   }
-
-  function ageLabel(days: number | null): string {
-    if (days === null) return 'unknown';
-    if (days < 1) return 'today';
-    if (days < 30) return `${days}d`;
-    if (days < 365) return `${Math.round(days / 30)}mo`;
-    return `${(days / 365).toFixed(1)}y`;
-  }
-
-  function statusVariant(status: string) {
-    return status === 'active' ? 'default' : status === 'recent' ? 'secondary' : 'outline';
-  }
-
-  /** Dormant and stale were both plain outline badges; the dash separates the
-   * two without spending a second hue on it. */
-  function statusClass(status: string) {
-    return status === 'stale' ? 'border-dashed opacity-70' : '';
-  }
-
-  /** Groups projects by their bucket for the tree, preserving activity order. */
-  const tree = $derived.by(() => {
-    const byArea = new Map<string, Map<string, DiscoveredProject[]>>();
-    for (const p of filtered) {
-      if (!byArea.has(p.area)) byArea.set(p.area, new Map());
-      const buckets = byArea.get(p.area)!;
-      const bucket = p.bucket || p.area;
-      if (!buckets.has(bucket)) buckets.set(bucket, []);
-      buckets.get(bucket)!.push(p);
-    }
-    return byArea;
-  });
-
-  const percent = $derived(
-    progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0
-  );
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -546,155 +501,22 @@
       {#snippet cardList()}
         <div class="space-y-2">
           {#each filtered as p, i (p.path)}
-            <!--
-          `tabindex=-1` so `move()` can put real focus here; the ring is a
-          thickness change rather than a hue change, so the cursor is still
-          visible without colour vision. Card draws no border of its own, so
-          a `border-*` class would have set a colour on a zero-width border.
-        -->
-            <Card
+            <AuditProjectCard
+              project={p}
               id={rowId(p.path)}
-              tabindex={-1}
-              aria-current={i === cursor ? 'true' : undefined}
-              class="audit-row outline-none focus-visible:ring-2 focus-visible:ring-ring {i ===
-              cursor
-                ? 'ring-2 ring-primary'
-                : selected?.path === p.path
-                  ? 'ring-1 ring-muted-foreground/30'
-                  : ''}"
-            >
-              <CardContent class="flex flex-wrap items-center gap-2 p-3">
-                <Checkbox
-                  checked={marked.has(p.path)}
-                  onCheckedChange={() => toggleMark(p.path)}
-                  aria-label={`Select ${p.name}`}
-                />
-                <Button
-                  variant="ghost"
-                  class="h-auto min-w-0 flex-1 flex-col items-start justify-start p-1 text-left whitespace-normal"
-                  onclick={() => {
-                    cursor = i;
-                    selected = selected?.path === p.path ? null : p;
-                  }}
-                >
-                  <div class="flex flex-wrap items-center gap-2">
-                    <span class="font-medium">{p.name}</span>
-                    {#if p.moduleCount > 1}
-                      <Badge variant="outline">{p.moduleCount} modules</Badge>
-                    {/if}
-                    {#each p.langs.slice(0, 3) as lang (lang)}
-                      <Badge variant="secondary">{lang}</Badge>
-                    {/each}
-                    {#if p.duplicateOf.length}
-                      <Badge variant="outline">dup: {p.duplicateOf[0]}</Badge>
-                    {/if}
-                  </div>
-                  <div class="w-full truncate font-mono text-xs text-muted-foreground">
-                    {p.path}
-                  </div>
-                </Button>
-
-                {#if p.regenerableBytes > 0}
-                  <Badge variant="outline" class="gap-1">
-                    <HardDrive class="h-3 w-3" />{fmtBytes(p.regenerableBytes)}
-                  </Badge>
-                {/if}
-                {#if p.riskLevel === 'high'}
-                  <Badge variant="destructive" class="gap-1">
-                    <ShieldAlert class="h-3 w-3" />{p.risk[0]}
-                  </Badge>
-                {:else if p.risk.length}
-                  <Badge variant="outline">{p.risk[0]}</Badge>
-                {/if}
-                <Badge variant={statusVariant(p.status)} class={statusClass(p.status)}>
-                  {p.status} · {ageLabel(p.ageDays)}
-                </Badge>
-
-                <div class="flex gap-1">
-                  {#each DECISIONS as d (d)}
-                    <Button
-                      size="sm"
-                      variant={decisions[p.path] === d
-                        ? d === 'delete'
-                          ? 'destructive'
-                          : 'default'
-                        : 'ghost'}
-                      class={d === 'delete' && decisions[p.path] !== d ? DESTRUCTIVE_CLASS : ''}
-                      onclick={() => decide(p, d)}
-                    >
-                      {d}
-                    </Button>
-                  {/each}
-                  <Button size="sm" variant="ghost" onclick={() => openFolder(p.abs)}>
-                    <FolderOpen class="h-3 w-3" />
-                  </Button>
-                </div>
-              </CardContent>
-
-              {#if selected?.path === p.path}
-                <CardContent class="border-t pt-3 text-sm">
-                  {#if p.description}
-                    <p class="mb-2 text-muted-foreground">{p.description}</p>
-                  {/if}
-                  <div class="grid gap-1 md:grid-cols-2">
-                    <div>
-                      <span class="text-muted-foreground">Path:</span>
-                      <span class="font-mono text-xs">{p.abs}</span>
-                    </div>
-                    <div>
-                      <span class="text-muted-foreground">Git:</span>
-                      {p.git.repos
-                        ? `${p.git.repos} repo(s) · ${p.git.branch ?? '?'} · ${p.git.commits} commits`
-                        : 'not a repo'}
-                    </div>
-                    {#if p.git.remote}
-                      <div class="md:col-span-2">
-                        <span class="text-muted-foreground">Remote:</span>
-                        <span class="font-mono text-xs">{p.git.remote}</span>
-                      </div>
-                    {/if}
-                    {#if p.risk.length}
-                      <div class="md:col-span-2">
-                        <span class="text-muted-foreground">Flags:</span>
-                        {p.risk.join(' · ')}
-                      </div>
-                    {/if}
-                    {#if p.regenerable.length}
-                      <div class="flex flex-wrap items-center gap-2 md:col-span-2">
-                        <span class="text-muted-foreground">Build output:</span>
-                        <span>{p.regenerable.join(', ')}</span>
-                        {#if p.regenerableBytes >= 0}
-                          <Badge variant="outline">{fmtBytes(p.regenerableBytes)}</Badge>
-                        {/if}
-                        <Button size="sm" variant="outline" onclick={() => cleanInDisk(p)}>
-                          <HardDrive class="mr-1 h-3 w-3" /> Clean in Disk utility
-                        </Button>
-                      </div>
-                    {/if}
-                  </div>
-
-                  {#if p.modules.length > 1}
-                    <div class="mt-3">
-                      <div class="mb-1 text-xs text-muted-foreground uppercase">
-                        Modules ({p.modules.length})
-                      </div>
-                      <div class="max-h-56 space-y-1 overflow-auto">
-                        {#each p.modules as m (m.path)}
-                          <div class="flex items-center gap-2 text-xs">
-                            <span class="flex-1 truncate font-mono">{m.path}</span>
-                            {#if m.ahead > 0}<Badge variant="destructive">+{m.ahead}</Badge>{/if}
-                            {#if m.git}<Badge variant="outline">{m.branch ?? 'git'}</Badge>{/if}
-                            <Button size="sm" variant="ghost" onclick={() => openFolder(m.abs)}>
-                              <FolderOpen class="h-3 w-3" />
-                            </Button>
-                          </div>
-                        {/each}
-                      </div>
-                    </div>
-                  {/if}
-                </CardContent>
-              {/if}
-            </Card>
+              isCursor={i === cursor}
+              isSelected={selected?.path === p.path}
+              marked={marked.has(p.path)}
+              decision={decisions[p.path] ?? null}
+              onToggleMark={() => toggleMark(p.path)}
+              onSelect={() => {
+                cursor = i;
+                selected = selected?.path === p.path ? null : p;
+              }}
+              onDecide={(d) => decide(p, d)}
+              onOpen={openFolder}
+              onClean={() => cleanInDisk(p)}
+            />
           {:else}
             <p class="py-8 text-center text-sm text-muted-foreground">Nothing matches.</p>
           {/each}
@@ -751,134 +573,18 @@
           <p class="font-mono text-xs text-muted-foreground">Written to {exportedTo}</p>
         {/if}
 
-        <Tabs.Content value="changes">
-          <Card>
-            <CardContent class="space-y-1 p-3">
-              {#each changes as c (c.at + c.kind + c.path)}
-                <div class="flex flex-wrap items-center gap-2 text-sm">
-                  <Badge
-                    variant={c.kind === 'removed'
-                      ? 'destructive'
-                      : c.kind === 'added'
-                        ? 'default'
-                        : 'secondary'}>{c.kind}</Badge
-                  >
-                  <span class="flex-1 truncate font-mono text-xs">{c.path}</span>
-                  {#if c.from && c.from !== c.path}
-                    <span class="truncate font-mono text-xs text-muted-foreground"
-                      >was {c.from}</span
-                    >
-                  {:else if c.kind === 'moved' && c.detail}
-                    <!-- Same id, new folder: the old absolute path is the whole story. -->
-                    <span class="truncate font-mono text-xs text-muted-foreground"
-                      >was {c.detail}</span
-                    >
-                  {/if}
-                  <span class="text-xs text-muted-foreground"
-                    >{new Date(c.at).toLocaleString()}</span
-                  >
-                </div>
-              {:else}
-                <p class="py-8 text-center text-sm text-muted-foreground">
-                  Nothing yet — the first scan is the baseline. Rescan later and what appeared,
-                  moved or vanished lands here.
-                </p>
-              {/each}
-            </CardContent>
-          </Card>
-        </Tabs.Content>
+        <Tabs.Content value="changes"><AuditChangesList {changes} /></Tabs.Content>
 
         <Tabs.Content value="duplicates">
-          <div class="space-y-3">
-            {#each duplicateSets as { cluster, members } (cluster.kind + cluster.key)}
-              <Card>
-                <CardHeader class="pb-2">
-                  <CardTitle class="flex items-center gap-2 text-sm">
-                    <Copy class="h-4 w-4" />
-                    {cluster.key}
-                    <Badge variant="outline">{cluster.kind}</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent class="space-y-1">
-                  {#each members as m, i (m.path)}
-                    <div class="flex items-center gap-2 text-sm">
-                      {#if i === 0}<Badge variant="default">newest</Badge>{/if}
-                      <span class="flex-1 truncate font-mono text-xs">{m.path}</span>
-                      <span class="text-xs text-muted-foreground">{ageLabel(m.ageDays)}</span>
-                      <span class="text-xs text-muted-foreground">{m.git.commits} commits</span>
-                      <Button size="sm" variant="ghost" onclick={() => (selected = m)}
-                        >inspect</Button
-                      >
-                    </div>
-                  {/each}
-                </CardContent>
-              </Card>
-            {:else}
-              <Card>
-                <CardContent class="py-8 text-center text-sm text-muted-foreground">
-                  No duplicate sets — nothing scanned shares a git remote or a folder name with
-                  anything else.
-                </CardContent>
-              </Card>
-            {/each}
-          </div>
+          <AuditDuplicateSets sets={duplicateSets} onInspect={(p) => (selected = p)} />
         </Tabs.Content>
 
         <Tabs.Content value="tree">
-          <Card
-            ><CardContent class="p-3 font-mono text-sm">
-              {#each [...tree.entries()] as [area, buckets] (area)}
-                <div class="py-1">
-                  <Button
-                    variant="ghost"
-                    class="h-auto justify-start gap-1 rounded px-1 py-0 font-mono text-sm hover:bg-muted"
-                    onclick={() => (expanded = { ...expanded, [area]: !expanded[area] })}
-                  >
-                    {#if expanded[area]}<ChevronDown class="h-3 w-3" />{:else}<ChevronRight
-                        class="h-3 w-3"
-                      />{/if}
-                    <span class="font-semibold text-primary">{area}</span>
-                    <span class="text-xs text-muted-foreground">
-                      {[...buckets.values()].reduce((a, b) => a + b.length, 0)} projects
-                    </span>
-                  </Button>
-                  {#if expanded[area]}
-                    <div class="ml-4 border-l border-muted pl-3">
-                      {#each [...buckets.entries()] as [bucket, items] (bucket)}
-                        <div class="py-1">
-                          <div class="text-xs text-muted-foreground">{bucket}</div>
-                          {#each items as p (p.path)}
-                            <Button
-                              variant="ghost"
-                              class="h-auto w-full justify-start gap-2 rounded px-1 py-0 text-left font-mono text-sm hover:bg-muted"
-                              onclick={() => (selected = p)}
-                            >
-                              <span class="flex-1 truncate">{p.name}</span>
-                              {#if p.moduleCount > 1}
-                                <Badge variant="outline">{p.moduleCount} modules</Badge>
-                              {/if}
-                              <Badge variant={statusVariant(p.status)} class={statusClass(p.status)}
-                                >{p.status}</Badge
-                              >
-                              <span class="text-xs text-muted-foreground"
-                                >{ageLabel(p.ageDays)}</span
-                              >
-                            </Button>
-                          {/each}
-                        </div>
-                      {/each}
-                    </div>
-                  {/if}
-                </div>
-              {:else}
-                <p class="py-8 text-center font-sans text-sm text-muted-foreground">
-                  {search.trim()
-                    ? 'Nothing matches that search.'
-                    : 'Nothing to group yet — run a scan first.'}
-                </p>
-              {/each}
-            </CardContent></Card
-          >
+          <AuditTree
+            projects={filtered}
+            searching={!!search.trim()}
+            onInspect={(p) => (selected = p)}
+          />
         </Tabs.Content>
 
         <!-- Same list, different filter — `filtered` narrows it by the active tab. -->
@@ -901,203 +607,29 @@
     borderClass=""
   >
     <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
-      <section class="space-y-2">
-        <div class="flex gap-2">
-          <Button class="flex-1" onclick={scan} disabled={scanning || !roots.length}>
-            <RefreshCw class={`mr-2 h-4 w-4 ${scanning ? 'animate-spin' : ''}`} />
-            {scanning ? 'Scanning…' : 'Scan and import'}
-          </Button>
-          {#if scanning}
-            <Button variant="ghost" onclick={() => cancelDiscovery()}>Cancel</Button>
-          {/if}
-        </div>
-
-        <Button
-          variant="ghost"
-          class="h-auto w-full justify-start gap-1 px-1 py-1 text-xs text-muted-foreground"
-          aria-expanded={scanOpen}
-          onclick={() => (scanOpen = !scanOpen)}
-        >
-          {#if scanOpen}
-            <ChevronDown class="h-3 w-3" />
-          {:else}
-            <ChevronRight class="h-3 w-3" />
-          {/if}
-          <FolderOpen class="h-3 w-3" />
-          {loadingState
-            ? 'Loading saved folders…'
-            : `${roots.length} ${roots.length === 1 ? 'folder' : 'folders'} to scan`}
-        </Button>
-
-        {#if scanOpen}
-          <div class="space-y-3">
-            <div class="flex flex-wrap gap-2">
-              {#each roots as root (root.path)}
-                <Badge variant="secondary" class="max-w-full gap-1 font-mono text-xs">
-                  <span class="truncate" title={root.path}>{root.path}</span>
-                  <!-- 24px is the WCAG 2.2 floor for a pointer target; the glyph
-                       stays 12px, only the hit area grows. -->
-                  <Button
-                    variant="ghost"
-                    class="-mr-1 h-6 w-6 shrink-0 rounded-full p-0"
-                    aria-label={`Remove ${root.path}`}
-                    onclick={() => removeRoot(root.path)}
-                    disabled={scanning}
-                  >
-                    <X class="h-3 w-3" />
-                  </Button>
-                </Badge>
-              {:else}
-                <p class="text-sm text-muted-foreground">
-                  No folders yet — add the drive or directory your projects live under.
-                </p>
-              {/each}
-            </div>
-
-            <div class="flex gap-2">
-              <Input
-                bind:value={newRootPath}
-                aria-label="Folder path"
-                aria-describedby="audit-root-hint"
-                placeholder={'D:\\production'}
-              />
-              <Button variant="outline" onclick={addRoot} disabled={scanning}>Add folder</Button>
-            </div>
-            <p id="audit-root-hint" class="text-xs text-muted-foreground">
-              Leave the field empty and Add folder opens a folder picker.
-            </p>
-
-            <div class="space-y-2 text-sm">
-              <label class="flex items-start gap-2">
-                <Checkbox
-                  checked={measureSizes}
-                  onCheckedChange={(v) => {
-                    measureSizes = v === true;
-                    void persistConfig();
-                  }}
-                  disabled={scanning}
-                />
-                <span>
-                  Measure reclaimable size
-                  <span class="text-xs text-muted-foreground">walks build output — slower</span>
-                </span>
-              </label>
-              <label class="flex items-start gap-2">
-                <Checkbox
-                  checked={markMissing}
-                  onCheckedChange={(v) => {
-                    markMissing = v === true;
-                    void persistConfig();
-                  }}
-                  disabled={scanning}
-                />
-                <span>
-                  Archive projects no longer on disk
-                  <span class="text-xs text-muted-foreground">
-                    roots that failed to open are skipped
-                  </span>
-                </span>
-              </label>
-            </div>
-          </div>
-        {/if}
-
-        {#if scanning && progress}
-          <div class="space-y-1">
-            <Progress value={percent} aria-label="Scan progress" />
-            <!-- The path changes many times a second; announcing it would drown
-                 out everything else, so the pollable progressbar carries it. -->
-            <p class="truncate font-mono text-xs text-muted-foreground" aria-hidden="true">
-              {progress.phase === 'find' ? 'walking' : `${progress.done}/${progress.total}`}
-              {progress.phase === 'size' ? ' sizing' : ''} — {progress.path}
-            </p>
-          </div>
-        {/if}
-
-        {#if error}
-          <p class="text-sm text-destructive" role="alert">{error}</p>
-        {/if}
-        {#if importSummary}
-          <p class="text-xs text-muted-foreground" role="status">{importSummary}</p>
-        {/if}
-      </section>
-
-      <section class="space-y-2 border-t pt-3">
-        <h3 class="text-xs font-semibold text-muted-foreground uppercase">Selected project</h3>
-        {#if focused}
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-sm font-medium">{focused.name}</span>
-            <Badge variant={statusVariant(focused.status)} class={statusClass(focused.status)}>
-              {focused.status} · {ageLabel(focused.ageDays)}
-            </Badge>
-          </div>
-          <p class="font-mono text-xs break-all text-muted-foreground">{focused.abs}</p>
-          <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
-            <dt class="text-muted-foreground">Reclaimable</dt>
-            <dd>
-              {focused.regenerableBytes < 0 ? 'not measured' : fmtBytes(focused.regenerableBytes)}
-            </dd>
-            <dt class="text-muted-foreground">Last commit</dt>
-            <dd>
-              {focused.git.lastCommit
-                ? new Date(focused.git.lastCommit).toLocaleDateString()
-                : focused.git.repos
-                  ? 'no commits'
-                  : 'not a repo'}
-            </dd>
-            <dt class="text-muted-foreground">Unpushed</dt>
-            <dd>{focused.git.ahead > 0 ? `${focused.git.ahead} commits` : 'none'}</dd>
-            <dt class="text-muted-foreground">Remote</dt>
-            <dd class="font-mono break-all">
-              {focused.git.remote ?? (focused.git.repos ? 'none — local only' : '—')}
-            </dd>
-            <dt class="text-muted-foreground">Duplicates</dt>
-            <dd>
-              {#each duplicateSiblings as sibling (sibling)}
-                <span class="block truncate font-mono" title={sibling}>{sibling}</span>
-              {:else}
-                none
-              {/each}
-            </dd>
-          </dl>
-          {#if focused.risk.length}
-            <p class="text-xs">
-              <span class="text-muted-foreground">Flags:</span>
-              {focused.risk.join(' · ')}
-            </p>
-          {/if}
-        {:else}
-          <p class="text-xs text-muted-foreground">
-            Nothing under the cursor — press <span class="font-mono">j</span> to start down the list.
-          </p>
-        {/if}
-      </section>
-
-      <section class="space-y-2 border-t pt-3">
-        <div class="flex items-center justify-between gap-2">
-          <h3 class="text-xs font-semibold text-muted-foreground uppercase">Marked</h3>
-          <span class="text-xs tabular-nums">{marked.size} selected</span>
-        </div>
-        {#if marked.size}
-          <div class="grid grid-cols-2 gap-1">
-            {#each DECISIONS as d (d)}
-              <Button
-                size="sm"
-                variant="outline"
-                class={d === 'delete' ? DESTRUCTIVE_CLASS : ''}
-                onclick={() => decideMarked(d)}>{d} all</Button
-              >
-            {/each}
-          </div>
-          <Button size="sm" variant="ghost" class="w-full" onclick={() => (marked = new Set())}>
-            clear
-          </Button>
-        {:else}
-          <p class="text-xs text-muted-foreground">
-            Press <span class="font-mono">x</span> on a row to tick it for a bulk decision.
-          </p>
-        {/if}
-      </section>
+      <AuditScanPanel
+        {roots}
+        {scanning}
+        {loadingState}
+        {progress}
+        {error}
+        {importSummary}
+        bind:scanOpen
+        bind:newRootPath
+        bind:measureSizes
+        bind:markMissing
+        onScan={scan}
+        onCancel={() => cancelDiscovery()}
+        onAddRoot={addRoot}
+        onRemoveRoot={removeRoot}
+        onPersist={persistConfig}
+      />
+      <AuditFocusedDetail project={focused} siblings={duplicateSiblings} />
+      <AuditMarkedActions
+        count={marked.size}
+        onDecide={decideMarked}
+        onClear={() => (marked = new Set())}
+      />
     </div>
   </ResponsivePanel>
 </div>

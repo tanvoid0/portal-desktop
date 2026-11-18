@@ -9,26 +9,16 @@
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
-  import { Badge } from '$lib/components/ui/badge';
-  import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-  } from '$lib/components/ui/dialog';
-  import { Label } from '$lib/components/ui/label';
-  import { Input } from '$lib/components/ui/input';
   import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import RefreshCw from '~icons/fa6-solid/rotate';
-  import FileCode from '~icons/fa6-solid/file-code';
   import RotateCcw from '~icons/fa6-solid/rotate-left';
   import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
   import Loading from '$lib/components/ui/loading.svelte';
   import { PageLoading, PageError } from '$lib/components/shell';
   import { toastActions } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
+  import DeploymentOverviewTab from '$lib/domains/cloud/components/deployment/DeploymentOverviewTab.svelte';
+  import DeploymentScaleDialog from '$lib/domains/cloud/components/deployment/DeploymentScaleDialog.svelte';
   import YamlEditor from '$lib/domains/cloud/components/YamlEditor.svelte';
 
   const deploymentName = $derived(page.params.deployment);
@@ -201,11 +191,6 @@
       isRollingBack = false;
     }
   }
-
-  const labels = $derived.by(() => {
-    if (!deployment || !deployment.metadata?.labels) return {};
-    return deployment.metadata.labels || {};
-  });
 </script>
 
 <div class="space-y-6 p-6">
@@ -249,104 +234,7 @@
 
       <!-- Overview Tab -->
       <TabsContent value="overview" class="space-y-4">
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Deployment Information</CardTitle>
-            </CardHeader>
-            <CardContent class="space-y-3">
-              <div>
-                <p class="text-sm text-muted-foreground">Status</p>
-                <Badge class="mt-1" variant="default">{deployment.status}</Badge>
-              </div>
-              <div>
-                <p class="text-sm text-muted-foreground">Desired Replicas</p>
-                <p class="font-medium">{deployment.metadata?.desired || 0}</p>
-              </div>
-              <div>
-                <p class="text-sm text-muted-foreground">Current Replicas</p>
-                <p class="font-medium">{deployment.metadata?.current || 0}</p>
-              </div>
-              <div>
-                <p class="text-sm text-muted-foreground">Available Replicas</p>
-                <p class="font-medium">
-                  {deployment.metadata?.available || 0}/{deployment.metadata?.desired || 0}
-                </p>
-              </div>
-              <div>
-                <p class="text-sm text-muted-foreground">Up-to-date Replicas</p>
-                <p class="font-medium">
-                  {deployment.metadata?.up_to_date || 0}
-                </p>
-              </div>
-              <div>
-                <p class="text-sm text-muted-foreground">Age</p>
-                <p class="font-medium">{deployment.metadata?.age || 'N/A'}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Replica Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div class="space-y-4">
-                <div>
-                  <div class="mb-2 flex justify-between">
-                    <span class="text-sm">Ready</span>
-                    <span class="font-medium"
-                      >{deployment.metadata?.available || 0}/{deployment.metadata?.desired ||
-                        0}</span
-                    >
-                  </div>
-                  <div class="h-2 w-full rounded-full bg-muted">
-                    <div
-                      class="h-2 rounded-full bg-green-600 transition-all"
-                      style="width: {deployment.metadata?.desired
-                        ? (deployment.metadata.available / deployment.metadata.desired) * 100
-                        : 0}%"
-                    ></div>
-                  </div>
-                </div>
-                <div>
-                  <div class="mb-2 flex justify-between">
-                    <span class="text-sm">Up-to-date</span>
-                    <span class="font-medium"
-                      >{deployment.metadata?.up_to_date || 0}/{deployment.metadata?.desired ||
-                        0}</span
-                    >
-                  </div>
-                  <div class="h-2 w-full rounded-full bg-muted">
-                    <div
-                      class="h-2 rounded-full bg-blue-600 transition-all"
-                      style="width: {deployment.metadata?.desired
-                        ? (deployment.metadata.up_to_date / deployment.metadata.desired) * 100
-                        : 0}%"
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Labels</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {#if Object.keys(labels).length > 0}
-              <div class="flex flex-wrap gap-2">
-                {#each Object.entries(labels) as [key, value]}
-                  <Badge variant="outline">{key}={value}</Badge>
-                {/each}
-              </div>
-            {:else}
-              <p class="text-muted-foreground">No labels configured</p>
-            {/if}
-          </CardContent>
-        </Card>
+        <DeploymentOverviewTab {deployment} />
       </TabsContent>
 
       <!-- YAML Tab -->
@@ -384,36 +272,12 @@
       </TabsContent>
     </Tabs>
 
-    <!-- Scale Dialog -->
-    <Dialog bind:open={showScaleDialog}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Scale Deployment: {deployment?.name}</DialogTitle>
-          <DialogDescription>
-            Enter the desired number of replicas for this deployment.
-          </DialogDescription>
-        </DialogHeader>
-        <div class="grid gap-4 py-4">
-          <div class="grid grid-cols-4 items-center gap-4">
-            <Label for="replicas" class="text-right">Replicas</Label>
-            <Input
-              id="replicas"
-              type="number"
-              min="0"
-              bind:value={scaleReplicas}
-              class="col-span-3"
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onclick={() => (showScaleDialog = false)} disabled={isScaling}
-            >Cancel</Button
-          >
-          <Button onclick={confirmScale} disabled={isScaling}>
-            {isScaling ? 'Scaling...' : 'Scale'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <DeploymentScaleDialog
+      bind:open={showScaleDialog}
+      name={deployment.name}
+      bind:replicas={scaleReplicas}
+      scaling={isScaling}
+      onConfirm={confirmScale}
+    />
   {/if}
 </div>

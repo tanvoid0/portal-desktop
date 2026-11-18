@@ -3,4 +3,4 @@
 /**
  * One SCAN page. `cursor` is a u64 as text (JS precision); "0" = done.
  */
-export type RedisScan = { keys: Array<string>; cursor: string };
+export type RedisScan = { keys: Array<string>, cursor: string, };

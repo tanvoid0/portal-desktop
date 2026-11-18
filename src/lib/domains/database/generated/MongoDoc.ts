@@ -5,4 +5,4 @@
  * `mongo.rs` for why it is text, not a JSON value). `id` is the `_id` in
  * canonical extended JSON, sent back verbatim to replace/delete.
  */
-export type MongoDoc = { id: string | null; json: string };
+export type MongoDoc = { id: string | null, json: string, };

@@ -9,21 +9,15 @@
   import { goto } from '$app/navigation';
   import { ollamaApi } from '$lib/domains/sdk/api/ollamaApi';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from '$lib/components/ui/card';
-  import { Badge } from '$lib/components/ui/badge';
-  import { Button } from '$lib/components/ui/button';
   import { logger } from '$lib/domains/shared';
   import { toast } from '$lib/utils/toast';
-  import ModelList from '$lib/components/ModelList.svelte';
-  import ModelTreeList from '$lib/components/ModelTreeList.svelte';
-  import ProgressIndicator from '$lib/components/ProgressIndicator.svelte';
   import { buildTabUrl, resolveUrlTab } from '$lib/utils/url-tabs';
+  import { OllamaModels } from '$lib/domains/sdk/state/ollamaModels.svelte';
+  import OllamaHeader from '$lib/domains/sdk/components/ollama/OllamaHeader.svelte';
+  import OllamaServiceTab from '$lib/domains/sdk/components/ollama/OllamaServiceTab.svelte';
+  import OllamaVersionsTab from '$lib/domains/sdk/components/ollama/OllamaVersionsTab.svelte';
+  import OllamaInfoTab from '$lib/domains/sdk/components/ollama/OllamaInfoTab.svelte';
+  import OllamaModelsTab from '$lib/domains/sdk/components/ollama/OllamaModelsTab.svelte';
 
   const OLLAMA_TABS = ['service', 'version', 'models', 'configuration', 'log'] as const;
   type OllamaTab = (typeof OLLAMA_TABS)[number];
@@ -40,17 +34,7 @@
   let versionsLoading = $state(false);
   let versionsError = $state<string | null>(null);
 
-  // Model management
-  let models = $state<any[]>([]);
-  let availableModels = $state<Record<string, any[]>>({});
-  let modelsLoading = $state(false);
-  let modelsError = $state<string | null>(null);
-  let modelTab = $state('local'); // 'local' or 'library'
-
-  // Installation progress tracking
-  let installingModel = $state<string | null>(null);
-  let installationProgress = $state(0);
-  let installationStatus = $state<string>('');
+  const models = new OllamaModels(() => !!serviceInfo?.running);
 
   onMount(async () => {
     await loadServiceInfo();
@@ -59,6 +43,8 @@
   $effect(() => {
     loadTabData(activeTab);
   });
+
+  const errMsg = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
   async function loadServiceInfo() {
     try {
@@ -70,9 +56,8 @@
 
       log.info('Ollama service info loaded', info);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      serviceError = errorMessage;
-      log.error('Failed to load Ollama service info', { error: errorMessage });
+      serviceError = errMsg(error);
+      log.error('Failed to load Ollama service info', { error: serviceError });
     } finally {
       serviceLoading = false;
     }
@@ -82,10 +67,10 @@
     if (tab === 'version') {
       if (versions.length === 0) void loadVersions();
     } else if (tab === 'models') {
-      if (modelTab === 'local') {
-        if (serviceInfo?.running) void loadModels();
+      if (models.tab === 'local') {
+        if (serviceInfo?.running) void models.loadLocal();
       } else {
-        void loadAvailableModels();
+        void models.loadLibrary();
       }
     }
   }
@@ -101,7 +86,7 @@
 
       log.info('Ollama versions loaded', versionsData);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = errMsg(error);
       versionsError = errorMessage;
       log.error('Failed to load Ollama versions', error);
 
@@ -119,342 +104,97 @@
     }
   }
 
-  async function loadModels() {
-    try {
-      log.debug('Loading local models', {
-        serviceRunning: serviceInfo?.running,
-      });
-      modelsLoading = true;
-      modelsError = null;
-
-      // Check if Ollama service is running first
-      if (!serviceInfo?.running) {
-        modelsError = 'Ollama service is not running. Please start the service first.';
-        toast.warning(
-          'Service Not Running',
-          'Please start the Ollama service before managing models.'
-        );
-        return;
+  function installOllamaVersion(version: string) {
+    log.info('Installing Ollama version:', version);
+    // For now, show a message that manual installation is needed
+    // In a real implementation, this would download and install Ollama
+    toast.info(
+      'Manual Installation Required',
+      `To install Ollama version ${version}, please download it from GitHub.`,
+      {
+        action: {
+          label: 'Download Version',
+          onClick: () =>
+            window.open(`https://github.com/ollama/ollama/releases/tag/v${version}`, '_blank'),
+        },
       }
+    );
+    return loadVersions(); // Refresh versions list
+  }
 
-      // Get real installed Ollama models
-      const modelsData = (await ollamaApi.getModels()) as any[];
-      // Backend reports family "Unknown" when /api/tags omits it; don't show it as a badge
-      models = modelsData.map((m) => (m.family === 'Unknown' ? { ...m, family: undefined } : m));
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-      log.info('Ollama models loaded', { count: modelsData.length });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load models';
-      modelsError = errorMessage;
-      log.error('Failed to load Ollama models', error);
-
-      // Show user-friendly error (toast already logs)
-      if (errorMessage.includes('not installed') || errorMessage.includes('program not found')) {
-        toast.error('Ollama Not Installed', 'Please install Ollama first to manage models.');
-      } else {
-        toast.error('Failed to Load Models', errorMessage);
+  /** Toast for a failed start/stop/restart; returns true if it was the "not installed" case. */
+  function notifyNotInstalled(errorMessage: string) {
+    if (!errorMessage.includes('not installed') && !errorMessage.includes('program not found')) {
+      return false;
+    }
+    toast.error(
+      'Ollama Not Installed',
+      'Please install Ollama from https://ollama.com/download first.',
+      {
+        action: {
+          label: 'Download Ollama',
+          onClick: () => window.open('https://ollama.com/download', '_blank'),
+        },
       }
-    } finally {
-      modelsLoading = false;
-    }
+    );
+    return true;
   }
 
-  async function loadAvailableModels() {
-    try {
-      log.debug('Loading available models from library');
-      modelsLoading = true;
-      modelsError = null;
-
-      // Available models can be loaded without service running - they're from online library
-      // Get available models from Ollama library
-      const availableModelsData = await ollamaApi.getAvailableModels();
-      availableModels = availableModelsData;
-
-      const totalModels = Object.values(availableModelsData).flat().length;
-      log.info('Available Ollama models loaded', {
-        categories: Object.keys(availableModelsData).length,
-        totalModels,
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to load available models';
-      modelsError = errorMessage;
-      log.error('Failed to load available Ollama models', error);
-
-      // Show user-friendly error (toast already logs)
-      toast.error('Failed to Load Available Models', errorMessage);
-    } finally {
-      modelsLoading = false;
-    }
-  }
-
-  async function installModel(modelName: string) {
-    try {
-      // Check if Ollama service is running first
-      if (!serviceInfo?.running) {
-        toast.warning(
-          'Service Not Running',
-          'Please start the Ollama service before installing models.'
-        );
-        return;
-      }
-
-      // Set up progress tracking
-      installingModel = modelName;
-      installationProgress = 0;
-      installationStatus = 'Starting download...';
-
-      log.info('Starting model installation', { modelName });
-
-      // Show initial progress
-      toast.info('Download Started', `Starting download of ${modelName}...`);
-
-      // Set initial progress state
-      installationProgress = 10;
-      installationStatus = 'Starting download...';
-
-      // Start the actual installation (this is a long-running operation)
-      installationStatus = 'Downloading model from Ollama registry...';
-      installationProgress = 50;
-
-      // Show honest status - this is a long-running operation
-      installationStatus = `Downloading ${modelName}... This may take several minutes for large models`;
-
-      // Start the installation with a timeout
-      const installPromise = ollamaApi.installModel(modelName);
-      const timeoutPromise = new Promise(
-        (_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error('Installation timeout - this may take several minutes for large models')
-              ),
-            300000
-          ) // 5 minutes
-      );
-
-      const result = await Promise.race([installPromise, timeoutPromise]);
-
-      // Installation completed
-      installationProgress = 100;
-      installationStatus = 'Installation complete!';
-
-      await loadModels(); // Refresh models list
-      log.info('Model installed successfully', { modelName, result });
-      toast.success('Model Installed', `${modelName} has been installed successfully`);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log.error('Failed to install model', { modelName, error: errorMessage });
-      toast.error('Installation Failed', `Failed to install ${modelName}: ${errorMessage}`);
-    } finally {
-      // Reset progress tracking
-      setTimeout(() => {
-        installingModel = null;
-        installationProgress = 0;
-        installationStatus = '';
-      }, 2000); // Keep progress visible for 2 seconds after completion
-    }
-  }
-
-  function cancelInstallation() {
-    if (installingModel) {
-      const modelName = installingModel;
-      log.info('Cancelling installation', { modelName });
-
-      // Reset installation state
-      installingModel = null;
-      installationProgress = 0;
-      installationStatus = '';
-
-      toast.info(
-        'Installation Cancelled',
-        `Installation of ${modelName} has been cancelled. Note: The download may continue in the background.`
-      );
-    }
-  }
-
-  async function removeModel(modelName: string) {
-    try {
-      // Check if Ollama service is running first
-      if (!serviceInfo?.running) {
-        toast.warning(
-          'Service Not Running',
-          'Please start the Ollama service before removing models.'
-        );
-        return;
-      }
-
-      log.info('Removing model:', modelName);
-      const result = await ollamaApi.removeModel(modelName);
-      await loadModels(); // Refresh models list
-      log.info('Model removed successfully', { modelName, result });
-      toast.success('Model Removed', `${modelName} has been removed successfully`);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log.error('Failed to remove model', { modelName, error: errorMessage });
-      toast.error('Removal Failed', `Failed to remove ${modelName}: ${errorMessage}`);
-    }
-  }
-
-  async function installOllamaVersion(version: string) {
-    try {
-      log.info('Installing Ollama version:', version);
-      // For now, show a message that manual installation is needed
-      // In a real implementation, this would download and install Ollama
-      toast.info(
-        'Manual Installation Required',
-        `To install Ollama version ${version}, please download it from GitHub.`,
-        {
-          action: {
-            label: 'Download Version',
-            onClick: () =>
-              window.open(`https://github.com/ollama/ollama/releases/tag/v${version}`, '_blank'),
-          },
-        }
-      );
-      await loadVersions(); // Refresh versions list
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log.error('Failed to install Ollama version', {
-        version,
-        error: errorMessage,
-      });
-    }
-  }
-
-  async function startService() {
+  /**
+   * Start or stop the service. The API can error even though the state changed, so
+   * after a failure re-read the status and treat the desired state as success.
+   */
+  async function setServiceRunning(running: boolean) {
+    const [verb, past, call] = running
+      ? (['Start', 'started', () => ollamaApi.startService()] as const)
+      : (['Stop', 'stopped', () => ollamaApi.stopService()] as const);
     try {
       serviceError = null; // Clear any previous errors
-      const result = await ollamaApi.startService();
-
-      // Wait a moment for the service to start
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Refresh service info to update UI
+      const result = await call();
+      await wait(500);
       await loadServiceInfo();
-
-      log.info('Ollama service started successfully', result);
-      toast.success('Service Started', 'Ollama service is now running');
+      log.info(`Ollama service ${past} successfully`, result);
+      toast.success(
+        `Service ${past[0].toUpperCase()}${past.slice(1)}`,
+        `Ollama service ${running ? 'is now running' : 'has been stopped'}`
+      );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-
-      // Wait a moment and check if service actually started despite the error
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const errorMessage = errMsg(error);
+      await wait(500);
       await loadServiceInfo();
 
-      // If service is actually running now, treat it as success
-      if (serviceInfo?.running) {
-        log.info('Ollama service started (verified after error)', errorMessage);
+      if (!!serviceInfo?.running === running) {
+        log.info(`Ollama service ${past} (verified after error)`, errorMessage);
         serviceError = null;
-        toast.success('Service Started', 'Ollama service is now running');
+        toast.success(
+          `Service ${past[0].toUpperCase()}${past.slice(1)}`,
+          `Ollama service ${running ? 'is now running' : 'has been stopped'}`
+        );
         return;
       }
 
-      // Service didn't start, show error
       serviceError = errorMessage;
-      log.error('Failed to start Ollama service', { error: errorMessage });
-
-      // Show user-friendly message if Ollama is not installed
-      if (errorMessage.includes('not installed') || errorMessage.includes('program not found')) {
-        toast.error(
-          'Ollama Not Installed',
-          'Please install Ollama from https://ollama.com/download first.',
-          {
-            action: {
-              label: 'Download Ollama',
-              onClick: () => window.open('https://ollama.com/download', '_blank'),
-            },
-          }
-        );
-      } else {
-        toast.error('Failed to Start Service', errorMessage);
-      }
-    }
-  }
-
-  async function stopService() {
-    try {
-      serviceError = null; // Clear any previous errors
-      const result = await ollamaApi.stopService();
-
-      // Wait a moment for the service to fully stop
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Refresh service info to update UI
-      await loadServiceInfo();
-
-      log.info('Ollama service stopped successfully', result);
-      toast.success('Service Stopped', 'Ollama service has been stopped');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-
-      // Wait a moment and check if service actually stopped despite the error
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      await loadServiceInfo();
-
-      // If service is actually stopped now, treat it as success
-      if (!serviceInfo?.running) {
-        log.info('Ollama service stopped (verified after error)', errorMessage);
-        serviceError = null;
-        toast.success('Service Stopped', 'Ollama service has been stopped');
-        return;
-      }
-
-      // Service is still running, show error
-      serviceError = errorMessage;
-      log.error('Failed to stop Ollama service', { error: errorMessage });
-
-      // Show user-friendly message if Ollama is not installed
-      if (errorMessage.includes('not installed') || errorMessage.includes('program not found')) {
-        toast.error(
-          'Ollama Not Installed',
-          'Please install Ollama from https://ollama.com/download first.',
-          {
-            action: {
-              label: 'Download Ollama',
-              onClick: () => window.open('https://ollama.com/download', '_blank'),
-            },
-          }
-        );
-      } else {
-        toast.error('Failed to Stop Service', errorMessage);
-      }
+      log.error(`Failed to ${verb.toLowerCase()} Ollama service`, { error: errorMessage });
+      if (!notifyNotInstalled(errorMessage)) toast.error(`Failed to ${verb} Service`, errorMessage);
     }
   }
 
   async function restartService() {
     try {
-      // Stop first, then start
       await ollamaApi.stopService();
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await wait(2000);
       await ollamaApi.startService();
-      await loadServiceInfo(); // Refresh service info
+      await loadServiceInfo();
       log.info('Ollama service restarted successfully');
       toast.success('Service Restarted', 'Ollama service has been restarted');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = errMsg(error);
       serviceError = errorMessage;
       log.error('Failed to restart Ollama service', { error: errorMessage });
-
-      // Show user-friendly message if Ollama is not installed
-      if (errorMessage.includes('not installed') || errorMessage.includes('program not found')) {
-        toast.error(
-          'Ollama Not Installed',
-          'Please install Ollama from https://ollama.com/download first.',
-          {
-            action: {
-              label: 'Download Ollama',
-              onClick: () => window.open('https://ollama.com/download', '_blank'),
-            },
-          }
-        );
-      }
+      notifyNotInstalled(errorMessage);
     }
-  }
-
-  async function viewLogs() {
-    // Switch to log tab to view logs
-    setActiveTab('log');
   }
 
   async function checkUpdates() {
@@ -462,12 +202,10 @@
       log.info('Checking for Ollama updates...');
       const result = await ollamaApi.checkUpdates();
       log.info('Update check result:', result);
-      // Show update status to user
       toast.success('Update Check Complete', result ? String(result) : 'No updates available');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log.error('Failed to check for updates', { error: errorMessage });
-      toast.error('Update Check Failed', errorMessage);
+      log.error('Failed to check for updates', { error: errMsg(error) });
+      toast.error('Update Check Failed', errMsg(error));
     }
   }
 
@@ -477,12 +215,10 @@
       const result = await ollamaApi.update();
       log.info('Update result:', result);
       toast.success('Ollama Updated', String(result));
-      // Refresh service info after update
       await loadServiceInfo();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log.error('Failed to update Ollama', { error: errorMessage });
-      toast.error('Update Failed', errorMessage);
+      log.error('Failed to update Ollama', { error: errMsg(error) });
+      toast.error('Update Failed', errMsg(error));
     }
   }
 
@@ -494,66 +230,8 @@
   }
 </script>
 
-<!-- Service Header -->
-<div
-  class="divider-edge-b divider-edge-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
->
-  <div class="flex h-14 w-full items-center px-4">
-    <div class="mr-4 hidden md:flex">
-      <a class="mr-6 flex items-center space-x-2" href="/sdk">
-        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M10 19l-7-7m0 0l7-7m-7 7h18"
-          />
-        </svg>
-        <span class="hidden font-bold lg:inline-block">Back to SDK</span>
-      </a>
-    </div>
-    <div class="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-      <div class="w-full flex-1 md:w-auto md:flex-none">
-        <div class="flex items-center gap-4">
-          <div class="flex items-center gap-3">
-            <div
-              class="flex size-8 items-center justify-center rounded-md bg-primary/10 text-sm font-semibold text-primary"
-            >
-              <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                <path
-                  d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"
-                />
-              </svg>
-            </div>
-            <div>
-              <h1 class="text-xl font-semibold">Ollama</h1>
-              <p class="text-sm text-muted-foreground">Local AI model runner</p>
-            </div>
-          </div>
-          <div class="flex items-center gap-2">
-            {#if serviceInfo?.running}
-              <Badge variant="default" class="bg-green-100 text-green-800">
-                <svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M5 13l4 4L19 7" />
-                </svg>
-                Running
-              </Badge>
-            {:else}
-              <Badge variant="outline" class="text-gray-500">
-                {serviceInfo?.status || 'Stopped'}
-              </Badge>
-            {/if}
-            {#if serviceInfo?.port}
-              <Badge variant="secondary">Port {serviceInfo.port}</Badge>
-            {/if}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+<OllamaHeader {serviceInfo} />
 
-<!-- Main Content -->
 <div class="flex-1 p-6">
   <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as OllamaTab)} class="w-full">
     <TabsList>
@@ -564,317 +242,45 @@
       <TabsTrigger value="log">Log</TabsTrigger>
     </TabsList>
 
-    <!-- Service Tab -->
     <TabsContent value="service" class="mt-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Ollama Service</CardTitle>
-          <CardDescription>Manage your Ollama service instance</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {#if serviceLoading}
-            <div class="flex items-center justify-center p-8">
-              <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
-              <span class="ml-2">Loading service information...</span>
-            </div>
-          {:else if serviceError}
-            <div class="p-8 text-center">
-              <p class="text-destructive">Error: {serviceError}</p>
-              <Button onclick={loadServiceInfo} class="mt-4">Retry</Button>
-            </div>
-          {:else}
-            <div class="space-y-4">
-              <div>
-                <h4 class="mb-2 font-medium">Service Status</h4>
-                <p class="text-sm text-muted-foreground">
-                  {#if serviceInfo?.running}
-                    Service is running on port {serviceInfo.port || '11434'}
-                  {:else}
-                    Service is {serviceInfo?.status || 'not running'}
-                  {/if}
-                </p>
-              </div>
-
-              <div class="flex flex-wrap gap-2">
-                {#if serviceInfo?.running}
-                  <Button variant="destructive" onclick={stopService}>Stop Service</Button>
-                {:else}
-                  <Button onclick={startService}>Start Service</Button>
-                {/if}
-                <Button variant="outline" onclick={restartService}>Restart Service</Button>
-                <Button variant="outline" onclick={viewLogs}>View Logs</Button>
-                <Button variant="outline" onclick={checkUpdates}>Check Updates</Button>
-                <Button variant="outline" onclick={updateOllama}>Update Ollama</Button>
-              </div>
-            </div>
-          {/if}
-        </CardContent>
-      </Card>
+      <OllamaServiceTab
+        {serviceInfo}
+        loading={serviceLoading}
+        error={serviceError}
+        onretry={loadServiceInfo}
+        onstart={() => setServiceRunning(true)}
+        onstop={() => setServiceRunning(false)}
+        onrestart={restartService}
+        onviewlogs={() => setActiveTab('log')}
+        oncheckupdates={checkUpdates}
+        onupdate={updateOllama}
+      />
     </TabsContent>
 
-    <!-- Version Tab -->
     <TabsContent value="version" class="mt-6">
-      <Card>
-        <CardHeader>
-          <div class="flex items-center justify-between">
-            <div>
-              <CardTitle>Ollama Versions</CardTitle>
-              <CardDescription>Install and manage Ollama versions</CardDescription>
-            </div>
-            <Button variant="outline" onclick={loadVersions} disabled={versionsLoading}>
-              <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              Refresh
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {#if versionsLoading}
-            <div class="flex items-center justify-center p-8">
-              <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
-              <span class="ml-2">Loading versions...</span>
-            </div>
-          {:else if versionsError}
-            <div class="p-8 text-center">
-              <p class="text-destructive">Error: {versionsError}</p>
-              <Button onclick={loadVersions} class="mt-4">Retry</Button>
-            </div>
-          {:else if versions.length > 0}
-            <div class="space-y-4">
-              <div class="grid gap-4">
-                {#each versions as version}
-                  <div class="flex items-center justify-between rounded-lg border p-4">
-                    <div class="flex items-center gap-4">
-                      <div class="flex items-center gap-2">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-                          />
-                        </svg>
-                        <span class="font-medium">Ollama-{version.version}</span>
-                      </div>
-                      <div class="text-sm text-muted-foreground">
-                        Version {version.version}
-                      </div>
-                      {#if version.size && version.size !== '0.0 MB'}
-                        <div class="text-sm text-muted-foreground">
-                          {version.size}
-                        </div>
-                      {/if}
-                    </div>
-                    <div class="flex items-center gap-2">
-                      {#if version.installed}
-                        <Badge variant="default" class="bg-green-100 text-green-800">
-                          <svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M5 13l4 4L19 7" />
-                          </svg>
-                          Installed
-                        </Badge>
-                        {#if version.active}
-                          <Badge variant="secondary" class="bg-blue-100 text-blue-800">
-                            Active
-                          </Badge>
-                        {/if}
-                      {:else}
-                        <Button size="sm" onclick={() => installOllamaVersion(version.version)}>
-                          <svg
-                            class="mr-1 h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                            />
-                          </svg>
-                          Install
-                        </Button>
-                      {/if}
-                    </div>
-                  </div>
-                {/each}
-              </div>
-            </div>
-          {:else}
-            <div class="p-8 text-center">
-              <p class="text-muted-foreground">No versions available.</p>
-              <Button onclick={loadVersions} class="mt-4">Load Versions</Button>
-            </div>
-          {/if}
-        </CardContent>
-      </Card>
+      <OllamaVersionsTab
+        {versions}
+        loading={versionsLoading}
+        error={versionsError}
+        onload={loadVersions}
+        oninstall={installOllamaVersion}
+      />
     </TabsContent>
 
-    <!-- Models Tab -->
     <TabsContent value="models" class="mt-6">
-      <Card>
-        <CardHeader>
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-4">
-              <div>
-                <CardTitle>Models</CardTitle>
-                <CardDescription>Manage your AI models</CardDescription>
-              </div>
-              <div class="flex items-center gap-2">
-                <Button
-                  variant={modelTab === 'local' ? 'default' : 'outline'}
-                  size="sm"
-                  onclick={() => {
-                    modelTab = 'local';
-                    loadModels();
-                  }}
-                >
-                  Local
-                </Button>
-                <Button
-                  variant={modelTab === 'library' ? 'default' : 'outline'}
-                  size="sm"
-                  onclick={() => {
-                    modelTab = 'library';
-                    loadAvailableModels();
-                  }}
-                >
-                  Library
-                </Button>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              onclick={() => (modelTab === 'local' ? loadModels() : loadAvailableModels())}
-              disabled={modelsLoading}
-            >
-              <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              Refresh
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {#if modelTab === 'local'}
-            {#if !serviceInfo?.running}
-              <div class="p-8 text-center">
-                <div class="flex flex-col items-center gap-4">
-                  <svg
-                    class="h-12 w-12 text-muted-foreground"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                    />
-                  </svg>
-                  <div>
-                    <h3 class="text-lg font-semibold">Ollama Service Not Running</h3>
-                    <p class="text-muted-foreground">
-                      Please start the Ollama service to view installed models.
-                    </p>
-                  </div>
-                  <Button onclick={startService} class="mt-2">
-                    <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h1m4 0h1m-6-8h8a2 2 0 012 2v8a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2z"
-                      />
-                    </svg>
-                    Start Service
-                  </Button>
-                </div>
-              </div>
-            {:else}
-              <ModelList
-                {models}
-                isInstalled={true}
-                error={modelsError}
-                {installingModel}
-                {installationProgress}
-                {installationStatus}
-                onInstall={installModel}
-                onRemove={removeModel}
-                onRetry={loadModels}
-                onBrowseAvailable={() => {
-                  modelTab = 'library';
-                  loadAvailableModels();
-                }}
-              />
-            {/if}
-          {:else if modelTab === 'library'}
-            <ModelTreeList
-              models={availableModels}
-              error={modelsError}
-              {installingModel}
-              {installationProgress}
-              {installationStatus}
-              onInstall={installModel}
-              onRetry={loadAvailableModels}
-              onCancel={cancelInstallation}
-            />
-          {/if}
-        </CardContent>
-      </Card>
+      <OllamaModelsTab
+        state={models}
+        serviceRunning={!!serviceInfo?.running}
+        onstart={() => setServiceRunning(true)}
+      />
     </TabsContent>
 
-    <!-- Configuration Tab: no backend command for the Ollama config file yet -->
     <TabsContent value="configuration" class="mt-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Configuration</CardTitle>
-          <CardDescription>Configure Ollama settings</CardDescription>
-        </CardHeader>
-        <CardContent class="space-y-4">
-          <p class="text-sm text-muted-foreground">
-            Reading and editing the Ollama config file is not available yet.
-          </p>
-          <div class="text-sm text-muted-foreground">
-            <p class="mb-2 font-medium">Available Settings:</p>
-            <ul class="list-inside list-disc space-y-1 text-xs">
-              <li><code>OLLAMA_HOST</code> - Host and port (default: 0.0.0.0:11434)</li>
-              <li>
-                <code>OLLAMA_KEEP_ALIVE</code> - Keep models in memory duration (default: 5m)
-              </li>
-              <li><code>OLLAMA_DEBUG</code> - Enable debug logging</li>
-              <li><code>OLLAMA_MAX_LOADED_MODELS</code> - Maximum number of loaded models</li>
-              <li><code>OLLAMA_NUM_PARALLEL</code> - Number of parallel requests</li>
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
+      <OllamaInfoTab kind="configuration" />
     </TabsContent>
 
-    <!-- Log Tab: no backend command for Ollama logs yet -->
     <TabsContent value="log" class="mt-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Service Logs</CardTitle>
-          <CardDescription>View Ollama service logs</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p class="text-sm text-muted-foreground">Log viewing is not available yet.</p>
-        </CardContent>
-      </Card>
+      <OllamaInfoTab kind="log" />
     </TabsContent>
   </Tabs>
 </div>

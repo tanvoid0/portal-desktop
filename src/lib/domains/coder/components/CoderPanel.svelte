@@ -1,36 +1,22 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { Button } from '$lib/components/ui/button';
-  import { Badge } from '$lib/components/ui/badge';
   import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
-  import Bot from '~icons/fa6-solid/robot';
-  import GitBranch from '~icons/fa6-solid/code-branch';
-  import GitCommitHorizontal from '~icons/fa6-solid/code-commit';
-  import RotateCcw from '~icons/fa6-solid/rotate-left';
-  import FolderOpen from '~icons/fa6-solid/folder-open';
-  import Copy from '~icons/fa6-solid/copy';
-  import Check from '~icons/fa6-solid/check';
-  import TerminalIcon from '~icons/fa6-solid/terminal';
-  import PanelRightOpen from '~icons/fa6-solid/table-columns';
-  import PanelLeftOpen from '~icons/fa6-solid/table-columns';
-  import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import { toast } from '$lib/utils/toast';
   import { afterNavigate, replaceState } from '$app/navigation';
   import { coderSession, type SubAgentNotificationEvent } from '../state/coderSession.svelte.js';
   import { coderUi } from '../state/coderUi.svelte.js';
   import { coderService } from '../services/coderService.js';
   import { coderTerminalStore } from '../state/coderTerminalStore.svelte.js';
-  import { isAuthError } from '$lib/domains/ai/utils/catalog.js';
-  import { AI_PROVIDER_SETTINGS_PATH } from '$lib/config/ai-nav';
   import { aiPlatform } from '$lib/domains/ai/state/aiPlatform.svelte.js';
   import PlatformStatusBanner from '$lib/domains/ai/components/PlatformStatusBanner.svelte';
   import { confirmAction } from '$lib/utils/confirm';
   import type { ChatMessage, CoderThread, GitDiffStats } from '../types.js';
   import CoderSessionList from './CoderSessionList.svelte';
-  import CoderProjectSelector from './CoderProjectSelector.svelte';
+  import CoderSessionHeader from './CoderSessionHeader.svelte';
+  import CoderTopbarActions from './CoderTopbarActions.svelte';
+  import CoderEmptyHero from './CoderEmptyHero.svelte';
   import CoderMultitaskBar from './CoderMultitaskBar.svelte';
-  import ProviderModelSelector from '$lib/domains/ai/components/ProviderModelSelector.svelte';
   import CoderComposer from './CoderComposer.svelte';
   import CoderFeed from './CoderFeed.svelte';
   import CoderWorkspaceSidebar from './CoderWorkspaceSidebar.svelte';
@@ -39,6 +25,8 @@
   import { aiTopbar } from '$lib/domains/ai/state/aiTopbarStore.svelte.js';
   import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
   import { withMessageTimestamps } from '../utils/messageTimestamps.js';
+  import { formatConversationForCopy } from '../utils/formatConversation.js';
+  import { toastSubAgentEvent } from '../utils/subAgentToasts.js';
   import ResponsivePanel from '$lib/components/shell/responsive-panel.svelte';
   import PageContainer from '$lib/components/shell/page-container.svelte';
 
@@ -47,11 +35,8 @@
   let showSettings = $state(false);
   let scrollViewport = $state<HTMLElement | null>(null);
   let input = $state('');
-  let copied = $state(false);
   let gitStats = $state<GitDiffStats | null>(null);
   let showCommitDialog = $state(false);
-  let catalogError = $state<string | null>(null);
-  const tokenRejected = $derived(isAuthError(catalogError));
   const platformBlocked = $derived(aiPlatform.blocked);
 
   // Hand the action row to the AI layout's tab bar row — it has the width.
@@ -191,50 +176,7 @@
   });
 
   function handleSubAgentNotification(event: SubAgentNotificationEvent) {
-    switch (event.type) {
-      case 'spawned': {
-        const label = `${event.count} sub-agent${event.count === 1 ? '' : 's'}`;
-        if (coderSession.activeThreadId === event.coordinatorId) {
-          toast.success(`Spawned ${label}`);
-          break;
-        }
-        toast.success(`Spawned ${label}`, {
-          action: {
-            label: 'View',
-            onClick: () => void selectThread(event.coordinatorId),
-          },
-        });
-        break;
-      }
-      case 'finished': {
-        const sa = event.subAgent;
-        const statusLabel =
-          sa.status === 'completed' ? 'completed' : sa.status === 'failed' ? 'failed' : 'finished';
-        const toastFn = sa.status === 'failed' ? toast.error : toast.success;
-        toastFn(`Sub-agent ${statusLabel}`, {
-          description: sa.title,
-          action: {
-            label: 'View',
-            onClick: () => void openSubAgent(sa.childThreadId, event.coordinatorId),
-          },
-        });
-        break;
-      }
-      case 'complete': {
-        const done = event.subAgents.filter((s) => s.status === 'completed').length;
-        const failed = event.subAgents.filter((s) => s.status === 'failed').length;
-        const parts = [`${done} completed`];
-        if (failed > 0) parts.push(`${failed} failed`);
-        toast.info('Multitask complete', {
-          description: parts.join(', '),
-          action: {
-            label: 'View',
-            onClick: () => void selectThread(event.coordinatorId),
-          },
-        });
-        break;
-      }
-    }
+    toastSubAgentEvent(event, { selectThread, openSubAgent });
   }
 
   // Svelte ignores anything an async onMount returns, so the cleanup has to be
@@ -400,208 +342,28 @@
     if (id) input = coderSession.runtimeFor(id).draftInput;
   });
 
-  function toolNameFor(callId: string): string {
-    for (const m of messages) {
-      for (const tc of m.tool_calls ?? []) {
-        if (tc.id === callId) return tc.function.name;
-      }
-    }
-    return callId;
-  }
-
-  function formatConversationForCopy(): string {
-    const lines: string[] = ['=== Coder Session ==='];
-    if (thread?.title) lines.push(`Title: ${thread.title}`);
-    if (coderSession.workspaceRoot) lines.push(`Workspace: ${coderSession.workspaceRoot}`);
-    if (coderSession.selectedModel) lines.push(`Model: ${coderSession.selectedModel}`);
-    lines.push(`Agent mode: ${coderSession.agentMode}`);
-    lines.push(`Permission: ${coderSession.permissionMode}`);
-    if (thread?.id) lines.push(`Thread ID: ${thread.id}`);
-    lines.push('');
-
-    for (const m of messages) {
-      if (m.role === 'system') continue;
-
-      const roleLabel =
-        m.role === 'user'
-          ? 'User'
-          : m.role === 'assistant'
-            ? 'Assistant'
-            : m.role === 'tool'
-              ? `Tool (${toolNameFor(m.tool_call_id ?? '')})`
-              : m.role;
-
-      lines.push(`--- ${roleLabel} ---`);
-      if (m.content) lines.push(m.content);
-
-      for (const tc of m.tool_calls ?? []) {
-        lines.push('');
-        lines.push(`[Tool Call: ${tc.function.name}]`);
-        lines.push(tc.function.arguments);
-      }
-      lines.push('');
-    }
-
-    if (streamingText) {
-      lines.push('--- Assistant (streaming) ---');
-      lines.push(streamingText);
-      lines.push('');
-    }
-
-    if (pending) {
-      lines.push('--- Pending Approval ---');
-      lines.push(`Tool: ${pending.tool}`);
-      lines.push(`Summary: ${pending.summary}`);
-      lines.push(JSON.stringify(pending.arguments, null, 2));
-      lines.push('');
-    }
-
-    if (error) {
-      lines.push('--- Error ---');
-      lines.push(error);
-    }
-
-    return lines.join('\n').trim();
-  }
+  const copyText = () =>
+    formatConversationForCopy({ thread, messages, streamingText, pending, error });
 
   const canCopyConversation = $derived(
     messages.some((m) => m.role !== 'system') || !!streamingText || !!pending || !!error
   );
-
-  async function copyConversation() {
-    const text = formatConversationForCopy();
-    if (!text) return;
-
-    try {
-      await navigator.clipboard.writeText(text);
-      copied = true;
-      toast.success('Conversation copied to clipboard');
-      setTimeout(() => {
-        copied = false;
-      }, 2000);
-    } catch {
-      toast.error('Failed to copy conversation');
-    }
-  }
 </script>
 
 {#snippet topbarActions()}
-  <ProviderModelSelector
-    bind:selectedProvider={coderSession.selectedProvider}
-    bind:selectedBackendProvider={coderSession.selectedBackendProvider}
-    bind:selectedModel={coderSession.selectedModel}
-    onModelChange={(m) => coderSession.handleModelChange(m)}
-    onBackendProviderChange={(p) => coderSession.handleBackendProviderChange(p)}
-    modelSelectClass="w-[180px]"
-    showInlineError={false}
-    onStatusChange={(s) => (catalogError = s.error)}
+  <CoderTopbarActions
+    {thread}
+    {activeThreadId}
+    {activeTerminalThread}
+    {running}
+    {showRetry}
+    {platformBlocked}
+    {pendingChangeCount}
+    {gitStats}
+    {canCopyConversation}
+    getConversationText={copyText}
+    onCommit={() => (showCommitDialog = true)}
   />
-  {#if catalogError && !platformBlocked}
-    <span class="text-xs font-medium text-destructive dark:text-red-400" title={catalogError}>
-      {tokenRejected ? 'Agent Platform token rejected.' : 'Agent Platform unreachable.'}
-      <a href={AI_PROVIDER_SETTINGS_PATH} class="underline">Settings &gt; AI</a>
-    </span>
-  {/if}
-  {#if showRetry && thread && !running}
-    <Button
-      size="sm"
-      variant="outline"
-      class="h-8 gap-1"
-      title={platformBlocked ? 'Unavailable: Agent Platform is down' : 'Retry the last message'}
-      disabled={platformBlocked}
-      onclick={() => coderSession.retry()}
-    >
-      <RotateCcw class="h-3.5 w-3.5" />
-      Retry
-    </Button>
-  {/if}
-  <Button
-    size="sm"
-    variant={coderWorkspaceStore.sidebarOpen ? 'secondary' : 'ghost'}
-    class="h-8 gap-1"
-    title="Workspace sidebar"
-    onclick={() => {
-      coderWorkspaceStore.sidebarOpen = !coderWorkspaceStore.sidebarOpen;
-    }}
-  >
-    <PanelRightOpen class="h-3.5 w-3.5" />
-  </Button>
-  <Button
-    size="sm"
-    variant={terminalOpen ? 'secondary' : 'ghost'}
-    class="h-8 gap-1"
-    title="Session terminal"
-    disabled={!activeThreadId}
-    onclick={() => {
-      if (!activeThreadId || !activeTerminalThread) return;
-      const tab = coderTerminalStore.ensureDefault(
-        activeThreadId,
-        activeTerminalThread.workspace_root
-      );
-      coderWorkspaceStore.openTerminal(activeThreadId, tab.id, tab.label);
-      coderSession.terminalOpen = true;
-    }}
-  >
-    <TerminalIcon class="h-3.5 w-3.5" />
-    <span class="hidden xl:inline">Terminal</span>
-  </Button>
-  <Button
-    size="icon"
-    variant="ghost"
-    class="h-8 w-8"
-    title="Copy conversation for debugging"
-    disabled={!canCopyConversation}
-    onclick={copyConversation}
-  >
-    {#if copied}
-      <Check class="h-3.5 w-3.5 text-green-500" />
-    {:else}
-      <Copy class="h-3.5 w-3.5" />
-    {/if}
-  </Button>
-  <Button
-    size="sm"
-    variant={showChanges ? 'secondary' : 'ghost'}
-    class="h-8 gap-1"
-    title="Review agent file changes"
-    onclick={() => {
-      coderWorkspaceStore.openChanges();
-      coderSession.refreshChanges(thread?.id);
-    }}
-  >
-    <Bot class="h-3.5 w-3.5" />
-    {#if pendingChangeCount > 0}
-      <span class="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">
-        {pendingChangeCount}
-      </span>
-    {/if}
-  </Button>
-  <Button
-    size="sm"
-    variant={showGitChanges ? 'secondary' : 'ghost'}
-    class="h-8 gap-1"
-    title="View git working tree changes"
-    onclick={() => coderWorkspaceStore.openGitChanges()}
-  >
-    <GitBranch class="h-3.5 w-3.5" />
-    {#if gitStats?.hasChanges}
-      <span class="font-mono text-[10px] text-green-600 dark:text-green-400">
-        {#if gitStats.additions > 0}+{gitStats.additions}{/if}
-        {#if gitStats.deletions > 0}-{gitStats.deletions}{/if}
-      </span>
-    {/if}
-  </Button>
-  <Button
-    size="sm"
-    variant="outline"
-    class="h-8 gap-1"
-    title="Review and commit git changes"
-    disabled={!gitStats?.hasChanges}
-    onclick={() => (showCommitDialog = true)}
-  >
-    <GitCommitHorizontal class="h-3.5 w-3.5" />
-    <span class="hidden xl:inline">Commit</span>
-  </Button>
 {/snippet}
 
 <div class="flex h-full w-full overflow-hidden">
@@ -632,65 +394,16 @@
   </ResponsivePanel>
 
   <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
-    <div
-      class="divider-edge-b divider-edge-full flex shrink-0 flex-wrap items-center justify-between gap-2 bg-background px-4 py-2.5"
-    >
-      <div class="flex min-w-0 flex-1 items-center gap-2">
-        <Button
-          size="icon"
-          variant="ghost"
-          class="h-8 w-8 shrink-0 md:hidden"
-          title="Sessions"
-          onclick={() => (sessionsPanelOpen = true)}
-        >
-          <PanelLeftOpen class="h-4 w-4" />
-        </Button>
-        <h2 class="truncate text-sm font-semibold">
-          {#if thread?.thread_kind === 'sub-agent' && parentCoordinatorId}
-            <span class="text-muted-foreground">Sub-agent</span>
-            <span class="mx-1 text-muted-foreground">/</span>
-          {/if}
-          {thread?.title || 'New session'}
-        </h2>
-        {#if thread?.thread_kind === 'sub-agent' && parentCoordinatorId}
-          <Button
-            size="sm"
-            variant="ghost"
-            class="h-7 gap-1 text-xs"
-            title="Back to coordinator"
-            onclick={() => void backToCoordinator()}
-          >
-            <ArrowLeft class="h-3.5 w-3.5" />
-            Coordinator
-          </Button>
-        {/if}
-        {#if running}
-          <span class="flex items-center gap-1 text-xs text-primary">
-            <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-primary"></span>
-            Running
-          </span>
-        {/if}
-        {#if queuedMessages.length > 0}
-          <span class="text-xs text-muted-foreground">
-            {queuedMessages.length} queued
-          </span>
-        {/if}
-        {#if coderSession.workspaceRoot}
-          <span class="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
-            <FolderOpen class="h-3 w-3" />
-            <span class="max-w-[200px] truncate">{workspaceName}</span>
-          </span>
-        {/if}
-      </div>
-
-      <div class="flex w-full min-w-0 items-center gap-1.5 sm:w-auto sm:max-w-md sm:shrink">
-        <CoderProjectSelector
-          bind:value={coderSession.workspaceRoot}
-          disabled={!!thread}
-          onSelect={handleProjectSelect}
-        />
-      </div>
-    </div>
+    <CoderSessionHeader
+      {thread}
+      {parentCoordinatorId}
+      {running}
+      queuedCount={queuedMessages.length}
+      {workspaceName}
+      onOpenSessions={() => (sessionsPanelOpen = true)}
+      onBackToCoordinator={() => void backToCoordinator()}
+      onProjectSelect={handleProjectSelect}
+    />
 
     <PlatformStatusBanner blocks="Sending, retry and approvals" />
 
@@ -711,20 +424,7 @@
           <div
             class="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-4 pb-8 [@media(max-height:700px)]:pb-2"
           >
-            <div class="mb-6 text-center [@media(max-height:700px)]:mb-2">
-              <div
-                class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 [@media(max-height:700px)]:hidden"
-              >
-                <Bot class="h-6 w-6 text-primary" />
-              </div>
-              <h3 class="text-lg font-semibold">What should we build?</h3>
-              <p
-                class="mt-1 max-w-md text-sm text-muted-foreground [@media(max-height:700px)]:hidden"
-              >
-                Describe a task. The agent explores, edits, and runs commands — mode controls how it
-                operates.
-              </p>
-            </div>
+            <CoderEmptyHero />
             <div class="w-full">
               <PageContainer variant="chat" class="px-0">
                 <CoderComposer

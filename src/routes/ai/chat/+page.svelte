@@ -13,13 +13,16 @@
     CatalogStatus,
     ChatMessage,
     ContextUsage,
-    ConversationMessage,
     LlmUsage,
     ProviderType,
   } from '$lib/domains/ai/types/index.js';
-  import { AI_PROVIDER_SETTINGS_PATH } from '$lib/config/ai-nav';
   import { isAuthError } from '$lib/domains/ai/utils/catalog.js';
   import { aiPlatform } from '$lib/domains/ai/state/aiPlatform.svelte.js';
+  import {
+    fromConversationMessages,
+    toWireMessages,
+  } from '$lib/domains/ai/utils/conversationWire.js';
+  import PlatformOfflineBanner from '$lib/domains/ai/components/PlatformOfflineBanner.svelte';
   import PlatformStatusBanner from '$lib/domains/ai/components/PlatformStatusBanner.svelte';
   import AIContextBar from '$lib/domains/ai/components/AIContextBar.svelte';
   import {
@@ -29,8 +32,6 @@
   } from '$lib/domains/chat/title.js';
   import PanelLeftOpen from '~icons/fa6-solid/table-columns';
   import Settings2 from '~icons/fa6-solid/sliders';
-  import RefreshCw from '~icons/fa6-solid/rotate';
-  import ServerOff from '~icons/fa6-solid/server';
   import ResponsivePanel from '$lib/components/shell/responsive-panel.svelte';
   import { Button } from '$lib/components/ui/button';
   import ChatSettingsPanel from '$lib/domains/ai/components/chat/ChatSettingsPanel.svelte';
@@ -92,6 +93,14 @@
     };
   });
 
+  /** Mirror the open conversation in the URL (?id=) without navigating. */
+  function setUrlConversationId(id: string | null) {
+    const url = new URL(page.url.href);
+    if (id) url.searchParams.set('id', id);
+    else url.searchParams.delete('id');
+    replaceState(url, {});
+  }
+
   function patchConversationTitle(id: string, title: string) {
     if (userRenamedConversationIds.has(id)) return;
 
@@ -127,11 +136,7 @@
         try {
           const result = await aiConversationService.loadConversation(urlConversationId);
           applyConversationSelection(result.conversation);
-          messages = result.messages.map((msg: ConversationMessage) => ({
-            role: msg.role,
-            content: msg.content,
-            timestamp: new Date(msg.timestamp),
-          }));
+          messages = fromConversationMessages(result.messages);
           conversationId = urlConversationId;
           await loadConversations(); // Reload to include it in the list
         } catch (error) {
@@ -165,17 +170,11 @@
     try {
       const result = await aiConversationService.loadConversation(conversation.id);
       applyConversationSelection(result.conversation);
-      messages = result.messages.map((msg: ConversationMessage) => ({
-        role: msg.role,
-        content: msg.content,
-        timestamp: new Date(msg.timestamp),
-      }));
+      messages = fromConversationMessages(result.messages);
       conversationId = conversation.id;
 
       // Update URL without navigation
-      const url = new URL(page.url.href);
-      url.searchParams.set('id', conversation.id);
-      replaceState(url, {});
+      setUrlConversationId(conversation.id);
     } catch (error) {
       toastActions.error('Failed to load conversation', error);
     } finally {
@@ -237,9 +236,7 @@
     llmUsage = null;
 
     // Clear URL parameter
-    const url = new URL(page.url.href);
-    url.searchParams.delete('id');
-    replaceState(url, {});
+    setUrlConversationId(null);
   }
 
   async function handleModelChange(model: string) {
@@ -370,9 +367,7 @@
 
         // Update URL if not already set
         if (!conversationId) {
-          const url = new URL(page.url.href);
-          url.searchParams.set('id', selectedConversation.id);
-          replaceState(url, {});
+          setUrlConversationId(selectedConversation.id);
         }
       }
     } catch (error) {
@@ -386,20 +381,6 @@
       isSending = false;
       activeStreamId = null;
     }
-  }
-
-  function toWireMessages(id: string, list: ChatMessage[]) {
-    return list.map((msg, idx) => ({
-      id: `${id}-${idx}`,
-      conversation_id: id,
-      role: msg.role,
-      content: msg.content,
-      timestamp:
-        msg.timestamp instanceof Date
-          ? msg.timestamp.toISOString()
-          : msg.timestamp || new Date().toISOString(),
-      sequence: idx,
-    }));
   }
 
   /** Persist the current message array over the stored conversation. */
@@ -435,9 +416,7 @@
       conversationId = conversation.id;
       await loadConversations();
 
-      const url = new URL(page.url.href);
-      url.searchParams.set('id', conversation.id);
-      replaceState(url, {});
+      setUrlConversationId(conversation.id);
       toastActions.success('Branched into a new conversation');
     } catch (error) {
       toastActions.error('Failed to branch conversation', error);
@@ -543,45 +522,12 @@
     {#if aiPlatform.blocked}
       <PlatformStatusBanner blocks="Sending, regenerate and edit-and-resend" />
     {:else if platformOffline}
-      <div
-        class="divider-edge-b divider-edge-full flex flex-wrap items-center gap-3 bg-destructive/10 px-4 py-2.5 text-destructive"
-        role="status"
-      >
-        <ServerOff class="h-4 w-4 shrink-0" />
-        <div class="min-w-0 flex-1">
-          <p class="text-xs font-medium">
-            {platformUnauthorized
-              ? 'Agent Platform rejected the API token'
-              : 'Agent Platform is unreachable'}
-          </p>
-          <p class="truncate text-[11px] opacity-80" title={platformError ?? ''}>
-            {platformUnauthorized
-              ? 'Update the token in Settings > AI, then reopen chat.'
-              : (platformError ?? 'Check that the platform is running.')}
-          </p>
-        </div>
-        {#if platformUnauthorized}
-          <Button
-            size="sm"
-            variant="outline"
-            class="h-7 shrink-0 text-xs"
-            href={AI_PROVIDER_SETTINGS_PATH}
-          >
-            Open Settings > AI
-          </Button>
-        {:else}
-          <Button
-            size="sm"
-            variant="outline"
-            class="h-7 shrink-0 gap-1.5 text-xs"
-            disabled={platformChecking}
-            onclick={retryPlatform}
-          >
-            <RefreshCw class="h-3 w-3 {platformChecking ? 'animate-spin' : ''}" />
-            {platformChecking ? 'Checking…' : 'Retry'}
-          </Button>
-        {/if}
-      </div>
+      <PlatformOfflineBanner
+        unauthorized={platformUnauthorized}
+        checking={platformChecking}
+        error={platformError}
+        onRetry={retryPlatform}
+      />
     {/if}
     <div class="flex min-h-0 w-full flex-1 flex-col">
       <AIChatPanel

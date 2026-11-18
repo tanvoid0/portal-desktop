@@ -3,4 +3,4 @@
 /**
  * One logical Redis database (`db0`…) and its key count.
  */
-export type RedisDb = { index: number; keys: number };
+export type RedisDb = { index: number, keys: number, };

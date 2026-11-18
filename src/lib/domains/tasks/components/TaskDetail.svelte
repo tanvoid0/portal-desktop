@@ -1,23 +1,6 @@
 <script lang="ts">
-  import FaArrowLeft from '~icons/fa6-solid/arrow-left';
-  import FaWandMagicSparkles from '~icons/fa6-solid/wand-magic-sparkles';
-  import FaPencil from '~icons/fa6-solid/pencil';
-  import FaTrash from '~icons/fa6-solid/trash';
   import FaClipboard from '~icons/fa6-solid/clipboard';
-  import FaFlag from '~icons/fa6-solid/flag';
-  import FaCalendar from '~icons/fa6-solid/calendar';
-  import FaHourglassHalf from '~icons/fa6-solid/hourglass-half';
-  import { goto } from '$app/navigation';
-  import { Button } from '$lib/components/ui/button';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import { Badge } from '$lib/components/ui/badge';
-  import { Separator } from '$lib/components/ui/separator';
-  import { Textarea } from '$lib/components/ui/textarea';
-  import { Input } from '$lib/components/ui/input';
-  import { Label } from '$lib/components/ui/label';
-  import Select from '$lib/components/ui/select.svelte';
-  import Icon from '@iconify/svelte';
-  import MarkdownView from '$lib/components/ui/markdown-view.svelte';
   import { PageLoading, PageError } from '$lib/components/shell';
   import { toastActions } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
@@ -25,14 +8,6 @@
   import { createTasksQuery } from '../queries/taskQueries';
   import { createProjectsQuery } from '$lib/domains/projects/queries/projectQueries';
   import { ResourceType } from '$lib/domains/shared/types/resourceType';
-  import {
-    getTaskStatusColor,
-    getStatusBadgeColor,
-    getPriorityColor,
-    getTaskIcon,
-    formatMinutes,
-    activeSession,
-  } from '../utils/taskDisplay';
   import { openClaudeSession } from '../utils/openClaudeSession';
   import { createQuery } from '@tanstack/svelte-query';
   import { agentSessionsQuery } from '$lib/domains/agents/queries/agentsQueries';
@@ -41,15 +16,10 @@
   import TaskInfoCard from './TaskInfoCard.svelte';
   import TaskLinkedDocument from './TaskLinkedDocument.svelte';
   import TaskQuickActions from './TaskQuickActions.svelte';
-  import {
-    TASK_STATUS_OPTIONS,
-    TASK_PRIORITY_OPTIONS,
-    taskStatusLabel,
-    type Task,
-    type TaskStatus,
-    type TaskPriority,
-    type UpdateTaskRequest,
-  } from '../types';
+  import TaskDetailHeader from './TaskDetailHeader.svelte';
+  import TaskDetailEditForm from './TaskDetailEditForm.svelte';
+  import TaskDetailReadView from './TaskDetailReadView.svelte';
+  import type { Task, TaskStatus, TaskPriority, UpdateTaskRequest } from '../types';
 
   interface Props {
     taskId: string;
@@ -231,62 +201,17 @@
     <PageError title="Failed to load task" message={error} onRetry={reloadTaskData} />
   {:else if task}
     <div>
-      <!-- Header -->
-      <div class="mb-6 flex flex-wrap items-center justify-between gap-2">
-        <div class="flex items-center gap-4">
-          {#if onBack}
-            <Button variant="ghost" onclick={onBack} class="flex items-center gap-2">
-              <FaArrowLeft class="h-4 w-4" />
-              Back to Tasks
-            </Button>
-            <Separator orientation="vertical" class="h-6" />
-          {/if}
-          <div class="flex items-center gap-2">
-            <Icon icon={getTaskIcon(task)} class="h-5 w-5 {getTaskStatusColor(task.status)}" />
-            <Badge class={getStatusBadgeColor(task.status)}>
-              {taskStatusLabel(task.status)}
-            </Badge>
-            {#if activeSession(task)}
-              <Badge
-                variant="outline"
-                class="cursor-pointer gap-1.5 text-xs hover:bg-accent"
-                title="Resume this Claude Code session in a terminal"
-                onclick={() => handleResumeSession(activeSession(task)!)}
-              >
-                <span
-                  class="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-500 shadow-[0_0_6px_theme(colors.emerald.500)]"
-                ></span>
-                <span class="max-w-[8ch] truncate text-muted-foreground">{activeSession(task)}</span
-                >
-              </Badge>
-            {/if}
-          </div>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-          {#if isEditing}
-            <Button variant="outline" onclick={handleCancel} disabled={isSaving}>Cancel</Button>
-            <Button onclick={handleSave} disabled={isSaving}>Save Changes</Button>
-          {:else}
-            <Button
-              variant="outline"
-              onclick={() => goto(`/tasks/${task.id}/generate`)}
-              class="flex items-center gap-2"
-            >
-              <FaWandMagicSparkles class="h-4 w-4" />
-              Generate Tasks with AI
-            </Button>
-            <Button variant="outline" onclick={handleEdit} class="flex items-center gap-2">
-              <FaPencil class="h-4 w-4" />
-              Edit
-            </Button>
-            <Button variant="destructive" onclick={handleDelete} class="flex items-center gap-2">
-              <FaTrash class="h-4 w-4" />
-              Delete
-            </Button>
-          {/if}
-        </div>
-      </div>
+      <TaskDetailHeader
+        {task}
+        {onBack}
+        {isEditing}
+        {isSaving}
+        onEdit={handleEdit}
+        onCancel={handleCancel}
+        onSave={handleSave}
+        onDelete={handleDelete}
+        onResumeSession={handleResumeSession}
+      />
 
       <div class="grid grid-cols-1 gap-6 @3xl:grid-cols-3">
         <!-- Main Content -->
@@ -301,150 +226,16 @@
             </CardHeader>
             <CardContent class="space-y-4">
               {#if isEditing}
-                <div class="space-y-4">
-                  <div>
-                    <Label for="edit-title">Title</Label>
-                    <Input
-                      id="edit-title"
-                      bind:value={editTitle}
-                      placeholder="Enter task title..."
-                    />
-                  </div>
-                  <div>
-                    <Label for="edit-description">Description</Label>
-                    <Textarea
-                      id="edit-description"
-                      bind:value={editDescription}
-                      placeholder="Enter task description..."
-                      rows={4}
-                    />
-                  </div>
-                  <div class="grid grid-cols-1 gap-4 @md:grid-cols-2">
-                    <div>
-                      <Label for="edit-status">Status</Label>
-                      <Select
-                        options={TASK_STATUS_OPTIONS}
-                        defaultValue={editStatus}
-                        placeholder="Select status..."
-                        onSelect={(value) => (editStatus = value as TaskStatus)}
-                      />
-                    </div>
-                    <div>
-                      <Label for="edit-priority">Priority</Label>
-                      <Select
-                        options={TASK_PRIORITY_OPTIONS}
-                        defaultValue={editPriority}
-                        placeholder="Select priority..."
-                        onSelect={(value) => (editPriority = value as TaskPriority)}
-                      />
-                    </div>
-                  </div>
-                  <div class="grid grid-cols-1 gap-4 @md:grid-cols-2">
-                    <div>
-                      <Label for="edit-type">Type</Label>
-                      <Input
-                        id="edit-type"
-                        bind:value={editType}
-                        placeholder="e.g., Story, Bug, Feature..."
-                      />
-                    </div>
-                    <div>
-                      <Label for="edit-due-date">Due Date</Label>
-                      <Input id="edit-due-date" type="date" bind:value={editDueDate} />
-                    </div>
-                  </div>
-                </div>
+                <TaskDetailEditForm
+                  bind:title={editTitle}
+                  bind:description={editDescription}
+                  bind:status={editStatus}
+                  bind:priority={editPriority}
+                  bind:type={editType}
+                  bind:dueDate={editDueDate}
+                />
               {:else}
-                <div class="space-y-4">
-                  <div>
-                    <h2 class="text-2xl font-bold text-foreground">
-                      {task.title}
-                    </h2>
-                    {#if task.description}
-                      <div class="mt-3">
-                        <MarkdownView content={task.description} truncateAt={500} />
-                      </div>
-                    {:else}
-                      <p class="mt-2 text-muted-foreground italic">No description provided</p>
-                    {/if}
-                  </div>
-
-                  <div class="grid grid-cols-1 gap-4 @md:grid-cols-2">
-                    <div>
-                      <Label class="text-sm font-medium text-muted-foreground">Status</Label>
-                      <div class="mt-1 flex items-center gap-2">
-                        <Icon
-                          icon={getTaskIcon(task)}
-                          class="h-4 w-4 {getTaskStatusColor(task.status)}"
-                        />
-                        <Badge class={getStatusBadgeColor(task.status)}>
-                          {taskStatusLabel(task.status)}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label class="text-sm font-medium text-muted-foreground">Priority</Label>
-                      <div class="mt-1 flex items-center gap-2">
-                        <FaFlag class="h-4 w-4 {getPriorityColor(task.priority)}" />
-                        <Badge variant="outline" class="uppercase">
-                          {task.priority}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-
-                  {#if task.type}
-                    <div>
-                      <Label class="text-sm font-medium text-muted-foreground">Type</Label>
-                      <div class="mt-1">
-                        <Badge variant="outline">{task.type}</Badge>
-                      </div>
-                    </div>
-                  {/if}
-
-                  {#if task.dueDate}
-                    <div>
-                      <Label class="text-sm font-medium text-muted-foreground">Due Date</Label>
-                      <div class="mt-1 flex items-center gap-2">
-                        <FaCalendar class="h-4 w-4 text-muted-foreground" />
-                        <span class="text-sm">{new Date(task.dueDate).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                  {/if}
-
-                  {#if task.assignee}
-                    <div>
-                      <Label class="text-sm font-medium text-muted-foreground">Assignee</Label>
-                      <div class="mt-1 text-sm">{task.assignee}</div>
-                    </div>
-                  {/if}
-
-                  {#if task.estimatedTime || task.actualTime}
-                    <div>
-                      <Label class="text-sm font-medium text-muted-foreground">Time</Label>
-                      <div class="mt-1 flex items-center gap-2 text-sm">
-                        <FaHourglassHalf class="h-4 w-4 text-muted-foreground" />
-                        <span>
-                          {task.estimatedTime ? formatMinutes(task.estimatedTime) : '-'} estimated{task.actualTime
-                            ? ` / ${formatMinutes(task.actualTime)} spent`
-                            : ''}
-                        </span>
-                      </div>
-                    </div>
-                  {/if}
-
-                  {#if task.tags && task.tags.length > 0}
-                    <div>
-                      <Label class="text-sm font-medium text-muted-foreground">Tags</Label>
-                      <div class="mt-1 flex flex-wrap gap-1">
-                        {#each task.tags as tag, i (i)}
-                          <Badge variant="outline">{tag}</Badge>
-                        {/each}
-                      </div>
-                    </div>
-                  {/if}
-                </div>
+                <TaskDetailReadView {task} />
               {/if}
             </CardContent>
           </Card>

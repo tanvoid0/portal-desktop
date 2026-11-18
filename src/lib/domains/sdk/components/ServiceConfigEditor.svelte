@@ -13,36 +13,15 @@
     DialogTitle,
     DialogTrigger,
   } from '$lib/components/ui/dialog';
-  import { Button } from '$lib/components/ui/button';
-  import { Badge } from '$lib/components/ui/badge';
-  import { Input } from '$lib/components/ui/input';
-  import { Label } from '$lib/components/ui/label';
-  import { Textarea } from '$lib/components/ui/textarea';
-  import Select from '$lib/components/ui/select.svelte';
+  import ServiceConfigFilesTab from './ServiceConfigFilesTab.svelte';
+  import ServiceConfigEnvTab from './ServiceConfigEnvTab.svelte';
+  import type { ConfigFile, EnvironmentVariable } from './serviceConfigTypes';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import Settings from '~icons/fa6-solid/gear';
-  import Save from '~icons/fa6-solid/floppy-disk';
-  import RotateCcw from '~icons/fa6-solid/rotate-left';
-  import Download from '~icons/fa6-solid/download';
-  import Upload from '~icons/fa6-solid/upload';
   import AlertCircle from '~icons/fa6-solid/circle-exclamation';
   import CheckCircle from '~icons/fa6-solid/circle-check';
   import FileText from '~icons/fa6-solid/file-lines';
   import Code from '~icons/fa6-solid/code';
-
-  interface ConfigFile {
-    name: string;
-    path: string;
-    content: string;
-    format: 'json' | 'yaml' | 'toml' | 'ini' | 'xml' | 'text';
-    lastModified: string;
-  }
-
-  interface EnvironmentVariable {
-    name: string;
-    value: string;
-    scope: 'global' | 'session' | 'project';
-  }
 
   interface Props {
     serviceId: string;
@@ -206,52 +185,6 @@
       error = 'Failed to download configuration file';
     }
   }
-
-  function addEnvironmentVar() {
-    environmentVars = [...environmentVars, { name: '', value: '', scope: 'project' }];
-  }
-
-  function removeEnvironmentVar(index: number) {
-    environmentVars = environmentVars.filter((_, i) => i !== index);
-  }
-
-  function updateEnvironmentVar(index: number, field: keyof EnvironmentVariable, value: string) {
-    environmentVars[index] = { ...environmentVars[index], [field]: value };
-  }
-
-  function getFileIcon(format: string) {
-    switch (format) {
-      case 'json':
-        return '{}';
-      case 'yaml':
-        return 'Y';
-      case 'toml':
-        return 'T';
-      case 'ini':
-        return 'I';
-      case 'xml':
-        return 'X';
-      default:
-        return 'T';
-    }
-  }
-
-  function getFileLanguage(format: string) {
-    switch (format) {
-      case 'json':
-        return 'json';
-      case 'yaml':
-        return 'yaml';
-      case 'toml':
-        return 'toml';
-      case 'ini':
-        return 'ini';
-      case 'xml':
-        return 'xml';
-      default:
-        return 'text';
-    }
-  }
 </script>
 
 <Dialog bind:open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -295,131 +228,23 @@
         </TabsTrigger>
       </TabsList>
 
-      <!-- Configuration Files Tab -->
       <TabsContent value="files" class="flex flex-1 gap-4">
-        <!-- File List -->
-        <div class="w-1/3 space-y-2">
-          <h3 class="mb-2 font-medium">Configuration Files</h3>
-          <div class="space-y-1">
-            {#each configFiles as file}
-              <Button
-                variant={selectedFile?.name === file.name ? 'default' : 'ghost'}
-                class="w-full justify-start"
-                onclick={() => selectFile(file)}
-              >
-                <span class="mr-2">{getFileIcon(file.format)}</span>
-                {file.name}
-              </Button>
-            {/each}
-          </div>
-        </div>
-
-        <!-- File Editor -->
-        <div class="flex flex-1 flex-col">
-          {#if selectedFile}
-            <div class="mb-4 flex items-center justify-between">
-              <div>
-                <h3 class="font-medium">{selectedFile.name}</h3>
-                <p class="text-sm text-muted-foreground">{selectedFile.path}</p>
-              </div>
-              <div class="flex items-center gap-2">
-                <Badge variant="outline">{getFileLanguage(selectedFile.format)}</Badge>
-                <Button variant="outline" size="sm" onclick={downloadConfig}>
-                  <Download class="mr-2 h-4 w-4" />
-                  Download
-                </Button>
-              </div>
-            </div>
-
-            <Textarea
-              bind:value={editedContent}
-              oninput={handleContentChange}
-              class="flex-1 font-mono text-sm"
-              placeholder="Configuration content..."
-            />
-
-            <div class="mt-4 flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                {#if hasChanges}
-                  <Badge variant="secondary">Unsaved changes</Badge>
-                {/if}
-              </div>
-              <div class="flex items-center gap-2">
-                <Button variant="outline" onclick={resetChanges} disabled={!hasChanges}>
-                  <RotateCcw class="mr-2 h-4 w-4" />
-                  Reset
-                </Button>
-                <Button onclick={saveConfig} disabled={!hasChanges || loading}>
-                  <Save class="mr-2 h-4 w-4" />
-                  Save
-                </Button>
-              </div>
-            </div>
-          {:else}
-            <div class="flex flex-1 items-center justify-center text-muted-foreground">
-              <div class="text-center">
-                <FileText class="mx-auto mb-4 h-12 w-12 opacity-50" />
-                <p>Select a configuration file to edit</p>
-              </div>
-            </div>
-          {/if}
-        </div>
+        <ServiceConfigFilesTab
+          {configFiles}
+          {selectedFile}
+          bind:editedContent
+          {hasChanges}
+          {loading}
+          onselect={selectFile}
+          onchange={handleContentChange}
+          onsave={saveConfig}
+          onreset={resetChanges}
+          ondownload={downloadConfig}
+        />
       </TabsContent>
 
-      <!-- Environment Variables Tab -->
       <TabsContent value="environment" class="flex-1">
-        <div class="space-y-4">
-          <div class="flex items-center justify-between">
-            <h3 class="font-medium">Environment Variables</h3>
-            <Button variant="outline" onclick={addEnvironmentVar}>Add Variable</Button>
-          </div>
-
-          <div class="space-y-3">
-            {#each environmentVars as envVar, index}
-              <div class="flex items-center gap-3 rounded-lg border p-3">
-                <div class="flex-1">
-                  <Label for="env-name-{index}" class="text-xs">Name</Label>
-                  <Input
-                    id="env-name-{index}"
-                    bind:value={envVar.name}
-                    oninput={(e) =>
-                      updateEnvironmentVar(index, 'name', (e.target as HTMLInputElement).value)}
-                    placeholder="VARIABLE_NAME"
-                  />
-                </div>
-                <div class="flex-1">
-                  <Label for="env-value-{index}" class="text-xs">Value</Label>
-                  <Input
-                    id="env-value-{index}"
-                    bind:value={envVar.value}
-                    oninput={(e) =>
-                      updateEnvironmentVar(
-                        index,
-                        'value',
-                        (e.target as HTMLInputElement)?.value || ''
-                      )}
-                    placeholder="variable_value"
-                  />
-                </div>
-                <div class="w-32">
-                  <Label for="env-scope-{index}" class="text-xs">Scope</Label>
-                  <Select
-                    options={[
-                      { value: 'project', label: 'Project' },
-                      { value: 'session', label: 'Session' },
-                      { value: 'global', label: 'Global' },
-                    ]}
-                    defaultValue={envVar.scope}
-                    onSelect={(value: string) => updateEnvironmentVar(index, 'scope', value)}
-                  />
-                </div>
-                <Button variant="ghost" size="sm" onclick={() => removeEnvironmentVar(index)}>
-                  Remove
-                </Button>
-              </div>
-            {/each}
-          </div>
-        </div>
+        <ServiceConfigEnvTab bind:environmentVars />
       </TabsContent>
     </Tabs>
   </DialogContent>

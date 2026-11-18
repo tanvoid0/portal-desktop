@@ -26,12 +26,11 @@
   import { Label } from '$lib/components/ui/label';
   import { Textarea } from '$lib/components/ui/textarea';
   import Select from '$lib/components/ui/select.svelte';
-  import { Badge } from '$lib/components/ui/badge';
   import { Alert, AlertDescription } from '$lib/components/ui/alert';
   import Loader2 from '~icons/fa6-solid/spinner';
   import AlertCircle from '~icons/fa6-solid/circle-exclamation';
-  import Plus from '~icons/fa6-solid/plus';
-  import X from '~icons/fa6-solid/xmark';
+  import CredentialDatabaseFields from './CredentialDatabaseFields.svelte';
+  import CredentialTagsInput from './CredentialTagsInput.svelte';
 
   interface Props {
     credential?: Credential | null;
@@ -54,7 +53,6 @@
   let description = $state(credential?.description || '');
   let value = $state(initialValue);
   let tags = $state<string[]>(credential?.tags || []);
-  let newTag = $state('');
   let expiresAt = $state<string>('');
   let metadata = $state<Partial<CredentialMetadata>>({});
 
@@ -65,14 +63,6 @@
       ? (Object.fromEntries(entries) as Partial<CredentialMetadata>)
       : undefined;
   });
-
-  // Database Explorer discovery reads these from plaintext metadata (host is required).
-  const dbEngines = [
-    { value: 'postgres', label: 'PostgreSQL' },
-    { value: 'mysql', label: 'MySQL / MariaDB' },
-    { value: 'mongodb', label: 'MongoDB' },
-    { value: 'redis', label: 'Redis' },
-  ];
 
   // Credential type options
   const credentialTypes: {
@@ -199,24 +189,6 @@
       loading = false;
     }
   }
-
-  function handleAddTag() {
-    if (newTag.trim() && !tags.includes(newTag.trim())) {
-      tags = [...tags, newTag.trim()];
-      newTag = '';
-    }
-  }
-
-  function handleRemoveTag(tagToRemove: string) {
-    tags = tags.filter((tag) => tag !== tagToRemove);
-  }
-
-  function handleKeyPress(event: KeyboardEvent) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      handleAddTag();
-    }
-  }
 </script>
 
 <Dialog open={true} onOpenChange={(open) => !open && onClose?.()}>
@@ -270,46 +242,7 @@
       </div>
 
       {#if type === CredentialType.DATABASE}
-        <!-- Connection (plaintext metadata; the secret stays the password) -->
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div class="space-y-2">
-            <Label>Engine</Label>
-            <Select
-              options={dbEngines}
-              defaultValue={metadata.provider ?? ''}
-              placeholder="Select engine"
-              onSelect={(v) => (metadata.provider = v)}
-              disabled={loading}
-            />
-          </div>
-          <div class="space-y-2">
-            <Label for="db-host">Host</Label>
-            <Input
-              id="db-host"
-              placeholder="localhost"
-              bind:value={metadata.host}
-              disabled={loading}
-            />
-          </div>
-          <div class="space-y-2">
-            <Label for="db-port">Port</Label>
-            <Input
-              id="db-port"
-              type="number"
-              placeholder="default"
-              bind:value={metadata.port}
-              disabled={loading}
-            />
-          </div>
-          <div class="space-y-2">
-            <Label for="db-name">Database</Label>
-            <Input id="db-name" bind:value={metadata.database} disabled={loading} />
-          </div>
-          <div class="space-y-2 sm:col-span-2">
-            <Label for="db-user">Username</Label>
-            <Input id="db-user" bind:value={metadata.username} disabled={loading} />
-          </div>
-        </div>
+        <CredentialDatabaseFields bind:metadata disabled={loading} />
       {/if}
 
       <!-- Value -->
@@ -328,35 +261,7 @@
       </div>
 
       <!-- Tags -->
-      <div class="space-y-2">
-        <Label>Tags</Label>
-        <div class="flex gap-2">
-          <Input
-            placeholder="Add tag"
-            bind:value={newTag}
-            onkeypress={handleKeyPress}
-            disabled={loading}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            onclick={handleAddTag}
-            disabled={loading || !newTag.trim()}
-          >
-            <Plus class="h-4 w-4" />
-          </Button>
-        </div>
-        {#if tags.length > 0}
-          <div class="flex flex-wrap gap-1">
-            {#each tags as tag (tag)}
-              <Badge variant="secondary" class="flex items-center gap-1">
-                {tag}
-                <X class="h-3 w-3 cursor-pointer" onclick={() => handleRemoveTag(tag)} />
-              </Badge>
-            {/each}
-          </div>
-        {/if}
-      </div>
+      <CredentialTagsInput bind:tags disabled={loading} />
 
       <!-- Expiration Date -->
       <div class="space-y-2">

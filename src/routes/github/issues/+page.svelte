@@ -3,10 +3,6 @@
   import FaList from '~icons/fa6-solid/list';
 
   import { Button } from '$lib/components/ui/button';
-  import { Input } from '$lib/components/ui/input';
-  import Select from '$lib/components/ui/select.svelte';
-  import { Textarea } from '$lib/components/ui/textarea';
-  import * as Dialog from '$lib/components/ui/dialog';
   import { PageHeader, PageLoading, PageEmpty } from '$lib/components/shell';
   import {
     createGitHubIssuesQuery,
@@ -17,6 +13,8 @@
     GitHubError,
     type GitHubIssue,
   } from '$lib/domains/github';
+  import GitHubIssueCreateDialog from '$lib/domains/github/components/GitHubIssueCreateDialog.svelte';
+  import GitHubIssueEditDialog from '$lib/domains/github/components/GitHubIssueEditDialog.svelte';
   import { isTokenUnreadableError } from '$lib/domains/github/utils/tokenError';
   import { createTaskUiState } from '$lib/domains/tasks/state/taskUi.svelte';
   import KanbanBoard from '$lib/domains/tasks/components/KanbanBoard.svelte';
@@ -25,7 +23,6 @@
   import type { TaskDisplay } from '$lib/domains/tasks/utils/taskDisplay';
   import { toast } from '$lib/utils/toast';
   import Bug from '~icons/fa6-solid/bug';
-  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
   import Plus from '~icons/fa6-solid/plus';
 
   let filter: 'assigned' | 'created' = $state('assigned');
@@ -241,36 +238,9 @@
     <GitHubConnectPrompt status={statusQuery.data} onConnected={() => statusQuery.refetch()} />
   {:else}
     <div class="flex flex-wrap items-center gap-3">
-      <Button
-        variant={filter === 'assigned' ? 'default' : 'outline'}
-        onclick={() => (filter = 'assigned')}
-      >
-        Assigned
-      </Button>
-      <Button
-        variant={filter === 'created' ? 'default' : 'outline'}
-        onclick={() => (filter = 'created')}
-      >
-        Created
-      </Button>
-      <Button
-        variant={stateValue === 'open' ? 'default' : 'outline'}
-        onclick={() => (stateValue = 'open')}
-      >
-        Open
-      </Button>
-      <Button
-        variant={stateValue === 'closed' ? 'default' : 'outline'}
-        onclick={() => (stateValue = 'closed')}
-      >
-        Closed
-      </Button>
-      <Button
-        variant={stateValue === 'all' ? 'default' : 'outline'}
-        onclick={() => (stateValue = 'all')}
-      >
-        All
-      </Button>
+      {#each [{ label: 'Assigned', active: filter === 'assigned', set: () => (filter = 'assigned') }, { label: 'Created', active: filter === 'created', set: () => (filter = 'created') }, { label: 'Open', active: stateValue === 'open', set: () => (stateValue = 'open') }, { label: 'Closed', active: stateValue === 'closed', set: () => (stateValue = 'closed') }, { label: 'All', active: stateValue === 'all', set: () => (stateValue = 'all') }] as f (f.label)}
+        <Button variant={f.active ? 'default' : 'outline'} onclick={f.set}>{f.label}</Button>
+      {/each}
     </div>
 
     {#if issuesQuery.isPending}
@@ -313,62 +283,23 @@
     {/if}
   {/if}
 
-  <Dialog.Root open={createDialogOpen} onOpenChange={(open) => (createDialogOpen = open)}>
-    <Dialog.Content class="max-w-2xl">
-      <Dialog.Header>
-        <Dialog.Title>Create Issue</Dialog.Title>
-      </Dialog.Header>
-      <div class="space-y-4">
-        <Select
-          bind:value={createRepoFullName}
-          options={repoOptions}
-          placeholder={reposQuery.isPending ? 'Loading repositories...' : 'Select a repository'}
-        />
-        <Input bind:value={createTitle} placeholder="Issue title" />
-        <Textarea bind:value={createBody} placeholder="Issue description" />
-        <Button
-          onclick={handleCreateIssue}
-          disabled={submitting || !createRepoFullName || !createTitle.trim()}
-        >
-          Create Issue
-        </Button>
-      </div>
-    </Dialog.Content>
-  </Dialog.Root>
+  <GitHubIssueCreateDialog
+    bind:open={createDialogOpen}
+    {repoOptions}
+    reposPending={reposQuery.isPending}
+    bind:repoFullName={createRepoFullName}
+    bind:title={createTitle}
+    bind:body={createBody}
+    {submitting}
+    onCreate={handleCreateIssue}
+  />
 
-  <Dialog.Root open={editDialogOpen} onOpenChange={(open) => (editDialogOpen = open)}>
-    <Dialog.Content class="max-w-2xl">
-      <Dialog.Header>
-        <Dialog.Title>Edit Issue</Dialog.Title>
-      </Dialog.Header>
-      <div class="space-y-4">
-        <Input bind:value={editTitle} placeholder="Issue title" />
-        <Textarea bind:value={editBody} placeholder="Issue description" />
-        {#if selectedIssue?.htmlUrl}
-          <a
-            href={selectedIssue.htmlUrl}
-            target="_blank"
-            rel="noreferrer"
-            class="inline-flex items-center text-sm text-primary"
-          >
-            Open on GitHub
-            <ExternalLink class="ml-1 h-4 w-4" />
-          </a>
-        {/if}
-        <div class="flex flex-wrap gap-2">
-          <Button onclick={() => handleUpdateIssue(undefined)} disabled={submitting}>Save</Button>
-          <Button
-            variant="outline"
-            onclick={() => handleUpdateIssue('closed')}
-            disabled={submitting}
-          >
-            Close
-          </Button>
-          <Button variant="outline" onclick={() => handleUpdateIssue('open')} disabled={submitting}>
-            Reopen
-          </Button>
-        </div>
-      </div>
-    </Dialog.Content>
-  </Dialog.Root>
+  <GitHubIssueEditDialog
+    bind:open={editDialogOpen}
+    bind:title={editTitle}
+    bind:body={editBody}
+    htmlUrl={selectedIssue?.htmlUrl}
+    {submitting}
+    onUpdate={handleUpdateIssue}
+  />
 </div>

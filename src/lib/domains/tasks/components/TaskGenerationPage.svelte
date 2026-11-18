@@ -1,21 +1,9 @@
 <script lang="ts">
   import FaArrowLeft from '~icons/fa6-solid/arrow-left';
-  import FaWandMagicSparkles from '~icons/fa6-solid/wand-magic-sparkles';
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
-  import { Textarea } from '$lib/components/ui/textarea';
-  import { Label } from '$lib/components/ui/label';
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from '$lib/components/ui/card';
-  import { Badge } from '$lib/components/ui/badge';
-  import { Separator } from '$lib/components/ui/separator';
 
   import {
     aiTaskService,
@@ -26,6 +14,7 @@
   import { taskActions } from '../stores/taskStore';
   import { toastActions } from '$lib/utils/toast';
   import { tauriTaskService } from '../services/tauriTaskService';
+  import { mergeWithOriginal, type OriginalTaskState } from '../utils/mergeGenerated';
   import type {
     Task,
     CreateTaskRequest,
@@ -33,11 +22,10 @@
     TaskPriority,
     TaskStatus,
   } from '../types';
-  import TaskPreviewCard from './TaskPreviewCard.svelte';
-  import TaskPreviewList from './TaskPreviewList.svelte';
+  import TaskStoryInputCard from './TaskStoryInputCard.svelte';
+  import TaskGenerationPreviewPanel from './TaskGenerationPreviewPanel.svelte';
   import AIChatPanel from '$lib/domains/ai/components/chat/AIChatPanel.svelte';
   import type { ChatMessage } from '$lib/domains/ai/types';
-  import InstructionTemplateManager from './InstructionTemplateManager.svelte';
   import LoadingSpinner from '$lib/components/ui/loading-spinner.svelte';
 
   interface Props {
@@ -56,13 +44,7 @@
   let existingTask = $state<Task | null>(null);
   let isLoadingTask = $state(false);
   let createdMainTaskId = $state<string | null>(null);
-  let originalTaskState = $state<{
-    status?: TaskStatus;
-    priority?: TaskPriority;
-    tags?: string[];
-    type?: string;
-    estimatedTime?: number;
-  } | null>(null);
+  let originalTaskState = $state<OriginalTaskState | null>(null);
   let existingSubtasks = $state<Map<number, Task>>(new Map()); // Map of order/index to existing subtask
 
   // Load existing task if taskId is provided
@@ -202,30 +184,8 @@
         context: taskContext,
       });
 
-      // If updating existing task, preserve original state in generated data
-      if (taskId && originalTaskState) {
-        // Merge AI result with original state preservation
-        generatedData = {
-          ...result,
-          main_task: {
-            ...result.main_task,
-            // Preserve original priority if not explicitly changed
-            priority: result.main_task.priority || originalTaskState.priority || 'medium',
-            // Preserve original type if not explicitly changed
-            type_: result.main_task.type_ || originalTaskState.type || '',
-            // Preserve original estimated time if not explicitly changed
-            estimated_time:
-              result.main_task.estimated_time || originalTaskState.estimatedTime || null,
-          },
-          // Preserve original tags if AI didn't suggest new ones
-          suggested_labels:
-            result.suggested_labels.length > 0
-              ? result.suggested_labels
-              : originalTaskState.tags || [],
-        };
-      } else {
-        generatedData = result;
-      }
+      // If updating an existing task, preserve its original state in the generated data
+      generatedData = mergeWithOriginal(result, taskId ? originalTaskState : null);
 
       chatMessages = [
         {
@@ -280,25 +240,7 @@
         context: taskContext,
       });
 
-      // If updating existing task, preserve original state
-      if (taskId && originalTaskState) {
-        generatedData = {
-          ...result,
-          main_task: {
-            ...result.main_task,
-            priority: result.main_task.priority || originalTaskState.priority || 'medium',
-            type_: result.main_task.type_ || originalTaskState.type || '',
-            estimated_time:
-              result.main_task.estimated_time || originalTaskState.estimatedTime || null,
-          },
-          suggested_labels:
-            result.suggested_labels.length > 0
-              ? result.suggested_labels
-              : originalTaskState.tags || [],
-        };
-      } else {
-        generatedData = result;
-      }
+      generatedData = mergeWithOriginal(result, taskId ? originalTaskState : null);
 
       chatMessages = [
         ...chatMessages,
@@ -520,81 +462,27 @@
         <!-- Left Column: Input and Preview -->
         <div class="space-y-6 lg:col-span-2">
           <!-- Story Input -->
-          <Card>
-            <CardHeader>
-              <CardTitle>Story / Description</CardTitle>
-              <CardDescription>
-                Paste your story, issue description, or requirements here
-              </CardDescription>
-            </CardHeader>
-            <CardContent class="space-y-4">
-              <div class="space-y-2">
-                <Label for="story-text">Story Text</Label>
-                <Textarea
-                  id="story-text"
-                  bind:value={storyText}
-                  placeholder="Paste your story, issue description, or requirements here..."
-                  rows={8}
-                  disabled={isGenerating}
-                />
-              </div>
-
-              <!-- Instruction Template Manager -->
-              <InstructionTemplateManager
-                bind:selectedTemplateId
-                bind:customInstruction
-                onTemplateSelect={handleTemplateSelect}
-              />
-
-              <Button
-                onclick={handleGenerate}
-                disabled={!storyText.trim() || isGenerating}
-                class="w-full"
-              >
-                <FaWandMagicSparkles class="mr-2 h-4 w-4" />
-                Generate Tasks
-              </Button>
-            </CardContent>
-          </Card>
+          <TaskStoryInputCard
+            bind:storyText
+            bind:selectedTemplateId
+            bind:customInstruction
+            {isGenerating}
+            onTemplateSelect={handleTemplateSelect}
+            onGenerate={handleGenerate}
+          />
 
           <!-- Preview -->
           {#if generatedData}
-            <div class="space-y-6">
-              <div class="flex items-center justify-between">
-                <div>
-                  <h2 class="text-xl font-bold">Preview</h2>
-                  <p class="text-sm text-muted-foreground">
-                    Review and edit the generated tasks before creating them
-                  </p>
-                </div>
-                <!-- 'existing-task' = loaded from a saved task, nothing generated yet -->
-                {#if generatedData.model_used !== 'existing-task'}
-                  <Badge variant="outline" class="text-xs">
-                    Confidence: {Math.round(generatedData.confidence * 100)}% | Model:{' '}
-                    {generatedData.model_used}
-                  </Badge>
-                {/if}
-              </div>
-
-              <TaskPreviewCard
-                task={generatedData.main_task}
-                bind:suggestedLabels={generatedData.suggested_labels}
-                onUpdate={handleUpdateMainTask}
-                onAdd={handleAddTask}
-                onAddAll={handleAddAll}
-                hasSubtasks={generatedData.subtasks.length > 0}
-                showAddButton={true}
-                originalStatus={originalTaskState?.status}
-                isUpdateMode={!!taskId}
-              />
-
-              <TaskPreviewList
-                bind:subtasks={generatedData.subtasks}
-                onUpdate={handleUpdateSubtask}
-                onAdd={handleAddSubtask}
-                showAddButtons={true}
-              />
-            </div>
+            <TaskGenerationPreviewPanel
+              bind:data={generatedData}
+              originalStatus={originalTaskState?.status}
+              isUpdateMode={!!taskId}
+              onUpdateMain={handleUpdateMainTask}
+              onUpdateSubtask={handleUpdateSubtask}
+              onAdd={handleAddTask}
+              onAddSubtask={handleAddSubtask}
+              onAddAll={handleAddAll}
+            />
           {/if}
         </div>
 
