@@ -30,6 +30,7 @@ export const queryKeys = {
   },
   ai: {
     logs: (filters: object) => ['ai', 'logs', filters] as const,
+    platformStatus: ['ai', 'platform', 'status'] as const,
   },
   tasks: {
     all: ['tasks'] as const,
