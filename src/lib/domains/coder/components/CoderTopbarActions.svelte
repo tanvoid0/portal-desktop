@@ -159,7 +159,7 @@
 >
   <Bot class="h-3.5 w-3.5" />
   {#if pendingChangeCount > 0}
-    <span class="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">
+    <span class="rounded-full bg-amber-500 px-1.5 text-xs text-white">
       {pendingChangeCount}
     </span>
   {/if}
@@ -173,7 +173,7 @@
 >
   <GitBranch class="h-3.5 w-3.5" />
   {#if gitStats?.hasChanges}
-    <span class="font-mono text-[10px] text-green-600 dark:text-green-400">
+    <span class="font-mono text-xs text-diff-add-foreground">
       {#if gitStats.additions > 0}+{gitStats.additions}{/if}
       {#if gitStats.deletions > 0}-{gitStats.deletions}{/if}
     </span>

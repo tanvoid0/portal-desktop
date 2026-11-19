@@ -20,7 +20,7 @@
   <Button
     type="button"
     variant="ghost"
-    class="h-auto w-full justify-between gap-2 px-0 py-0.5 text-left text-[11px] font-normal hover:bg-transparent {hasFailed
+    class="h-auto w-full justify-between gap-2 px-0 py-0.5 text-left text-xs font-normal hover:bg-transparent {hasFailed
       ? 'text-destructive hover:text-destructive'
       : isRunning
         ? 'text-foreground hover:text-foreground'
@@ -41,7 +41,7 @@
   </Button>
 
   {#if open && children}
-    <div class="mt-1 space-y-0.5 rounded-lg border border-border/80 px-2.5 py-1.5">
+    <div class="mt-1 space-y-0.5 rounded-lg bg-muted/30 px-2.5 py-1.5">
       {@render children()}
     </div>
   {/if}

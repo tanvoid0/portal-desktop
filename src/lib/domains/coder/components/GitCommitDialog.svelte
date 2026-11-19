@@ -144,7 +144,7 @@
               {draft.branch ?? 'detached'}
             </code>
             {#if draft.aiGenerated}
-              <Badge variant="secondary" class="gap-1 text-[10px]">
+              <Badge variant="secondary" class="gap-1 text-xs">
                 <Sparkles class="h-3 w-3" />
                 AI suggested
               </Badge>
@@ -214,28 +214,28 @@
                       />
                       <Folder class="h-3.5 w-3.5 shrink-0 text-amber-500" />
                       <span class="truncate font-medium">{node.name}</span>
-                      <span class="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground">
+                      <span class="ml-auto shrink-0 font-mono text-xs text-muted-foreground">
                         {#if node.additions > 0}
-                          <span class="text-green-600 dark:text-green-400">+{node.additions}</span>
+                          <span class="text-diff-add-foreground">+{node.additions}</span>
                         {/if}
                         {#if node.deletions > 0}
-                          <span class="text-red-600 dark:text-red-400">-{node.deletions}</span>
+                          <span class="text-diff-del-foreground">-{node.deletions}</span>
                         {/if}
                       </span>
                     </Button>
                   {:else if node.change}
                     <File class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     <span class="min-w-0 flex-1 truncate font-mono">{node.name}</span>
-                    <Badge variant={statusVariant(node.change.status)} class="text-[10px]">
+                    <Badge variant={statusVariant(node.change.status)} class="text-xs">
                       {node.change.status}
                     </Badge>
                     {#if node.change.additions > 0}
-                      <span class="font-mono text-[10px] text-green-600 dark:text-green-400">
+                      <span class="font-mono text-xs text-diff-add-foreground">
                         +{node.change.additions}
                       </span>
                     {/if}
                     {#if node.change.deletions > 0}
-                      <span class="font-mono text-[10px] text-red-600 dark:text-red-400">
+                      <span class="font-mono text-xs text-diff-del-foreground">
                         -{node.change.deletions}
                       </span>
                     {/if}

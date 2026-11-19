@@ -82,15 +82,13 @@
 
 <aside class="divider-edge-l flex w-56 shrink-0 flex-col overflow-hidden bg-muted/20">
   <div class="divider-edge-b divider-edge-full flex items-center px-2 py-1.5">
-    <span class="text-[11px] font-medium text-muted-foreground">Workspace</span>
+    <span class="text-xs font-medium text-muted-foreground">Workspace</span>
   </div>
 
   <div class="min-h-0 flex-1 overflow-y-auto text-sm">
     {#if openTabs.length > 0}
       <div class="divider-edge-b divider-edge-full px-2 py-2">
-        <div
-          class="mb-1 px-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase"
-        >
+        <div class="mb-1 px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
           Open tabs
         </div>
         <ul class="space-y-0.5">
@@ -125,7 +123,7 @@
     {/if}
 
     <div class="px-2 py-2">
-      <div class="mb-1 px-1 text-[10px] font-medium text-muted-foreground">
+      <div class="mb-1 px-1 text-xs font-medium text-muted-foreground">
         On {workspaceName || 'workspace'}
       </div>
 
@@ -148,7 +146,7 @@
             <Bot class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             <span class="flex-1">Agent changes</span>
             {#if agentDiffLabel}
-              <span class="font-mono text-[10px] text-amber-600 dark:text-amber-400">
+              <span class="font-mono text-xs text-amber-600 dark:text-amber-400">
                 {agentDiffLabel}
               </span>
             {/if}
@@ -175,7 +173,7 @@
           <GitBranch class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span class="flex-1">Git changes</span>
           {#if gitDiffLabel}
-            <span class="font-mono text-[10px] text-green-600 dark:text-green-400">
+            <span class="font-mono text-xs text-diff-add-foreground">
               {gitDiffLabel}
             </span>
           {/if}
@@ -265,12 +263,12 @@
                 </Button>
               </li>
             {:else}
-              <li class="px-2 py-1 text-[11px] text-muted-foreground">
+              <li class="px-2 py-1 text-xs text-muted-foreground">
                 {#if threadId}
                   <Button
                     type="button"
                     variant="link"
-                    class="h-auto p-0 text-[11px]"
+                    class="h-auto p-0 text-xs"
                     onclick={createTerminal}
                   >
                     Create terminal

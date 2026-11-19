@@ -248,7 +248,7 @@
 
             <span>Agent changes</span>
 
-            <span class="rounded-full bg-amber-500 px-1.5 font-mono text-[10px] text-white">
+            <span class="rounded-full bg-amber-500 px-1.5 font-mono text-xs text-white">
               {pendingChangeCount}
             </span>
           </Button>
@@ -274,13 +274,13 @@
             <span>Git changes</span>
 
             {#if gitStats && gitStats.additions > 0}
-              <span class="font-mono text-emerald-600 dark:text-emerald-400">
+              <span class="font-mono text-diff-add-foreground">
                 +{gitStats.additions}
               </span>
             {/if}
 
             {#if gitStats && gitStats.deletions > 0}
-              <span class="font-mono text-red-600 dark:text-red-400">
+              <span class="font-mono text-diff-del-foreground">
                 -{gitStats.deletions}
               </span>
             {/if}
@@ -291,7 +291,7 @@
 
     {#if queueCount > 0}
       <div class="mb-2 space-y-1">
-        <div class="flex items-center gap-1.5 px-1 text-[11px] font-medium text-muted-foreground">
+        <div class="flex items-center gap-1.5 px-1 text-xs font-medium text-muted-foreground">
           <ListOrdered class="h-3 w-3" />
 
           <span>{queueCount} queued</span>
@@ -357,7 +357,7 @@
   {/snippet}
 
   {#snippet footer()}
-    <div class="flex items-center justify-between gap-3 px-1 text-[11px] text-muted-foreground">
+    <div class="flex items-center justify-between gap-3 px-1 text-xs text-muted-foreground">
       <div class="flex min-w-0 items-center gap-3">
         <span
           class="inline-flex max-w-[120px] items-center gap-1 truncate"

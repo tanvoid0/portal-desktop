@@ -107,22 +107,22 @@
         >
           <FileEdit class="h-4 w-4 shrink-0 text-muted-foreground" />
           <span class="min-w-0 flex-1 truncate font-mono">{c.path}</span>
-          <Badge variant={statusVariant(c.status)} class="text-[10px]">
+          <Badge variant={statusVariant(c.status)} class="text-xs">
             {c.status}
           </Badge>
           {#if c.additions > 0}
-            <span class="font-mono text-[10px] text-green-600 dark:text-green-400">
+            <span class="font-mono text-xs text-diff-add-foreground">
               +{c.additions}
             </span>
           {/if}
           {#if c.deletions > 0}
-            <span class="font-mono text-[10px] text-red-600 dark:text-red-400">
+            <span class="font-mono text-xs text-diff-del-foreground">
               -{c.deletions}
             </span>
           {/if}
         </Button>
         {#if expanded.has(c.path) && c.diff}
-          <pre class="max-h-80 overflow-auto p-2 font-mono text-[11px] leading-relaxed"><code
+          <pre class="max-h-80 overflow-auto p-2 font-mono text-xs leading-relaxed"><code
               >{c.diff}</code
             ></pre>
         {/if}

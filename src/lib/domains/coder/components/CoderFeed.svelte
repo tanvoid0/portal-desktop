@@ -200,7 +200,7 @@
   {#if showRetry && !running}
     {#if error}
       <div
-        class="flex items-start gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-[11px] text-destructive"
+        class="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive"
       >
         <span class="flex-1">{error}</span>
         {#if onRetry}
@@ -217,9 +217,9 @@
       </div>
     {:else}
       <div
-        class="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-4 text-center"
+        class="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border/60 bg-muted/30 px-4 py-4 text-center"
       >
-        <p class="text-[11px] text-muted-foreground">
+        <p class="text-xs text-muted-foreground">
           The agent didn't reply. Retry to run the turn again.
         </p>
         {#if onRetry}
@@ -232,7 +232,7 @@
     {/if}
   {:else if error}
     <div
-      class="flex items-start gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-[11px] text-destructive"
+      class="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive"
     >
       <span class="flex-1">{error}</span>
     </div>

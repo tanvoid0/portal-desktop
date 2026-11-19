@@ -75,6 +75,12 @@
     --accent-foreground: 0 0% 9%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
+    --diff-add: 142 71% 45%;
+    --diff-add-foreground: 142 72% 29%;
+    --diff-del: 0 84% 60%;
+    --diff-del-foreground: 0 72% 45%;
+    --terminal: 240 6% 10%;
+    --terminal-foreground: 240 5% 96%;
     --border: 0 0% 92.2%;
     --input: 0 0% 89.8%;
     --ring: 221.2 83.2% 53.3%;
@@ -155,6 +161,12 @@
     --accent-foreground: var(--sidebar-accent-foreground);
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: var(--sidebar-foreground);
+    --diff-add: 142 69% 58%;
+    --diff-add-foreground: 142 69% 62%;
+    --diff-del: 0 91% 71%;
+    --diff-del-foreground: 0 91% 71%;
+    --terminal: 240 6% 6%;
+    --terminal-foreground: 240 5% 96%;
     --border: var(--sidebar-border);
     /* Deliberately not aliased to --sidebar-border: that value (16%) is tuned for a
        1px border line, but --input also backs Switch's unchecked *fill* track

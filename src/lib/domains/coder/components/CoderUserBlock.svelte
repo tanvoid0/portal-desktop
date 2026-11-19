@@ -92,7 +92,7 @@
             <X class="h-3.5 w-3.5" />
             Cancel
           </Button>
-          <span class="text-[11px] text-muted-foreground">Ctrl+Enter to save</span>
+          <span class="text-xs text-muted-foreground">Ctrl+Enter to save</span>
         </div>
       </div>
     {/if}

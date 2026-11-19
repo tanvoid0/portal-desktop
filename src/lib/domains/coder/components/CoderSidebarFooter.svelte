@@ -23,7 +23,7 @@
 
 <div class="divider-edge-t divider-edge-full shrink-0 space-y-2 bg-muted/20 px-3 py-2.5">
   <div class="flex items-center justify-between gap-2">
-    <span class="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+    <span class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
       Settings
     </span>
     <div class="flex items-center gap-0.5">
@@ -59,7 +59,7 @@
         <ul class="max-h-32 space-y-1 overflow-y-auto">
           {#each coderSession.rules as r}
             <li class="flex items-center gap-1.5">
-              <Badge variant={r.allow ? 'secondary' : 'destructive'} class="text-[10px]">
+              <Badge variant={r.allow ? 'secondary' : 'destructive'} class="text-xs">
                 {r.allow ? 'allow' : 'deny'}
               </Badge>
               <span class="truncate font-mono">{r.tool}</span>

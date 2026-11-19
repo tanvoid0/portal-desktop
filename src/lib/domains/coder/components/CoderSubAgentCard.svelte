@@ -56,7 +56,7 @@
     >
       <div class="flex items-center gap-2">
         <p class="truncate text-sm font-medium">{subAgent.title}</p>
-        <span class={`rounded-full px-2 py-0.5 text-[10px] font-medium ${tone}`}>
+        <span class={`rounded-full px-2 py-0.5 text-xs font-medium ${tone}`}>
           {subAgent.status}
         </span>
       </div>

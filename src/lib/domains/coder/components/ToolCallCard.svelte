@@ -72,7 +72,7 @@
   <Button
     type="button"
     variant="ghost"
-    class="h-auto w-full justify-start gap-1.5 px-0 py-0.5 text-left font-normal hover:bg-transparent {failed
+    class="h-7 w-full justify-start gap-1.5 px-0 py-0 text-left font-normal hover:bg-transparent {failed
       ? 'text-destructive'
       : 'text-muted-foreground hover:text-foreground'}"
     disabled={!expandable}
@@ -94,10 +94,8 @@
       {/if}
       {#if line.additions || line.deletions}
         <span class="shrink-0 tabular-nums">
-          {#if line.additions}<span class="text-green-600 dark:text-green-400"
-              >+{line.additions}</span
-            >{/if}
-          {#if line.deletions}<span class="text-destructive">−{line.deletions}</span>{/if}
+          {#if line.additions}<span class="text-diff-add-foreground">+{line.additions}</span>{/if}
+          {#if line.deletions}<span class="text-diff-del-foreground">−{line.deletions}</span>{/if}
         </span>
       {/if}
       {#if status === 'pending'}

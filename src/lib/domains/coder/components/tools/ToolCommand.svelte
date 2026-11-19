@@ -30,9 +30,9 @@
     <div
       class="rounded px-2 py-1 font-mono text-xs {failed
         ? 'bg-destructive/10 text-destructive'
-        : 'bg-zinc-900 text-zinc-100 dark:bg-zinc-950'}"
+        : 'bg-terminal text-terminal-foreground'}"
     >
-      <span class={failed ? 'text-destructive/70' : 'text-zinc-500'}>$</span>
+      <span class={failed ? 'text-destructive/70' : 'text-terminal-foreground/50'}>$</span>
       {command}
     </div>
     {#if result !== null}

@@ -58,7 +58,7 @@
         <FileEdit class="h-4 w-4 text-muted-foreground" />
         <span class="font-mono text-xs">{c.path}</span>
         {#if c.created}
-          <Badge variant="secondary" class="text-[10px]">new</Badge>
+          <Badge variant="secondary" class="text-xs">new</Badge>
         {/if}
         <Badge
           variant={c.status === 'accepted'
@@ -66,7 +66,7 @@
             : c.status === 'rejected'
               ? 'destructive'
               : 'outline'}
-          class="text-[10px]"
+          class="text-xs"
         >
           {c.status}
         </Badge>

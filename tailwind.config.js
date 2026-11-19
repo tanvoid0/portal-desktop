@@ -46,6 +46,18 @@ export default {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
         },
+        'diff-add': {
+          DEFAULT: 'hsl(var(--diff-add))',
+          foreground: 'hsl(var(--diff-add-foreground))',
+        },
+        'diff-del': {
+          DEFAULT: 'hsl(var(--diff-del))',
+          foreground: 'hsl(var(--diff-del-foreground))',
+        },
+        terminal: {
+          DEFAULT: 'hsl(var(--terminal))',
+          foreground: 'hsl(var(--terminal-foreground))',
+        },
         muted: {
           DEFAULT: 'hsl(var(--muted))',
           foreground: 'hsl(var(--muted-foreground))',

@@ -52,21 +52,21 @@
 </script>
 
 <div
-  class="divider-edge-b divider-edge-full flex shrink-0 items-center gap-2 bg-background px-4 py-2.5"
+  class="divider-edge-b divider-edge-full flex h-10 shrink-0 items-center gap-2 bg-background px-3"
 >
   <div class="flex min-w-0 flex-1 items-center gap-2">
     {#if onOpenSessions}
       <Button
         size="icon"
         variant="ghost"
-        class="h-8 w-8 shrink-0 md:hidden"
+        class="h-7 w-7 shrink-0 md:hidden"
         title="Sessions"
         onclick={onOpenSessions}
       >
         <PanelLeftOpen class="h-4 w-4" />
       </Button>
     {/if}
-    <h2 class="min-w-0 truncate text-sm font-semibold">
+    <h2 class="min-w-0 truncate text-[13px] font-medium">
       {#if subAgent}
         <span class="text-muted-foreground">Sub-agent</span>
         <span class="mx-1 text-muted-foreground">/</span>

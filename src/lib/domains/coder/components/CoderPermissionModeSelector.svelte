@@ -26,7 +26,7 @@
     disabled={isDisabled}
     title={inert ? 'Not applicable in Ask mode' : config.hint}
     class={cn(
-      'inline-flex h-7 max-w-[96px] items-center gap-1 rounded-full border px-2 text-[11px] font-medium transition-colors',
+      'inline-flex h-7 max-w-[96px] items-center gap-1 rounded-full border px-2 text-xs font-medium transition-colors',
       mode === 'auto-accept-all'
         ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
         : 'border-border/80 bg-muted/40 text-muted-foreground hover:text-foreground',
@@ -47,7 +47,7 @@
         <DropdownMenu.RadioItem value={m.value} class="rounded-md py-1.5 text-xs">
           {#snippet children({ checked: _checked })}
             <span class="font-medium">{m.label}</span>
-            <span class="ml-1 text-[10px] text-muted-foreground">{m.hint}</span>
+            <span class="ml-1 text-xs text-muted-foreground">{m.hint}</span>
           {/snippet}
         </DropdownMenu.RadioItem>
       {/each}

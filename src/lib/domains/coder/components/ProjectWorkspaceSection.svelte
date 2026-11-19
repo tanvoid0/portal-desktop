@@ -88,7 +88,7 @@
         ></span>
       {/if}
       {#if sessionCount > 0}
-        <span class="shrink-0 text-[10px] text-muted-foreground tabular-nums">
+        <span class="shrink-0 text-xs text-muted-foreground tabular-nums">
           {sessionCount}
         </span>
       {/if}
@@ -114,6 +114,6 @@
       {/each}
     </div>
   {:else if expanded && sessionCount === 0}
-    <p class="px-3 pb-2 pl-8 text-[11px] text-muted-foreground">No sessions — start one below</p>
+    <p class="px-3 pb-2 pl-8 text-xs text-muted-foreground">No sessions — start one below</p>
   {/if}
 </div>

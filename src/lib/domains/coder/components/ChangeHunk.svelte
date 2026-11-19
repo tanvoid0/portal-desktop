@@ -65,11 +65,11 @@
 >
   <div class="mb-1 flex items-center justify-between gap-2">
     <div class="flex items-center gap-2">
-      <span class="text-[10px] text-muted-foreground">
+      <span class="text-xs text-muted-foreground">
         hunk {h.index + 1} · line {h.before_start + 1}
       </span>
       {#if reviewed}
-        <Badge variant={h.accepted ? 'secondary' : 'destructive'} class="text-[10px]">
+        <Badge variant={h.accepted ? 'secondary' : 'destructive'} class="text-xs">
           {h.accepted ? 'accepted' : 'rejected'}
         </Badge>
       {/if}
@@ -80,7 +80,7 @@
         <Button
           size="sm"
           variant={focused && !reviewed ? 'secondary' : 'ghost'}
-          class="h-6 text-[10px]"
+          class="h-6 text-xs"
           onclick={(e) => {
             e.stopPropagation();
             onAccept();
@@ -92,7 +92,7 @@
         <Button
           size="sm"
           variant="ghost"
-          class="h-6 text-[10px] text-destructive hover:text-destructive"
+          class="h-6 text-xs text-destructive hover:text-destructive"
           onclick={(e) => {
             e.stopPropagation();
             onReject();
@@ -106,13 +106,13 @@
   </div>
   {#if h.before_lines.length}
     <pre
-      class="overflow-auto rounded bg-red-500/10 px-2 py-1 text-xs {h.accepted
+      class="overflow-auto rounded bg-diff-del/10 px-2 py-1 text-xs {h.accepted
         ? ''
         : 'opacity-50'}"><code>{display(h.before_lines).replace(/^/gm, '- ')}</code></pre>
   {/if}
   {#if h.after_lines.length}
     <pre
-      class="overflow-auto rounded bg-green-500/10 px-2 py-1 text-xs {h.accepted
+      class="overflow-auto rounded bg-diff-add/10 px-2 py-1 text-xs {h.accepted
         ? ''
         : 'line-through opacity-50'}"><code>{display(h.after_lines).replace(/^/gm, '+ ')}</code
       ></pre>

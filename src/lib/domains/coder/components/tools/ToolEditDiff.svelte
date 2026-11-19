@@ -29,8 +29,8 @@
   <pre class="max-h-64 overflow-auto rounded bg-muted/40 py-1 text-xs"><code
       >{#each rows as row, i (i)}<span
           class="block px-2 {row.sign === '-'
-            ? 'bg-destructive/10 text-destructive'
-            : 'bg-green-500/10 text-green-700 dark:text-green-400'}">{row.sign} {row.line}</span
+            ? 'bg-diff-del/10 text-diff-del-foreground'
+            : 'bg-diff-add/10 text-diff-add-foreground'}">{row.sign} {row.line}</span
         >{/each}</code
     ></pre>
 {/if}

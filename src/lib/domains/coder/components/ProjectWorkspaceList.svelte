@@ -162,7 +162,7 @@
 
 <div class="flex min-h-0 flex-1 flex-col">
   <div class="divider-edge-b divider-edge-full flex items-center justify-between gap-2 px-3 py-2">
-    <span class="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+    <span class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
       Workspaces
     </span>
     <Button
@@ -222,18 +222,14 @@
         </p>
       {:else}
         {#if otherVisible}
-          <p
-            class="px-2 pt-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase"
-          >
+          <p class="px-2 pt-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
             Other folders
           </p>
           {#each otherWorkspaces as workspace (workspace.path)}
             {@render workspaceRow(workspace, true)}
           {/each}
           {#if projectVisible}
-            <p
-              class="px-2 pt-2 text-[10px] font-medium tracking-wide text-muted-foreground uppercase"
-            >
+            <p class="px-2 pt-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
               Projects
             </p>
           {/if}
