@@ -3,6 +3,7 @@
   import ContextMenuList from '$lib/components/menu/ContextMenuList.svelte';
   import { buildReference } from '$lib/domains/shared/utils/entityReference';
   import { copyText } from '$lib/domains/shared/utils/clipboard';
+  import { PORTAL_ENGINE_TAB, sessionPath } from '$lib/config/agents-tabs';
   import type { SessionCardBadge } from '$lib/domains/ai/components/shared/AISessionCard.svelte';
   import { openCoderSession } from '../utils/launch';
   import { buildCoderThreadMenu } from '../utils/threadMenu';
@@ -83,6 +84,7 @@
         }),
         'Session reference copied'
       ),
+    onCopyLink: () => copyText(sessionPath(PORTAL_ENGINE_TAB.id, thread.id), 'Session link copied'),
     onLaunchWorkspace:
       thread.workspace_root && onLaunchWorkspace !== null
         ? () =>
