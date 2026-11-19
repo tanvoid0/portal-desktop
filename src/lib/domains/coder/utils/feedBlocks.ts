@@ -1,5 +1,6 @@
 import type { ChatMessage, ToolCall } from '../types.js';
 import { getToolResultStatus } from './toolCallDisplay.js';
+import { normalizeTool } from './toolKinds.js';
 
 /** One phrase in a grouped activity summary, e.g. "Running" + " a command". */
 export type ActivitySummaryPart = {
@@ -53,14 +54,15 @@ type ToolBucket = {
 };
 
 const ACTIVITY_ORDER = [
-  'edit_file',
-  'write_file',
-  'read_file',
-  'list_dir',
-  'search_files',
-  'run_command',
-  'delegate_task',
-  'spawn_parallel_tasks',
+  'edit',
+  'write',
+  'read',
+  'list',
+  'search',
+  'command',
+  'todo',
+  'web',
+  'subagent',
 ] as const;
 
 function parseTimestamp(value?: string | null): number | null {
@@ -74,71 +76,43 @@ function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function activityPhrase(tool: string, count: number, active: boolean): ActivitySummaryPart | null {
+/** `key` is a ToolKind, or the raw tool name for kind 'fallback'. */
+function activityPhrase(key: string, count: number, active: boolean): ActivitySummaryPart | null {
   const plural = count > 1;
-  switch (tool) {
-    case 'edit_file':
-      return active
-        ? { verb: 'Editing', rest: plural ? ` ${count} files` : ' a file', isActive: true }
-        : { verb: 'Edited', rest: plural ? ` ${count} files` : ' a file', isActive: false };
-    case 'write_file':
-      return active
-        ? { verb: 'Creating', rest: plural ? ` ${count} files` : ' a file', isActive: true }
-        : { verb: 'Created', rest: plural ? ` ${count} files` : ' a file', isActive: false };
-    case 'read_file':
-      return active
-        ? { verb: 'Reading', rest: plural ? ` ${count} files` : ' a file', isActive: true }
-        : { verb: 'Read', rest: plural ? ` ${count} files` : ' a file', isActive: false };
-    case 'list_dir':
-      return active
-        ? {
-            verb: 'Listing',
-            rest: plural ? ` ${count} directories` : ' a directory',
-            isActive: true,
-          }
-        : {
-            verb: 'Listed',
-            rest: plural ? ` ${count} directories` : ' a directory',
-            isActive: false,
-          };
-    case 'search_files':
-      if (active) {
-        return {
-          verb: 'Searching',
-          rest: plural ? ` ${count} times` : ' files',
-          isActive: true,
-        };
-      }
-      return {
-        verb: plural ? `${count} searches` : 'Searched',
-        rest: plural ? '' : ' files',
-        isActive: false,
-      };
-    case 'run_command':
-      return active
-        ? { verb: 'Running', rest: plural ? ` ${count} commands` : ' a command', isActive: true }
-        : { verb: 'Ran', rest: plural ? ` ${count} commands` : ' a command', isActive: false };
-    case 'delegate_task':
-      return active
-        ? { verb: 'Delegating', rest: plural ? ` ${count} tasks` : ' a task', isActive: true }
-        : { verb: 'Delegated', rest: plural ? ` ${count} tasks` : ' a task', isActive: false };
-    case 'spawn_parallel_tasks':
-      return active
-        ? { verb: 'Spawning', rest: ' parallel tasks', isActive: true }
-        : { verb: 'Spawned', rest: ' parallel tasks', isActive: false };
-    default:
-      return active
-        ? {
-            verb: 'Running',
-            rest: ` ${tool.replace(/_/g, ' ')}`,
-            isActive: true,
-          }
-        : {
-            verb: 'Ran',
-            rest: ` ${tool.replace(/_/g, ' ')}`,
-            isActive: false,
-          };
+  const files = plural ? ` ${count} files` : ' a file';
+  const [gerund, past, rest] = ((): [string, string, string] => {
+    switch (key) {
+      case 'edit':
+        return ['Editing', 'Edited', files];
+      case 'write':
+        return ['Creating', 'Created', files];
+      case 'read':
+        return ['Reading', 'Read', files];
+      case 'list':
+        return ['Listing', 'Listed', plural ? ` ${count} directories` : ' a directory'];
+      case 'search':
+        return ['Searching', plural ? `${count} searches` : 'Searched', plural ? '' : ' files'];
+      case 'command':
+        return ['Running', 'Ran', plural ? ` ${count} commands` : ' a command'];
+      case 'todo':
+        return ['Updating', 'Updated', ' todos'];
+      case 'web':
+        return ['Fetching', 'Fetched', plural ? ` ${count} pages` : ' a page'];
+      case 'subagent':
+        return ['Delegating', 'Delegated', plural ? ` ${count} tasks` : ' a task'];
+      default:
+        return ['Running', 'Ran', ` ${key.replace(/_/g, ' ')}`];
+    }
+  })();
+  // 'Searching' keeps its in-progress rest ("N times") from before.
+  if (active) {
+    return {
+      verb: gerund,
+      rest: key === 'search' && plural ? ` ${count} times` : rest,
+      isActive: true,
+    };
   }
+  return { verb: past, rest, isActive: false };
 }
 
 /** Build Cursor-style summary parts for a consecutive tool run. */
@@ -153,7 +127,9 @@ export function buildActivitySummary(tools: Array<{ call: ToolCall; result: stri
 
   for (const { call, result } of tools) {
     const tool = call.function.name;
-    const bucket = buckets.get(tool) ?? { total: 0, pending: 0, failed: 0 };
+    const { kind } = normalizeTool(tool, {});
+    const key = kind === 'fallback' ? tool : kind === 'multi-edit' ? 'edit' : kind;
+    const bucket = buckets.get(key) ?? { total: 0, pending: 0, failed: 0 };
     bucket.total++;
     const status = getToolResultStatus(tool, result);
     if (status === 'pending') {
@@ -163,7 +139,7 @@ export function buildActivitySummary(tools: Array<{ call: ToolCall; result: stri
       bucket.failed++;
       hasFailed = true;
     }
-    buckets.set(tool, bucket);
+    buckets.set(key, bucket);
   }
 
   const orderedTools = [

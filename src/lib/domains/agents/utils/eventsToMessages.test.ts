@@ -22,12 +22,12 @@ const fixture: AgentEvent[] = [
 ];
 
 describe('eventsToMessages', () => {
-  it('maps a native Bash tool call onto the synthetic run_command shape', () => {
+  it('passes a native Bash tool call through unchanged', () => {
     const view = eventsToMessages(fixture);
     const toolCallMessage = view.messages.find((m) => m.tool_calls?.length);
     expect(toolCallMessage).toBeDefined();
     const call = toolCallMessage!.tool_calls![0];
-    expect(call.function.name).toBe('run_command');
+    expect(call.function.name).toBe('Bash');
     expect(JSON.parse(call.function.arguments)).toMatchObject({ command: 'ls' });
   });
 

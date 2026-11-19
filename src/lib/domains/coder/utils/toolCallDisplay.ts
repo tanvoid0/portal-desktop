@@ -1,3 +1,5 @@
+import { normalizeTool } from './toolKinds.js';
+
 export interface ToolCallDisplay {
   label: string;
   detail: string;
@@ -21,28 +23,36 @@ function str(args: Record<string, unknown>, key: string, fallback = ''): string 
 }
 
 /** Human-readable header for a coder tool bubble. */
-export function getToolCallDisplay(tool: string, args: Record<string, unknown>): ToolCallDisplay {
-  switch (tool) {
-    case 'read_file':
+export function getToolCallDisplay(
+  tool: string,
+  rawArgs: Record<string, unknown>
+): ToolCallDisplay {
+  const { kind, args } = normalizeTool(tool, rawArgs);
+  switch (kind) {
+    case 'read':
       return { label: 'Reading file', detail: str(args, 'path') };
-    case 'write_file':
+    case 'write':
       return { label: 'Writing file', detail: str(args, 'path') };
-    case 'edit_file':
+    case 'edit':
+    case 'multi-edit':
       return { label: 'Editing file', detail: str(args, 'path') };
-    case 'list_dir':
+    case 'list':
       return { label: 'Reading directory', detail: str(args, 'path', '.') };
-    case 'search_files':
+    case 'search':
       return {
         label: 'Searching files',
         detail: `"${str(args, 'query')}" in ${str(args, 'path', '.')}`,
       };
-    case 'run_command':
+    case 'command':
       return { label: 'Running command', detail: str(args, 'command') };
-    case 'list_terminals':
-      return { label: 'Listing terminals', detail: '' };
-    case 'delegate_task':
-      return { label: 'Delegating task', detail: str(args, 'goal') };
-    case 'spawn_parallel_tasks': {
+    case 'todo':
+      return { label: 'Updating todos', detail: '' };
+    case 'web':
+      return { label: 'Fetching web', detail: str(args, 'url') || str(args, 'query') };
+    case 'subagent': {
+      if (tool !== 'spawn_parallel_tasks') {
+        return { label: 'Delegating task', detail: str(args, 'description') };
+      }
       const tasks = args.tasks;
       const count = Array.isArray(tasks) ? tasks.length : 0;
       const issues = args.issue_urls;
@@ -54,7 +64,10 @@ export function getToolCallDisplay(tool: string, args: Record<string, unknown>):
       };
     }
     default:
-      return { label: tool.replace(/_/g, ' '), detail: '' };
+      return {
+        label: tool === 'list_terminals' ? 'Listing terminals' : tool.replace(/_/g, ' '),
+        detail: '',
+      };
   }
 }
 
@@ -75,7 +88,7 @@ export function isToolResultFailure(tool: string, result: string): boolean {
     return true;
   }
 
-  if (tool === 'run_command') {
+  if (normalizeTool(tool, {}).kind === 'command') {
     const match = text.match(/^exit (-?\d+)/);
     if (match) return Number.parseInt(match[1], 10) !== 0;
   }
@@ -99,7 +112,7 @@ export function getToolResultFailureSummary(tool: string, result: string): strin
     return first.length > 80 ? `${first.slice(0, 77)}…` : first;
   }
 
-  if (tool === 'run_command') {
+  if (normalizeTool(tool, {}).kind === 'command') {
     const match = result.match(/^exit (-?\d+)/);
     if (match) return `Command failed (exit ${match[1]})`;
   }
@@ -114,7 +127,7 @@ export function formatFailedResult(tool: string, result: string): string {
     return result.slice('Error: '.length).trim();
   }
 
-  if (tool === 'run_command') {
+  if (normalizeTool(tool, {}).kind === 'command') {
     return result.replace(/^exit -?\d+\n?/, '').trim() || result.trim();
   }
 
@@ -158,13 +171,17 @@ export function countEditDiff(
 }
 
 /** Cursor-style one-line summary for a tool action. */
-export function getCompactToolLine(tool: string, args: Record<string, unknown>): CompactToolLine {
-  switch (tool) {
-    case 'read_file':
+export function getCompactToolLine(
+  tool: string,
+  rawArgs: Record<string, unknown>
+): CompactToolLine {
+  const { kind, args } = normalizeTool(tool, rawArgs);
+  switch (kind) {
+    case 'read':
       return { verb: 'Read', target: basename(str(args, 'path')) };
-    case 'write_file':
+    case 'write':
       return { verb: 'Wrote', target: basename(str(args, 'path')) };
-    case 'edit_file': {
+    case 'edit': {
       const diff = countEditDiff(str(args, 'old_string'), str(args, 'new_string'));
       return {
         verb: 'Edited',
@@ -173,21 +190,37 @@ export function getCompactToolLine(tool: string, args: Record<string, unknown>):
         deletions: diff.deletions,
       };
     }
-    case 'list_dir':
+    case 'multi-edit': {
+      const edits = (Array.isArray(args.edits) ? args.edits : []) as Array<Record<string, unknown>>;
+      let additions = 0;
+      let deletions = 0;
+      for (const e of edits) {
+        const d = countEditDiff(str(e, 'old_string'), str(e, 'new_string'));
+        additions += d.additions;
+        deletions += d.deletions;
+      }
+      return { verb: 'Edited', target: basename(str(args, 'path')), additions, deletions };
+    }
+    case 'list':
       return { verb: 'Listed', target: str(args, 'path', '.') };
-    case 'search_files':
+    case 'search':
       return {
         verb: 'Searched',
         target: `"${str(args, 'query')}"`,
       };
-    case 'run_command': {
+    case 'command': {
       const cmd = str(args, 'command');
       const short = cmd.length > 48 ? `${cmd.slice(0, 45)}…` : cmd;
       return { verb: 'Ran', target: short };
     }
-    case 'delegate_task':
-      return { verb: 'Delegated', target: str(args, 'goal').slice(0, 48) };
-    case 'spawn_parallel_tasks': {
+    case 'todo':
+      return { verb: 'Updated todos', target: '' };
+    case 'web':
+      return { verb: 'Fetched', target: str(args, 'url') || `"${str(args, 'query')}"` };
+    case 'subagent': {
+      if (tool !== 'spawn_parallel_tasks') {
+        return { verb: 'Delegated', target: str(args, 'description').slice(0, 48) };
+      }
       const tasks = args.tasks;
       const count = Array.isArray(tasks) ? tasks.length : 0;
       return {

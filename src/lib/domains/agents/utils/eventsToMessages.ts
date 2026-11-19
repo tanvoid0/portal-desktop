@@ -3,11 +3,10 @@
 // already renders, so the Run launcher reuses those components instead of a
 // parallel chat UI.
 //
-// `AgentEvent::ToolCall` carries Claude Code's *native* tool names/args
-// (`Bash` + `command`, `Read` + `file_path`, ...) — `mapToolCall` below
-// translates those onto the synthetic shape `ToolCallCard.svelte` /
-// `toolCallDisplay.ts` already render for Coder's own tool calls
-// (`run_command` + `command`, `read_file` + `path`, ...).
+// `AgentEvent::ToolCall` carries the backend's *native* tool names/args
+// (`Bash` + `command`, `Read` + `file_path`, ...) and they pass through
+// untouched — `normalizeTool` (coder/utils/toolKinds.ts) maps them to a kind at
+// display time.
 
 import type { AgentEvent, AgentEventRow } from '../generated';
 import type { ChatMessage, PendingApproval } from '$lib/domains/coder/types.js';
@@ -39,43 +38,6 @@ function summarizePermission(toolName: string, input: unknown): string {
     if (typeof obj.file_path === 'string') return obj.file_path;
   }
   return toolName;
-}
-
-/** Native Claude Code tool name/input -> Coder's synthetic tool-call shape. */
-function mapToolCall(
-  name: string,
-  input: unknown
-): { name: string; args: Record<string, unknown> } {
-  const obj = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
-  switch (name) {
-    case 'Bash':
-      return { name: 'run_command', args: { command: obj.command } };
-    case 'Read':
-      return { name: 'read_file', args: { path: obj.file_path } };
-    case 'Write':
-      return { name: 'write_file', args: { path: obj.file_path, content: obj.content } };
-    case 'Edit':
-      return {
-        name: 'edit_file',
-        args: {
-          path: obj.file_path,
-          old_string: obj.old_string,
-          new_string: obj.new_string,
-          replace_all: obj.replace_all,
-        },
-      };
-    case 'Grep':
-    case 'Glob':
-      return { name: 'search_files', args: { query: obj.pattern, path: obj.path } };
-    case 'LS':
-      return { name: 'list_dir', args: { path: obj.path } };
-    default:
-      // MultiEdit and anything unrecognized (incl. future tools) — Coder has
-      // no matching synthetic branch, so pass the native shape straight
-      // through; ToolCallCard's default branch dumps raw args rather than
-      // rendering nothing.
-      return { name, args: obj };
-  }
 }
 
 /** `parent_tool_use_id` lives only on the event types a subagent turn streams. */
@@ -130,7 +92,6 @@ export function eventsToMessages(events: AgentEvent[]): AgentRunView {
         thinkingText = '';
         break;
       case 'tool_call': {
-        const { name, args } = mapToolCall(e.name, e.input);
         messages.push({
           role: 'assistant',
           // Thinking that led straight into this call rides along as the
@@ -143,7 +104,7 @@ export function eventsToMessages(events: AgentEvent[]): AgentRunView {
             {
               id: e.id,
               type: 'function',
-              function: { name, arguments: JSON.stringify(args) },
+              function: { name: e.name, arguments: JSON.stringify(e.input ?? {}) },
             },
           ],
         });
