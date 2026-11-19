@@ -200,3 +200,50 @@ export interface PlatformPairResult {
   ok: boolean;
   detail: string;
 }
+
+// ----- Model ops (snake_case straight from agent-platformd via Rust) -----
+
+export interface ModelRegistryEntry {
+  id: number;
+  project_id: number;
+  project_name: string | null;
+  version: string;
+  ollama_tag: string;
+  base_model: string | null;
+  eval_score: number | null;
+  metadata: unknown;
+  is_active: boolean;
+}
+
+export interface ModelProject {
+  id: number;
+  name: string;
+  description: string | null;
+  manifest: unknown;
+  registry_entries: ModelRegistryEntry[];
+}
+
+export interface ModelBuildJob {
+  id: number;
+  job_type: string | null;
+  project_id: number | null;
+  project_name: string | null;
+  stages: string[];
+  status: string;
+  current_stage: string | null;
+  register_alias: string | null;
+  result: unknown;
+  error_message: string | null;
+  progress: Record<string, unknown>;
+  log_tail: string | null;
+  created_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+/** Ollama's own model row; shape varies by version, so only `name`/`size` are relied on. */
+export interface OllamaModel {
+  name: string;
+  size?: number | null;
+  [key: string]: unknown;
+}

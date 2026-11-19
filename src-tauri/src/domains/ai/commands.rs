@@ -10,6 +10,7 @@ use crate::domains::ai::conversation::{
 };
 use crate::domains::ai::logging::{AILog, LogFilters};
 use crate::domains::ai::message::ChatMessage;
+use crate::domains::ai::model_ops::{ModelBuildJob, ModelProject, ModelRegistryEntry};
 use crate::domains::ai::platform_admin::{self, PairResult, PlatformHealth, StartResult};
 use crate::domains::ai::platform_config::PlatformConfig;
 use crate::domains::ai::providers::{
@@ -156,6 +157,129 @@ pub async fn get_ai_platform_catalog(
     };
     platform
         .fetch_catalog(query)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ----- Model ops (proxied to agent-platformd `/api/v1/model-ops/*`) -----
+
+/// Build the agent-platform provider from the saved config, for the model-ops
+/// proxy commands below.
+fn model_ops_platform(
+    settings_service: &AISettingsService,
+) -> Result<AgentPlatformProvider, String> {
+    let config = settings_service
+        .get_provider_config(ProviderType::AgentPlatform)
+        .map_err(|e| e.to_string())?;
+    Ok(AgentPlatformProvider::new(config))
+}
+
+/// Fine-tune projects, each with its registered adapter versions.
+#[portal_rpc_macro::rpc]
+pub async fn ai_model_projects(
+    settings_service: State<'_, Arc<AISettingsService>>,
+) -> Result<Vec<ModelProject>, String> {
+    model_ops_platform(&settings_service)?
+        .model_projects()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Create a new fine-tune project.
+#[portal_rpc_macro::rpc]
+pub async fn ai_create_model_project(
+    name: String,
+    description: Option<String>,
+    base_model: Option<String>,
+    settings_service: State<'_, Arc<AISettingsService>>,
+) -> Result<ModelProject, String> {
+    model_ops_platform(&settings_service)?
+        .create_model_project(name, description, base_model)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Local models Ollama has on this machine (raw rows: `name`, `size`, …).
+#[portal_rpc_macro::rpc]
+pub async fn ai_ollama_models(
+    settings_service: State<'_, Arc<AISettingsService>>,
+) -> Result<Vec<serde_json::Value>, String> {
+    model_ops_platform(&settings_service)?
+        .ollama_models()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Pull an Ollama model; returns a build job to poll.
+#[portal_rpc_macro::rpc]
+pub async fn ai_pull_ollama_model(
+    name: String,
+    settings_service: State<'_, Arc<AISettingsService>>,
+) -> Result<ModelBuildJob, String> {
+    model_ops_platform(&settings_service)?
+        .pull_ollama_model(name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Adapters registered from completed builds.
+#[portal_rpc_macro::rpc]
+pub async fn ai_model_registry(
+    settings_service: State<'_, Arc<AISettingsService>>,
+) -> Result<Vec<ModelRegistryEntry>, String> {
+    model_ops_platform(&settings_service)?
+        .model_registry()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Make a registry entry the active adapter for its project.
+#[portal_rpc_macro::rpc]
+pub async fn ai_activate_registry_entry(
+    entry_id: i64,
+    settings_service: State<'_, Arc<AISettingsService>>,
+) -> Result<ModelRegistryEntry, String> {
+    model_ops_platform(&settings_service)?
+        .activate_registry_entry(entry_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Start a build pipeline for a project; returns the launched job.
+#[portal_rpc_macro::rpc]
+pub async fn ai_start_model_build(
+    project: String,
+    stages: Vec<String>,
+    register_alias: Option<String>,
+    settings_service: State<'_, Arc<AISettingsService>>,
+) -> Result<ModelBuildJob, String> {
+    let stages = crate::domains::ai::model_ops::ordered_stages(&stages);
+    model_ops_platform(&settings_service)?
+        .start_model_build(project, stages, register_alias)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Poll a build job's status, progress and log tail.
+#[portal_rpc_macro::rpc]
+pub async fn ai_model_build_job(
+    job_id: i64,
+    settings_service: State<'_, Arc<AISettingsService>>,
+) -> Result<ModelBuildJob, String> {
+    model_ops_platform(&settings_service)?
+        .model_build_job(job_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Cancel a running build job.
+#[portal_rpc_macro::rpc]
+pub async fn ai_cancel_model_build_job(
+    job_id: i64,
+    settings_service: State<'_, Arc<AISettingsService>>,
+) -> Result<ModelBuildJob, String> {
+    model_ops_platform(&settings_service)?
+        .cancel_model_build_job(job_id)
         .await
         .map_err(|e| e.to_string())
 }

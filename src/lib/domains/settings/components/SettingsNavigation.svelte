@@ -101,6 +101,11 @@
           path: '/settings/ai/providers',
         },
         {
+          id: 'model-ops' as const,
+          label: 'Model ops',
+          path: '/settings/ai/model-ops',
+        },
+        {
           id: 'training' as const,
           label: 'Training Data',
           path: '/settings/ai/training',

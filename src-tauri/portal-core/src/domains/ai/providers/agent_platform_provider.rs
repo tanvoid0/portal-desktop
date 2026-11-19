@@ -10,6 +10,7 @@ use crate::domains::ai::providers::{
 };
 use futures_util::StreamExt;
 use reqwest::Client;
+use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use std::time::Instant;
 
@@ -183,6 +184,62 @@ impl AgentPlatformProvider {
             .json::<PlatformCatalog>()
             .await
             .map_err(|e| AIError::InvalidResponse(format!("Invalid catalog response: {}", e)))
+    }
+
+    /// Authenticated JSON request to an agent-platform API path (e.g.
+    /// `/api/v1/model-ops/projects`). Reuses the catalog fetch's auth and error
+    /// mapping so every proxied call reports a 401 the same way. `path` is an
+    /// absolute path with a leading slash; it is appended to the base URL.
+    pub(crate) async fn request_json<T: DeserializeOwned>(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        body: Option<Value>,
+        timeout_s: u64,
+    ) -> Result<T, AIError> {
+        let url = format!("{}{}", self.base_url(), path);
+        let mut req = self.authed(self.client.request(method, &url));
+        if let Some(body) = body {
+            req = req.json(&body);
+        }
+
+        let response = req
+            .timeout(std::time::Duration::from_secs(timeout_s))
+            .send()
+            .await
+            .map_err(|e| {
+                if e.is_timeout() {
+                    AIError::TimeoutError(format!("Request to {path} timed out"))
+                } else if e.is_connect() {
+                    AIError::NetworkError(format!(
+                        "Cannot reach agent-platform at {}. Is it running?",
+                        self.base_url()
+                    ))
+                } else {
+                    AIError::NetworkError(format!("Request to {path} failed: {e}"))
+                }
+            })?;
+
+        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+            return Err(AIError::AuthenticationError(auth_failure_detail(
+                response.text().await.unwrap_or_default(),
+            )));
+        }
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(AIError::InvalidResponse(format!(
+                "agent-platform {path} returned status {status}: {error_text}"
+            )));
+        }
+
+        response
+            .json::<T>()
+            .await
+            .map_err(|e| AIError::InvalidResponse(format!("Invalid response from {path}: {e}")))
     }
 
     async fn chat_completion(
