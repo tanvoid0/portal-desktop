@@ -93,8 +93,13 @@
       id: 'ai' as const,
       label: 'AI',
       icon: Sparkles,
-      path: '/settings/ai/providers',
+      path: '/settings/ai/status',
       subSections: [
+        {
+          id: 'status' as const,
+          label: 'Status & Logs',
+          path: '/settings/ai/status',
+        },
         {
           id: 'providers' as const,
           label: 'Providers',

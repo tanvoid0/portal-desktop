@@ -860,6 +860,8 @@ pub fn run() {
             domains::ai::commands::ai_platform_health,
             domains::ai::commands::start_agent_platform,
             domains::ai::commands::pair_agent_platform,
+            domains::ai::commands::get_platform_system_status,
+            domains::ai::commands::get_platform_system_logs,
             domains::ai::commands::generate_ai_text,
             domains::ai::commands::generate_ai_text_with_system,
             // AI Chat commands

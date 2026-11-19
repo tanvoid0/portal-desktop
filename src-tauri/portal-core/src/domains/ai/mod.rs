@@ -10,5 +10,6 @@ pub mod platform_admin;
 pub mod platform_config;
 pub mod platform_daemon;
 pub mod platform_project;
+pub mod platform_system;
 pub mod providers;
 pub mod services;

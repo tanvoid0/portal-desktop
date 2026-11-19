@@ -12,6 +12,7 @@ use crate::domains::ai::logging::{AILog, LogFilters};
 use crate::domains::ai::message::ChatMessage;
 use crate::domains::ai::platform_admin::{self, PairResult, PlatformHealth, StartResult};
 use crate::domains::ai::platform_config::PlatformConfig;
+use crate::domains::ai::platform_system;
 use crate::domains::ai::providers::{
     AIError, AgentPlatformProvider, ConfigurationStatus, GenerationOptions, GenerationResult,
     ProviderConfig, ProviderType,
@@ -175,6 +176,25 @@ pub async fn start_agent_platform(
     settings_service: State<'_, Arc<AISettingsService>>,
 ) -> Result<StartResult, String> {
     Ok(platform_admin::start_platform(&settings_service, super::platform_sidecar::spawn).await)
+}
+
+/// Daemon status aggregate (`GET /api/v1/system/status`): version, uptime,
+/// readiness, process counts, paths. Free-form; the Status screen normalizes it.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn get_platform_system_status(
+    settings_service: State<'_, Arc<AISettingsService>>,
+) -> Result<serde_json::Value, String> {
+    platform_system::system_status(&settings_service).await
+}
+
+/// Recent daemon log lines (`GET /api/v1/system/logs`). Poll with the `next`
+/// cursor from the previous response to tail only what is new.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn get_platform_system_logs(
+    after: Option<u64>,
+    settings_service: State<'_, Arc<AISettingsService>>,
+) -> Result<serde_json::Value, String> {
+    platform_system::system_logs(&settings_service, after.unwrap_or(0)).await
 }
 
 /// Mint a workspace token with the master key and save it. The key is used for
