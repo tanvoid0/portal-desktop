@@ -21,6 +21,7 @@
     type SessionSortKey,
     type SessionStatusFilter,
   } from '../utils/sessionList.js';
+  import type { SessionCardBadge } from '$lib/domains/ai/components/shared/AISessionCard.svelte';
   import type { CoderThread } from '../types.js';
 
   interface Props {
@@ -36,6 +37,13 @@
     loading?: boolean;
     showRules?: boolean;
     onToggleRules?: () => void;
+    title?: string;
+    /** The saved-rules footer; off for providers without remember-rule. */
+    showRulesFooter?: boolean;
+    /** The provider filter; off for providers with a single backend. */
+    allowProviderFilter?: boolean;
+    /** Provider-specific badges per session, e.g. "Needs approval". */
+    badgeFor?: (threadId: string) => SessionCardBadge[];
   }
 
   let {
@@ -51,6 +59,10 @@
     loading = false,
     showRules = false,
     onToggleRules,
+    title = 'Sessions',
+    showRulesFooter = true,
+    allowProviderFilter = true,
+    badgeFor,
   }: Props = $props();
 
   let searchValue = $state('');
@@ -98,7 +110,7 @@
     ...extractProviderOptions(displayThreads),
   ]);
 
-  const showProviderFilter = $derived(providerOptions.length > 2);
+  const showProviderFilter = $derived(allowProviderFilter && providerOptions.length > 2);
 
   // The count spans every workspace group below, and collapsed groups hide their rows,
   // so say how many workspaces it covers rather than letting it contradict what is on screen.
@@ -123,8 +135,13 @@
   }
 </script>
 
+{#snippet footer()}
+  <CoderSidebarFooter {showRules} {onToggleRules} />
+{/snippet}
+
 <AISessionSidebar
-  title="Sessions"
+  {title}
+  footer={showRulesFooter ? footer : undefined}
   searchPlaceholder="Search sessions..."
   bind:searchValue
   {showLoadingSkeleton}
@@ -230,9 +247,6 @@
     {onProjectSelect}
     {queuedCountFor}
     {subAgentSummaryFor}
+    {badgeFor}
   />
-
-  {#snippet footer()}
-    <CoderSidebarFooter {showRules} {onToggleRules} />
-  {/snippet}
 </AISessionSidebar>

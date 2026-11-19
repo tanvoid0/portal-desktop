@@ -18,6 +18,7 @@
     type SessionListFilters,
     type SessionSortKey,
   } from '../utils/sessionList.js';
+  import type { SessionCardBadge } from '$lib/domains/ai/components/shared/AISessionCard.svelte';
   import type { CoderThread } from '../types.js';
 
   interface Props {
@@ -31,6 +32,7 @@
     onProjectSelect?: (path: string, projectId?: string) => void;
     queuedCountFor?: (threadId: string) => number;
     subAgentSummaryFor?: (threadId: string) => { running: number; total: number };
+    badgeFor?: (threadId: string) => SessionCardBadge[];
   }
 
   let {
@@ -44,6 +46,7 @@
     onProjectSelect,
     queuedCountFor,
     subAgentSummaryFor,
+    badgeFor,
   }: Props = $props();
 
   let projects = $state<Project[]>([]);
@@ -267,6 +270,7 @@
       {onDeleteThread}
       {queuedCountFor}
       {subAgentSummaryFor}
+      {badgeFor}
     />
   {/if}
 {/snippet}

@@ -21,7 +21,7 @@
   import { Button } from '$lib/components/ui/button';
   import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { toast } from '$lib/utils/toast';
-  import AgentSessionSidebar from './AgentSessionSidebar.svelte';
+  import CoderSessionList from '$lib/domains/coder/components/CoderSessionList.svelte';
   import PanelRightOpen from '~icons/fa6-solid/table-columns';
   import AgentSessionPanel from './AgentSessionPanel.svelte';
   import CoderWorkspacePanel from '$lib/domains/coder/components/CoderWorkspacePanel.svelte';
@@ -31,7 +31,14 @@
   import { provideCoderWorkspace } from '$lib/domains/coder/state/coderWorkspaceStore.svelte.js';
   import { aiTopbar } from '$lib/domains/ai/state/aiTopbarStore.svelte.js';
   import { agentRuns } from '../state/agentRuns.svelte.js';
-  import { agentSessionsQuery } from '../queries/agentsQueries.js';
+  import { agentBackendsQuery, agentSessionsQuery } from '../queries/agentsQueries.js';
+  import { agentsApi } from '../api/agentsApi.js';
+  import { filterSessionsByBackend } from '../utils/groupSessions.js';
+  import { sessionToThread } from '../utils/sessionToThread.js';
+  import { queryClient } from '$lib/domains/shared/query/queryClient';
+  import { queryKeys } from '$lib/domains/shared/query/keys';
+  import { confirmAction } from '$lib/utils/confirm';
+  import type { CoderThread } from '$lib/domains/coder/types.js';
 
   interface Props {
     /** Which backend's tab this is — scopes the sidebar list, the launcher,
@@ -102,6 +109,17 @@
   // There's no other tab to send it to yet — #725 adds one route per
   // backend; until then the safe fallback is just dropping focus.
   const sessionsQuery = createQuery(agentSessionsQuery);
+  const backendsQuery = createQuery(agentBackendsQuery);
+  const backendName = $derived(
+    backendsQuery.data?.find((b) => b.id === backendId)?.display_name ?? 'Agents'
+  );
+  const threads = $derived(
+    filterSessionsByBackend(sessionsQuery.data ?? [], backendId).map(sessionToThread)
+  );
+  // Only this tab's own sessions: a running id from another backend would show as a stray row.
+  const runningThreadIds = $derived(
+    new Set(threads.filter((t) => agentRuns.runningIds.has(t.id)).map((t) => t.id))
+  );
   const focused = $derived(sessionsQuery.data?.find((s) => s.id === focusedId));
   const cwd = $derived(focused?.cwd ?? '');
   $effect(() => {
@@ -140,6 +158,22 @@
     prefillTaskId = null;
     syncUrl(null);
   }
+  async function deleteThread(t: CoderThread) {
+    if (
+      !(await confirmAction(`Delete "${t.title}"? This can't be undone.`, 'Delete session', {
+        destructive: true,
+      }))
+    )
+      return;
+    try {
+      await agentsApi.deleteSession(t.id);
+      if (t.id === focusedId) syncUrl(null);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.agents.sessions });
+    } catch (e) {
+      toast.error(String(e));
+    }
+  }
+
   async function endRun() {
     if (!focusedId) return;
     try {
@@ -179,7 +213,22 @@
 {/snippet}
 
 {#snippet sessions()}
-  <AgentSessionSidebar {backendId} {focusedId} onSelect={selectSession} onNewRun={newRun} />
+  <CoderSessionList
+    title={backendName}
+    {threads}
+    loading={sessionsQuery.isPending}
+    selectedThreadId={focusedId}
+    {runningThreadIds}
+    showRulesFooter={caps.rememberRule}
+    allowProviderFilter={caps.modelPicker === 'catalog'}
+    badgeFor={(id) =>
+      agentRuns.pendingCountFor(id) > 0
+        ? [{ label: 'Needs approval', variant: 'destructive' }]
+        : []}
+    onThreadClick={(t) => selectSession(t.id)}
+    onCreateNew={newRun}
+    onDeleteThread={deleteThread}
+  />
 {/snippet}
 
 {#snippet body()}

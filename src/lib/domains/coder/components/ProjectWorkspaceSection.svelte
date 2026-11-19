@@ -3,6 +3,7 @@
   import Folder from '~icons/fa6-solid/folder';
   import { Button } from '$lib/components/ui/button';
   import CoderSessionCard from './CoderSessionCard.svelte';
+  import type { SessionCardBadge } from '$lib/domains/ai/components/shared/AISessionCard.svelte';
   import type { CoderThread } from '../types.js';
   import type { ProjectWorkspace } from '../utils/sessionList.js';
 
@@ -19,6 +20,7 @@
     onDeleteThread?: (thread: CoderThread) => void;
     queuedCountFor?: (threadId: string) => number;
     subAgentSummaryFor?: (threadId: string) => { running: number; total: number };
+    badgeFor?: (threadId: string) => SessionCardBadge[];
   }
 
   let {
@@ -34,6 +36,7 @@
     onDeleteThread,
     queuedCountFor,
     subAgentSummaryFor,
+    badgeFor,
   }: Props = $props();
 
   const sessionCount = $derived(threads.length);
@@ -100,6 +103,7 @@
           isRunning={runningThreadIds.has(t.id)}
           queuedCount={queuedCountFor?.(t.id) ?? 0}
           subAgentRunning={subAgentSummaryFor?.(t.id).running ?? 0}
+          extraBadges={badgeFor?.(t.id)}
         />
       {/each}
     </div>

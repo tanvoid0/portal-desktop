@@ -3,6 +3,7 @@
   import ContextMenuList from '$lib/components/menu/ContextMenuList.svelte';
   import { buildReference } from '$lib/domains/shared/utils/entityReference';
   import { copyText } from '$lib/domains/shared/utils/clipboard';
+  import type { SessionCardBadge } from '$lib/domains/ai/components/shared/AISessionCard.svelte';
   import { openCoderSession } from '../utils/launch';
   import { buildCoderThreadMenu } from '../utils/threadMenu';
   import type { CoderThread } from '../types.js';
@@ -16,6 +17,8 @@
     queuedCount?: number;
     subAgentRunning?: number;
     hideProject?: boolean;
+    /** Provider-specific badges, e.g. "Needs approval". */
+    extraBadges?: SessionCardBadge[];
   }
 
   let {
@@ -27,6 +30,7 @@
     queuedCount = 0,
     subAgentRunning = 0,
     hideProject = false,
+    extraBadges = [],
   }: Props = $props();
 
   const messageCount = $derived(
@@ -41,11 +45,7 @@
   );
 
   const trailingBadges = $derived.by(() => {
-    const badges: {
-      label: string;
-      variant: 'outline';
-      class?: string;
-    }[] = [];
+    const badges: SessionCardBadge[] = [...extraBadges];
     if (subAgentRunning > 0) {
       badges.push({
         label: `${subAgentRunning} agent${subAgentRunning === 1 ? '' : 's'}`,
