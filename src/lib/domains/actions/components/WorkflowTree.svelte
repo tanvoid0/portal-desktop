@@ -7,19 +7,16 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import { cn } from '$lib/utils';
-  import type {
-    ScriptExecutionInfo,
-    WorkflowPlanStep,
-  } from '$lib/domains/scripts/services/scriptExecutionService';
+  import type { WorkflowPlanStep } from '$lib/domains/scripts/services/scriptExecutionService';
   import {
     getExecutionStatusColor,
     getExecutionStatusIcon,
   } from '$lib/domains/projects/pipelines/utils/executionDisplay';
-  import { buildStepGraph } from '../stepGraph';
+  import { buildStepGraph, type StepRun } from '../stepGraph';
 
   interface Props {
     plan: WorkflowPlanStep[];
-    executions?: ScriptExecutionInfo[];
+    executions?: StepRun[];
     selectedStepId?: string | null;
     onSelect?: (stepId: string, executionId?: string) => void;
   }

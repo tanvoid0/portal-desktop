@@ -5,6 +5,9 @@ import type {
 
 export type StepStatus = ScriptExecutionInfo['status'] | 'skipped';
 
+/** What the graph reads of a step's run: an action run row or a pipeline StepExecution. */
+export type StepRun = { id: string; stepId?: string | null; status: StepStatus };
+
 export interface StepNode {
   id: string;
   name: string;
@@ -30,10 +33,7 @@ export function dedupePlan(plan: WorkflowPlanStep[]): WorkflowPlanStep[] {
 }
 
 /** Stage = longest path from a root. A cycle or unknown `needs` collapses to one column. */
-export function buildStepGraph(
-  rawPlan: WorkflowPlanStep[],
-  executions: ScriptExecutionInfo[] = []
-): StepGraph {
+export function buildStepGraph(rawPlan: WorkflowPlanStep[], executions: StepRun[] = []): StepGraph {
   const plan = dedupePlan(rawPlan);
   const rows = new Map(executions.filter((e) => e.stepId).map((e) => [e.stepId!, e]));
   // A run is over once a step failed or was stopped; steps with no row then never ran.

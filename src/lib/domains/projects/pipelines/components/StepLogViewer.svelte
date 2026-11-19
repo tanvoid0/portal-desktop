@@ -9,6 +9,7 @@
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
   import { toast } from '$lib/utils/toast';
+  import { ansiSpans, toTerminalText } from '$lib/domains/actions/runOutput';
   import type { StepExecution } from '../types';
 
   interface Props {
@@ -23,18 +24,17 @@
   let userAutoScroll = $state(true);
   let copied = $state(false);
 
-  const displayLines = $derived.by(() => {
-    if (liveLines.length > 0) {
-      return liveLines;
-    }
-    if (step?.logs?.length) {
-      return step.logs;
-    }
-    if (step?.output) {
-      return step.output.split('\n').filter((l) => l.length > 0);
-    }
-    return [];
-  });
+  // Raw process lines carry ANSI colour codes and `\r` redraws — show them as a terminal
+  // would: coloured spans on screen, plain text for copy and the stderr check.
+  const rawLines = $derived(
+    liveLines.length
+      ? liveLines
+      : step?.logs?.length
+        ? step.logs
+        : (step?.output ?? '').split('\n').filter((l) => l.length > 0)
+  );
+  const displayLines = $derived(rawLines.map(toTerminalText));
+  const spans = $derived(rawLines.map(ansiSpans));
 
   const lineCount = $derived(displayLines.length);
 
@@ -144,7 +144,7 @@
               ? 'text-red-400'
               : 'text-zinc-300'}"
           >
-            {line}
+            {#each spans[i] as s, j (j)}<span class={s.cls || undefined}>{s.text}</span>{/each}
           </div>
         {/each}
       {/if}

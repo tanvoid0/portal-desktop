@@ -19,8 +19,11 @@
   import { PageHeader, PageError, PageLoading } from '$lib/components/shell';
   import type { PipelineExecution, StepExecution } from '../types';
   import { executionService } from '../services/executionService';
+  import { pipelineService } from '../services/pipelineService';
   import StepLogViewer from './StepLogViewer.svelte';
   import RunProgressBar from '$lib/domains/actions/components/RunProgressBar.svelte';
+  import WorkflowTree from '$lib/domains/actions/components/WorkflowTree.svelte';
+  import type { WorkflowPlanStep } from '$lib/domains/scripts/services/scriptExecutionService';
 
   interface Props {
     executionId: string;
@@ -52,6 +55,27 @@
   );
 
   const selectedLiveLines = $derived(selectedStepId ? (liveLogBuffers[selectedStepId] ?? []) : []);
+
+  // The pipeline's dependsOn edges are what the stage tree draws (same staging the executor uses).
+  // ponytail: reads the pipeline as it is now; snapshot the plan on the execution if edits after a run matter.
+  let plan = $state<WorkflowPlanStep[]>([]);
+  const pipelineId = $derived(execution?.pipelineId);
+  $effect(() => {
+    const id = pipelineId;
+    plan = [];
+    if (!id) return;
+    let cancelled = false;
+    pipelineService
+      .getPipeline(id)
+      .then((p) => {
+        if (cancelled || !p) return;
+        plan = p.steps.map((s) => ({ id: s.id, name: s.name, needs: s.dependsOn ?? [] }));
+      })
+      .catch(() => {}); // the step list below still works without the tree
+    return () => {
+      cancelled = true;
+    };
+  });
 
   function normalizeExecution(raw: PipelineExecution): PipelineExecution {
     return {
@@ -280,6 +304,19 @@
     <PageLoading message="Loading execution..." />
   {:else}
     {#if execution.progress}<RunProgressBar progress={execution.progress} />{/if}
+    <!-- no dependsOn anywhere = one column, which the Steps list already shows -->
+    {#if plan.some((s) => s.needs.length)}
+      <Card>
+        <CardContent class="p-3">
+          <WorkflowTree
+            {plan}
+            executions={execution.stepExecutions}
+            {selectedStepId}
+            onSelect={(stepId) => (selectedStepId = stepId)}
+          />
+        </CardContent>
+      </Card>
+    {/if}
     <div class="grid min-h-[480px] flex-1 gap-4 @3xl:grid-cols-[280px_1fr]">
       <!-- Step timeline -->
       <Card class="h-fit">
