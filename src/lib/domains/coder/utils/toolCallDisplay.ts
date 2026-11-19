@@ -88,7 +88,7 @@ export function isToolResultFailure(tool: string, result: string): boolean {
     return true;
   }
 
-  if (normalizeTool(tool, {}).kind === 'command') {
+  if (tool === 'run_command') {
     const match = text.match(/^exit (-?\d+)/);
     if (match) return Number.parseInt(match[1], 10) !== 0;
   }
@@ -112,7 +112,7 @@ export function getToolResultFailureSummary(tool: string, result: string): strin
     return first.length > 80 ? `${first.slice(0, 77)}…` : first;
   }
 
-  if (normalizeTool(tool, {}).kind === 'command') {
+  if (tool === 'run_command') {
     const match = result.match(/^exit (-?\d+)/);
     if (match) return `Command failed (exit ${match[1]})`;
   }
@@ -127,7 +127,7 @@ export function formatFailedResult(tool: string, result: string): string {
     return result.slice('Error: '.length).trim();
   }
 
-  if (normalizeTool(tool, {}).kind === 'command') {
+  if (tool === 'run_command') {
     return result.replace(/^exit -?\d+\n?/, '').trim() || result.trim();
   }
 

@@ -46,6 +46,7 @@ const KINDS: Record<string, ToolKind> = {
   task: 'subagent',
   webfetch: 'web',
   websearch: 'web',
+  web_search: 'web',
   // Cursor / Codex
   shell: 'command',
   commandexecution: 'command',

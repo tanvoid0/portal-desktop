@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { getToolResultStatus } from './toolCallDisplay';
 import { normalizeTool } from './toolKinds';
+
+describe('exit-code failure parsing', () => {
+  it('only applies to Portal run_command', () => {
+    expect(getToolResultStatus('commandExecution', 'exit 2\n')).toBe('success');
+    expect(getToolResultStatus('run_command', 'exit 2\nboom')).toBe('failed');
+  });
+});
 
 describe('normalizeTool', () => {
   it('maps Bash and run_command to command with canonical args', () => {

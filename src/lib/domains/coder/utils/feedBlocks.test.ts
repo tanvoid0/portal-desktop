@@ -18,6 +18,13 @@ function phrase(tools: Array<{ call: ToolCall; result: string | null }>): string
 }
 
 describe('buildActivitySummary', () => {
+  it('keeps spawn_parallel_tasks distinct from delegate_task', () => {
+    expect(phrase([{ call: call('spawn_parallel_tasks'), result: 'ok' }])).toBe(
+      'Spawned parallel tasks'
+    );
+    expect(phrase([{ call: call('delegate_task'), result: 'ok' }])).toBe('Delegated a task');
+  });
+
   it('counts successful calls', () => {
     expect(
       phrase([

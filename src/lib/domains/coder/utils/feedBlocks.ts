@@ -63,6 +63,7 @@ const ACTIVITY_ORDER = [
   'todo',
   'web',
   'subagent',
+  'spawn_parallel_tasks',
 ] as const;
 
 function parseTimestamp(value?: string | null): number | null {
@@ -98,6 +99,8 @@ function activityPhrase(key: string, count: number, active: boolean): ActivitySu
         return ['Updating', 'Updated', ' todos'];
       case 'web':
         return ['Fetching', 'Fetched', plural ? ` ${count} pages` : ' a page'];
+      case 'spawn_parallel_tasks':
+        return ['Spawning', 'Spawned', ' parallel tasks'];
       case 'subagent':
         return ['Delegating', 'Delegated', plural ? ` ${count} tasks` : ' a task'];
       default:
@@ -128,7 +131,12 @@ export function buildActivitySummary(tools: Array<{ call: ToolCall; result: stri
   for (const { call, result } of tools) {
     const tool = call.function.name;
     const { kind } = normalizeTool(tool, {});
-    const key = kind === 'fallback' ? tool : kind === 'multi-edit' ? 'edit' : kind;
+    const key =
+      kind === 'fallback' || tool === 'spawn_parallel_tasks'
+        ? tool
+        : kind === 'multi-edit'
+          ? 'edit'
+          : kind;
     const bucket = buckets.get(key) ?? { total: 0, pending: 0, failed: 0 };
     bucket.total++;
     const status = getToolResultStatus(tool, result);

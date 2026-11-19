@@ -59,7 +59,9 @@
   const failedOutput = $derived(failed && result ? formatFailedResult(tool, result) : '');
   // Full path/command behind the (basename-only) chip.
   const chipTitle = $derived(
-    String(normalized.args.path ?? normalized.args.command ?? line.target)
+    normalized.kind === 'search'
+      ? line.target
+      : String(normalized.args.path ?? normalized.args.command ?? line.target)
   );
 
   const expandable = $derived(Object.keys(rawArgs).length > 0 || result != null);
