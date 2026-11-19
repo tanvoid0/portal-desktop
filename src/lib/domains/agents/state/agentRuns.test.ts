@@ -1,10 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentEventSeq } from '../generated';
-import { appendFolded } from './agentRuns.svelte.js';
+import { appendFolded, detailToLog } from './agentRuns.svelte.js';
+import { eventsToMessages } from '../utils/eventsToMessages.js';
 
 function seq(n: number, event: AgentEventSeq['event']): AgentEventSeq {
   return { seq: n, event };
 }
+
+describe('detailToLog', () => {
+  it('synthesizes message events for imported sessions (messages, no events)', () => {
+    const log = detailToLog({
+      events: [],
+      messages: [
+        {
+          id: 'b',
+          seq: 2,
+          role: 'assistant',
+          text: 'hi',
+          parent_tool_use_id: null,
+          created_at: '',
+        },
+        { id: 'a', seq: 1, role: 'user', text: 'yo', parent_tool_use_id: null, created_at: '' },
+      ],
+    });
+    expect(eventsToMessages(log.map((i) => i.event)).messages.length).toBe(2);
+    expect(log[0].seq).toBe(1);
+  });
+});
 
 describe('appendFolded', () => {
   it('folds consecutive text_delta events from the same parent into one', () => {

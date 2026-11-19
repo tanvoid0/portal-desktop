@@ -8,7 +8,7 @@
 
 import { agentsApi } from '../api/agentsApi.js';
 import { eventsToMessages, type AgentRunView } from '../utils/eventsToMessages.js';
-import type { AgentEvent, AgentEventSeq } from '../generated';
+import type { AgentEvent, AgentEventSeq, AgentSessionDetail } from '../generated';
 import { queryClient } from '$lib/domains/shared/query/queryClient';
 import { queryKeys } from '$lib/domains/shared/query/keys';
 import type { UnlistenFn } from '@tauri-apps/api/event';
@@ -39,6 +39,27 @@ export function appendFolded(log: AgentEventSeq[], item: AgentEventSeq): AgentEv
     return [...log.slice(0, -1), { seq: item.seq, event: merged }];
   }
   return [...log, item];
+}
+
+/** Persisted base log of a session. Imported transcripts only have message
+ *  rows and no events — synthesize `message` events from them so they render. */
+export function detailToLog(
+  detail: Pick<AgentSessionDetail, 'events' | 'messages'> | null | undefined
+): AgentEventSeq[] {
+  let log: AgentEventSeq[] = [];
+  const events = [...(detail?.events ?? [])].sort((a, b) => a.seq - b.seq);
+  for (const row of events) log = appendFolded(log, { seq: row.seq, event: row.event });
+  if (events.length) return log;
+  const messages = [...(detail?.messages ?? [])].sort((a, b) => a.seq - b.seq);
+  return messages.map((m) => ({
+    seq: m.seq,
+    event: {
+      type: 'message',
+      role: m.role,
+      text: m.text,
+      parent_tool_use_id: m.parent_tool_use_id,
+    },
+  }));
 }
 
 class AgentRunsState {
@@ -123,8 +144,7 @@ class AgentRunsState {
     let log: AgentEventSeq[] = [];
     try {
       const detail = await agentsApi.getSession(sessionId);
-      const rows = [...(detail?.events ?? [])].sort((a, b) => a.seq - b.seq);
-      for (const row of rows) log = appendFolded(log, { seq: row.seq, event: row.event });
+      log = detailToLog(detail);
     } catch (e) {
       console.error('agents: getSession failed', e);
     }

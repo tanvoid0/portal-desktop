@@ -70,6 +70,8 @@
   const view = $derived(sessionId ? agentRuns.viewFor(sessionId) : null);
   const detail = $derived(sessionDetailQuery.data ?? null);
   const title = $derived(detail?.session.title || detail?.session.backend_id || 'Session');
+  // Imported sessions never emit `exited`, so the view alone says "not ended".
+  const ended = $derived(!!sessionId && (!!view?.ended || !agentRuns.runningIds.has(sessionId)));
   const firstPending = $derived(view?.pending[0] ?? null);
   const extraPending = $derived(view?.pending.slice(1) ?? []);
 
@@ -124,7 +126,7 @@
     if (!id || !text) return;
     draft = '';
     try {
-      if (view?.ended) {
+      if (ended) {
         const newId = await agentRuns.resume(id, text);
         onStarted(newId);
       } else {
@@ -181,7 +183,7 @@
       <div class="flex min-w-0 flex-1 items-center gap-2">
         <h2 class="min-w-0 truncate text-sm font-semibold">{title}</h2>
         <Badge variant={view?.running ? 'default' : 'secondary'}>
-          {view?.ended ? 'Ended' : view?.running ? 'Running' : (detail?.session.status ?? '…')}
+          {ended ? 'Ended' : view?.running ? 'Running' : (detail?.session.status ?? '…')}
         </Badge>
         {#if detail}
           <span class="hidden shrink-0 text-xs text-muted-foreground sm:inline">
@@ -227,7 +229,7 @@
             <TabsTrigger value="timeline" class="px-2.5 text-xs">Timeline</TabsTrigger>
           </TabsList>
         </Tabs>
-        {#if view && !view.ended}
+        {#if view && !ended}
           <Button size="sm" variant="outline" onclick={handleCancel}>End run</Button>
         {/if}
       </div>
@@ -265,7 +267,7 @@
     <div class="divider-edge-t flex shrink-0 items-end gap-2 p-3">
       <Textarea
         bind:value={draft}
-        placeholder={view?.ended ? 'Send a message to resume…' : 'Send a follow-up…'}
+        placeholder={ended ? 'Send a message to resume…' : 'Send a follow-up…'}
         rows={2}
         class="flex-1 resize-none"
         onkeydown={onComposerKeydown}
@@ -276,7 +278,7 @@
         </Button>
       {:else}
         <Button disabled={!draft.trim()} onclick={send}>
-          {view?.ended ? 'Resume' : 'Send'}
+          {ended ? 'Resume' : 'Send'}
         </Button>
       {/if}
     </div>
