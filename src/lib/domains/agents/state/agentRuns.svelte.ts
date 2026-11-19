@@ -174,6 +174,12 @@ class AgentRunsState {
     return (this.logs[sessionId] ?? []).map((item) => item.event);
   }
 
+  /** No live backend process. Imported sessions never emit `exited`, so the
+   *  event view alone can't say; the running ids can. */
+  isEnded(sessionId: string): boolean {
+    return !this.runningIds.has(sessionId) || this.viewFor(sessionId).ended;
+  }
+
   pendingCountFor(sessionId: string): number {
     return this.viewFor(sessionId).pending.length;
   }

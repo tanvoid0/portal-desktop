@@ -1,61 +1,83 @@
-<!-- Title row above the Coder feed: session title, run state, workspace and project picker. -->
+<!-- One-row title bar above a coder feed, shared by every provider: title, run state, meta,
+     chips and (when `onProjectSelect` is given) the project picker. Plain props only. -->
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { Button } from '$lib/components/ui/button';
   import FolderOpen from '~icons/fa6-solid/folder-open';
   import PanelLeftOpen from '~icons/fa6-solid/table-columns';
   import ArrowLeft from '~icons/fa6-solid/arrow-left';
-  import { coderSession } from '../state/coderSession.svelte.js';
-  import type { CoderThread } from '../types.js';
   import CoderProjectSelector from './CoderProjectSelector.svelte';
 
   interface Props {
-    thread: CoderThread | null | undefined;
-    parentCoordinatorId: string | null | undefined;
-    running: boolean;
-    queuedCount: number;
-    workspaceName: string;
-    onOpenSessions: () => void;
-    onBackToCoordinator: () => void;
-    onProjectSelect: (path: string, projectId?: string) => void;
+    title: string;
+    /** Sub-agent breadcrumb prefix, with the way back to its coordinator. */
+    subAgent?: boolean;
+    running?: boolean;
+    /** Replaces the default "Running" label next to the status dot. */
+    statusLabel?: string;
+    queuedCount?: number;
+    /** Quiet secondary text, e.g. backend · model. */
+    meta?: string;
+    /** Total spend, shown as quiet meta. */
+    costUsd?: number | null;
+    workspaceRoot?: string;
+    workspaceName?: string;
+    /** Extra clickable chips (project / task links). */
+    chips?: Snippet;
+    onOpenSessions?: () => void;
+    onBackToCoordinator?: () => void;
+    /** Present = the project is pickable here (locked via `projectLocked`). */
+    onProjectSelect?: (path: string, projectId?: string) => void;
+    projectLocked?: boolean;
   }
 
   let {
-    thread,
-    parentCoordinatorId,
-    running,
-    queuedCount,
-    workspaceName,
+    title,
+    subAgent = false,
+    running = false,
+    statusLabel,
+    queuedCount = 0,
+    meta,
+    costUsd = null,
+    workspaceRoot = $bindable(''),
+    workspaceName = '',
+    chips,
     onOpenSessions,
     onBackToCoordinator,
     onProjectSelect,
+    projectLocked = false,
   }: Props = $props();
+
+  const label = $derived(statusLabel ?? (running ? 'Running' : ''));
 </script>
 
 <div
-  class="divider-edge-b divider-edge-full flex shrink-0 flex-wrap items-center justify-between gap-2 bg-background px-4 py-2.5"
+  class="divider-edge-b divider-edge-full flex shrink-0 items-center gap-2 bg-background px-4 py-2.5"
 >
   <div class="flex min-w-0 flex-1 items-center gap-2">
-    <Button
-      size="icon"
-      variant="ghost"
-      class="h-8 w-8 shrink-0 md:hidden"
-      title="Sessions"
-      onclick={onOpenSessions}
-    >
-      <PanelLeftOpen class="h-4 w-4" />
-    </Button>
-    <h2 class="truncate text-sm font-semibold">
-      {#if thread?.thread_kind === 'sub-agent' && parentCoordinatorId}
+    {#if onOpenSessions}
+      <Button
+        size="icon"
+        variant="ghost"
+        class="h-8 w-8 shrink-0 md:hidden"
+        title="Sessions"
+        onclick={onOpenSessions}
+      >
+        <PanelLeftOpen class="h-4 w-4" />
+      </Button>
+    {/if}
+    <h2 class="min-w-0 truncate text-sm font-semibold">
+      {#if subAgent}
         <span class="text-muted-foreground">Sub-agent</span>
         <span class="mx-1 text-muted-foreground">/</span>
       {/if}
-      {thread?.title || 'New session'}
+      {title}
     </h2>
-    {#if thread?.thread_kind === 'sub-agent' && parentCoordinatorId}
+    {#if subAgent && onBackToCoordinator}
       <Button
         size="sm"
         variant="ghost"
-        class="h-7 gap-1 text-xs"
+        class="h-7 shrink-0 gap-1 text-xs"
         title="Back to coordinator"
         onclick={onBackToCoordinator}
       >
@@ -63,30 +85,49 @@
         Coordinator
       </Button>
     {/if}
-    {#if running}
-      <span class="flex items-center gap-1 text-xs text-primary">
-        <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-primary"></span>
-        Running
+    {#if label}
+      <span class="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+        <span
+          class={[
+            'h-1.5 w-1.5 rounded-full',
+            running ? 'animate-pulse bg-primary' : 'bg-muted-foreground/50',
+          ]}
+        ></span>
+        {label}
       </span>
     {/if}
     {#if queuedCount > 0}
-      <span class="text-xs text-muted-foreground">
-        {queuedCount} queued
+      <span class="shrink-0 text-xs text-muted-foreground">{queuedCount} queued</span>
+    {/if}
+    {#if meta}
+      <span class="hidden min-w-0 shrink truncate text-xs text-muted-foreground sm:inline">
+        {meta}
       </span>
     {/if}
-    {#if coderSession.workspaceRoot}
-      <span class="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
-        <FolderOpen class="h-3 w-3" />
+    {#if costUsd != null}
+      <span class="shrink-0 text-xs text-muted-foreground tabular-nums">
+        ${costUsd.toFixed(4)}
+      </span>
+    {/if}
+    {#if workspaceRoot && !onProjectSelect}
+      <span
+        class="hidden min-w-0 shrink items-center gap-1 text-xs text-muted-foreground sm:flex"
+        title={workspaceRoot}
+      >
+        <FolderOpen class="h-3 w-3 shrink-0" />
         <span class="max-w-[200px] truncate">{workspaceName}</span>
       </span>
     {/if}
+    {@render chips?.()}
   </div>
 
-  <div class="flex w-full min-w-0 items-center gap-1.5 sm:w-auto sm:max-w-md sm:shrink">
-    <CoderProjectSelector
-      bind:value={coderSession.workspaceRoot}
-      disabled={!!thread}
-      onSelect={onProjectSelect}
-    />
-  </div>
+  {#if onProjectSelect}
+    <div class="flex w-44 min-w-0 shrink items-center gap-1.5 sm:w-64">
+      <CoderProjectSelector
+        bind:value={workspaceRoot}
+        disabled={projectLocked}
+        onSelect={onProjectSelect}
+      />
+    </div>
+  {/if}
 </div>

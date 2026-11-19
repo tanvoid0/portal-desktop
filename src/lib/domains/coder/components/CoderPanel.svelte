@@ -73,14 +73,16 @@
 
 {#snippet header()}
   <CoderSessionHeader
-    thread={p.thread}
-    parentCoordinatorId={p.parentCoordinatorId}
+    title={p.thread?.title || 'New session'}
+    subAgent={p.thread?.thread_kind === 'sub-agent' && !!p.parentCoordinatorId}
     running={p.running}
     queuedCount={p.queuedMessages.length}
+    bind:workspaceRoot={coderSession.workspaceRoot}
     workspaceName={p.workspaceName}
     onOpenSessions={() => (p.sessionsPanelOpen = true)}
     onBackToCoordinator={() => void p.backToCoordinator()}
     onProjectSelect={p.handleProjectSelect}
+    projectLocked={!!p.thread}
   />
 {/snippet}
 

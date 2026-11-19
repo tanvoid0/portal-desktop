@@ -19,6 +19,8 @@
   import { page } from '$app/state';
   import { afterNavigate, replaceState } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
+  import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+  import { toast } from '$lib/utils/toast';
   import AgentSessionSidebar from './AgentSessionSidebar.svelte';
   import PanelRightOpen from '~icons/fa6-solid/table-columns';
   import AgentSessionPanel from './AgentSessionPanel.svelte';
@@ -42,6 +44,7 @@
 
   const caps = $derived(agentCapabilities(backendId));
   let sidebarOpen = $state(false);
+  let feedView = $state<'transcript' | 'timeline'>('transcript');
   let prefillCwd = $state<string | undefined>(page.url.searchParams.get('cwd') ?? undefined);
   let prefillPrompt = $state<string | undefined>(undefined);
   let prefillTaskId = $state<string | null>(null);
@@ -106,7 +109,7 @@
   });
 
   $effect(() => {
-    if (!cwd) return;
+    if (!cwd && !focusedId) return;
     aiTopbar.actions = topbarActions;
     return () => {
       aiTopbar.actions = null;
@@ -137,21 +140,42 @@
     prefillTaskId = null;
     syncUrl(null);
   }
+  async function endRun() {
+    if (!focusedId) return;
+    try {
+      await agentRuns.cancel(focusedId);
+    } catch (e) {
+      toast.error(String(e));
+    }
+  }
 </script>
 
 {#snippet topbarActions()}
-  <Button
-    size="sm"
-    variant={coderWorkspaceStore.sidebarOpen ? 'secondary' : 'ghost'}
-    class="h-8 gap-1"
-    title="Workspace sidebar"
-    aria-label="Workspace sidebar"
-    onclick={() => {
-      coderWorkspaceStore.sidebarOpen = !coderWorkspaceStore.sidebarOpen;
-    }}
-  >
-    <PanelRightOpen class="h-3.5 w-3.5" />
-  </Button>
+  {#if focusedId && caps.timeline}
+    <Tabs value={feedView} onValueChange={(v) => (feedView = v as typeof feedView)}>
+      <TabsList class="h-8">
+        <TabsTrigger value="transcript" class="px-2.5 text-xs">Transcript</TabsTrigger>
+        <TabsTrigger value="timeline" class="px-2.5 text-xs">Timeline</TabsTrigger>
+      </TabsList>
+    </Tabs>
+  {/if}
+  {#if focusedId && caps.endRun && !agentRuns.isEnded(focusedId)}
+    <Button size="sm" variant="outline" class="h-8" onclick={endRun}>End run</Button>
+  {/if}
+  {#if cwd}
+    <Button
+      size="sm"
+      variant={coderWorkspaceStore.sidebarOpen ? 'secondary' : 'ghost'}
+      class="h-8 gap-1"
+      title="Workspace sidebar"
+      aria-label="Workspace sidebar"
+      onclick={() => {
+        coderWorkspaceStore.sidebarOpen = !coderWorkspaceStore.sidebarOpen;
+      }}
+    >
+      <PanelRightOpen class="h-3.5 w-3.5" />
+    </Button>
+  {/if}
 {/snippet}
 
 {#snippet sessions()}
@@ -165,6 +189,7 @@
     initialCwd={prefillCwd}
     initialPrompt={prefillPrompt}
     taskId={prefillTaskId}
+    bind:feedView
     onStarted={(id) => syncUrl(id)}
   />
 {/snippet}

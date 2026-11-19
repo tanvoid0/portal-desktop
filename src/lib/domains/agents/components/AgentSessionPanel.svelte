@@ -6,12 +6,11 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
   import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
-  import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { PageContainer, PageLoading, PageError } from '$lib/components/shell';
   import CoderFeed from '$lib/domains/coder/components/CoderFeed.svelte';
   import ApprovalBanner from '$lib/domains/coder/components/ApprovalBanner.svelte';
+  import CoderSessionHeader from '$lib/domains/coder/components/CoderSessionHeader.svelte';
   import CoderComposer from '$lib/domains/coder/components/CoderComposer.svelte';
   import CoderEmptyHero from '$lib/domains/coder/components/CoderEmptyHero.svelte';
   import CoderProjectSelector from '$lib/domains/coder/components/CoderProjectSelector.svelte';
@@ -34,6 +33,8 @@
     initialCwd?: string;
     initialPrompt?: string;
     taskId?: string | null;
+    /** Transcript vs timeline; the toggle lives in the AI topbar, owned by AgentsWorkspace. */
+    feedView?: 'transcript' | 'timeline';
     onStarted: (id: string) => void;
   }
 
@@ -43,6 +44,7 @@
     initialCwd,
     initialPrompt,
     taskId = null,
+    feedView = $bindable('transcript'),
     onStarted,
   }: Props = $props();
 
@@ -58,7 +60,6 @@
   // Launch settings for a new run; the model is fixed once the run starts (QA-085).
   let cwd = $state(initialCwd ?? '');
   let modelName = $state('');
-  let timelineView = $state<'transcript' | 'timeline'>('transcript');
   let scrollViewport = $state<HTMLElement | null>(null);
   let pinnedToBottom = $state(true);
 
@@ -71,15 +72,14 @@
   $effect(() => {
     draft = sessionId ? '' : (initialPrompt ?? '');
     if (!sessionId && initialCwd) cwd = initialCwd;
-    timelineView = 'transcript';
+    feedView = 'transcript';
   });
 
   const caps = $derived(agentCapabilities(backendId));
   const view = $derived(sessionId ? agentRuns.viewFor(sessionId) : null);
   const detail = $derived(sessionDetailQuery.data ?? null);
   const title = $derived(detail?.session.title || detail?.session.backend_id || 'Session');
-  // Imported sessions never emit `exited`, so the view alone says "not ended".
-  const ended = $derived(!!sessionId && (!!view?.ended || !agentRuns.runningIds.has(sessionId)));
+  const ended = $derived(!!sessionId && agentRuns.isEnded(sessionId));
   const firstPending = $derived(view?.pending[0] ?? null);
   const extraPending = $derived(view?.pending.slice(1) ?? []);
 
@@ -157,15 +157,6 @@
       toast.error(String(e));
     }
   }
-
-  async function handleCancel() {
-    if (!sessionId) return;
-    try {
-      await agentRuns.cancel(sessionId);
-    } catch (e) {
-      toast.error(String(e));
-    }
-  }
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -229,24 +220,18 @@
       {/if}
     </div>
   {:else}
-    <div
-      class="divider-edge-b flex shrink-0 flex-wrap items-center justify-between gap-2 px-3 py-2"
+    <CoderSessionHeader
+      {title}
+      running={view?.running ?? false}
+      statusLabel={ended ? 'Ended' : view?.running ? 'Running' : (detail?.session.status ?? '…')}
+      meta={detail
+        ? `${detail.session.backend_id}${detail.session.model ? ` · ${detail.session.model}` : ''}`
+        : undefined}
+      costUsd={caps.cost ? (view?.totalCostUsd ?? null) : null}
+      workspaceRoot={detail?.session.cwd ?? ''}
+      workspaceName={detail?.session.cwd.split(/[\\/]/).filter(Boolean).pop() ?? ''}
     >
-      <div class="flex min-w-0 flex-1 items-center gap-2">
-        <h2 class="min-w-0 truncate text-sm font-semibold">{title}</h2>
-        <Badge variant={view?.running ? 'default' : 'secondary'}>
-          {ended ? 'Ended' : view?.running ? 'Running' : (detail?.session.status ?? '…')}
-        </Badge>
-        {#if detail}
-          <span class="hidden shrink-0 text-xs text-muted-foreground sm:inline">
-            {detail.session.backend_id}{detail.session.model ? ` · ${detail.session.model}` : ''}
-          </span>
-        {/if}
-        {#if view?.totalCostUsd != null}
-          <span class="shrink-0 text-xs text-muted-foreground tabular-nums">
-            ${view.totalCostUsd.toFixed(4)}
-          </span>
-        {/if}
+      {#snippet chips()}
         {#if projectMatch}
           <Badge
             variant="outline"
@@ -255,39 +240,20 @@
           >
             {projectMatch.label}
           </Badge>
-        {:else if detail}
-          <span
-            class="hidden max-w-[12rem] shrink-0 truncate text-xs text-muted-foreground sm:inline"
-            title={detail.session.cwd}
-          >
-            {detail.session.cwd}
-          </span>
         {/if}
         {#if taskQuery.data}
           <Badge
             variant="outline"
-            class="max-w-[12rem] shrink-0 cursor-pointer truncate text-xs hover:bg-accent"
+            class="max-w-[12rem] min-w-0 shrink cursor-pointer truncate text-xs hover:bg-accent"
             onclick={() => goto(`/tasks/${taskQuery.data!.id}`)}
           >
             {taskQuery.data.title}
           </Badge>
         {/if}
-      </div>
+      {/snippet}
+    </CoderSessionHeader>
 
-      <div class="flex shrink-0 items-center gap-2">
-        <Tabs value={timelineView} onValueChange={(v) => (timelineView = v as typeof timelineView)}>
-          <TabsList class="h-8">
-            <TabsTrigger value="transcript" class="px-2.5 text-xs">Transcript</TabsTrigger>
-            <TabsTrigger value="timeline" class="px-2.5 text-xs">Timeline</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        {#if view && !ended}
-          <Button size="sm" variant="outline" onclick={handleCancel}>End run</Button>
-        {/if}
-      </div>
-    </div>
-
-    {#if timelineView === 'timeline'}
+    {#if feedView === 'timeline'}
       <ScrollArea class="min-h-0 flex-1">
         <PageContainer variant="chat" class="py-4">
           <AgentSessionTimeline events={detail?.events ?? []} />
