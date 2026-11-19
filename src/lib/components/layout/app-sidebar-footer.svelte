@@ -6,6 +6,7 @@
   import SidebarTooltip from '$lib/components/shell/sidebar-tooltip.svelte';
   import { isMobileShell } from '$lib/domains/mobile/shell';
   import { mobileConnection } from '$lib/domains/mobile/connection.svelte';
+  import HostStats from './host-stats.svelte';
   import Gear from '~icons/fa6-solid/gear';
   import Unplug from '~icons/fa6-solid/link-slash';
 </script>
@@ -15,6 +16,9 @@
 <div
   class="divider-edge-t divider-edge-full divider-edge-sidebar flex-shrink-0 p-4 group-data-[collapsible=icon]:p-2"
 >
+  {#if !isMobileShell}
+    <HostStats />
+  {/if}
   <div
     class="flex items-center justify-between gap-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1"
   >

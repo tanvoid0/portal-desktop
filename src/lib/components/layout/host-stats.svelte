@@ -36,9 +36,7 @@
 </script>
 
 {#if stats}
-  <div
-    class="divider-edge-t divider-edge-full flex shrink-0 items-center justify-center gap-1.5 px-3 py-1.5"
-  >
+  <div class="mb-2 flex items-center justify-center gap-1.5 group-data-[collapsible=icon]:hidden">
     <span
       class="inline-flex items-center gap-1 rounded-md bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground tabular-nums"
       title={memoryTitle}

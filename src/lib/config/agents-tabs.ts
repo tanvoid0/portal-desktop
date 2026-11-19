@@ -7,6 +7,11 @@ export function agentTabPath(backendId: string = DEFAULT_AGENT_BACKEND): string 
   return `${AGENT_TAB_BASE}/${backendId}`;
 }
 
+/** Shareable deep link to one session of one provider; `portal` is Portal's own coder. */
+export function sessionPath(backendId: string, sessionId: string): string {
+  return `${AGENT_TAB_BASE}/${backendId}/${encodeURIComponent(sessionId)}`;
+}
+
 export interface EngineTab {
   id: string;
   label: string;

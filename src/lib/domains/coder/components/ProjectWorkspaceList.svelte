@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { open } from '@tauri-apps/plugin-dialog';
   import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
   import { Button } from '$lib/components/ui/button';
@@ -157,6 +157,21 @@
     return sortThreadsForWorkspace(scoped, filters.sort as SessionSortKey, runningThreadIds);
   }
 
+  // Follow the open conversation: expand its workspace, then scroll its row into view.
+  // Re-runs when the list changes too, so a deep link scrolls once threads have loaded.
+  $effect(() => {
+    const id = selectedThreadId;
+    if (!id) return;
+    const ws = threads.find((t) => t.id === id)?.workspace_root;
+    if (ws && ui.showAllWorkspaces && !ui.isExpanded(ws)) ui.toggleExpanded(ws);
+    void tick().then(() => {
+      const el = listEl?.querySelector(`[data-session-id="${CSS.escape(id)}"]`);
+      el?.scrollIntoView({ block: 'nearest' });
+    });
+  });
+
+  let listEl = $state<HTMLElement | null>(null);
+
   const showLoading = $derived(loading && threads.length === 0 && projectsLoading);
 </script>
 
@@ -203,7 +218,7 @@
   {/if}
 
   <ScrollArea class="min-h-0 flex-1">
-    <div class="space-y-0.5 p-2">
+    <div class="space-y-0.5 p-2" bind:this={listEl}>
       {#if showLoading}
         <div class="flex items-center justify-center gap-2 py-6 text-muted-foreground">
           <Loader2 class="h-4 w-4 animate-spin" />

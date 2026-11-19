@@ -1,5 +1,4 @@
 <script lang="ts">
-  import ChevronRight from '~icons/fa6-solid/chevron-right';
   import GitBranch from '~icons/fa6-solid/code-branch';
   import Globe from '~icons/fa6-solid/globe';
   import TerminalIcon from '~icons/fa6-solid/terminal';
@@ -32,22 +31,13 @@
   }: Props = $props();
   const coderWorkspaceStore = useCoderWorkspace();
 
-  const openTabs = $derived.by(() => {
-    coderWorkspaceStore.openTabs;
-    return coderWorkspaceStore.openTabs;
-  });
+  const fileTabs = $derived(coderWorkspaceStore.openTabs.filter((t) => t.panel === 'file'));
 
   const terminalTabs = $derived.by(() => {
     if (!threadId) return [];
     coderTerminalStore.revision;
     return coderTerminalStore.tabsFor(threadId);
   });
-
-  const terminalExpanded = $derived(coderWorkspaceStore.isExpanded('terminal'));
-  const filesExpanded = $derived(coderWorkspaceStore.isExpanded('files'));
-  const browserExpanded = $derived(coderWorkspaceStore.isExpanded('browser'));
-  const changesExpanded = $derived(coderWorkspaceStore.isExpanded('changes'));
-  const gitChangesExpanded = $derived(coderWorkspaceStore.isExpanded('git-changes'));
 
   function createTerminal() {
     if (!threadId || !workspaceRoot) return;
@@ -80,226 +70,107 @@
   });
 </script>
 
-<aside class="divider-edge-l flex w-56 shrink-0 flex-col overflow-hidden bg-muted/20">
-  <div class="divider-edge-b divider-edge-full flex items-center px-2 py-1.5">
-    <span class="text-xs font-medium text-muted-foreground">Workspace</span>
-  </div>
-
-  <div class="min-h-0 flex-1 overflow-y-auto text-sm">
-    {#if openTabs.length > 0}
-      <div class="divider-edge-b divider-edge-full px-2 py-2">
-        <div class="mb-1 px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          Open tabs
-        </div>
-        <ul class="space-y-0.5">
-          {#each openTabs as tab (tab.id)}
-            <li>
-              <Button
-                type="button"
-                variant="ghost"
-                class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1 text-xs {coderWorkspaceStore.activeTabId ===
-                tab.id
-                  ? 'bg-muted text-foreground'
-                  : 'text-muted-foreground hover:bg-muted/60'}"
-                onclick={() => coderWorkspaceStore.selectTab(tab.id)}
-              >
-                {#if tab.panel === 'terminal'}
-                  <TerminalIcon class="h-3.5 w-3.5 shrink-0" />
-                {:else if tab.panel === 'changes'}
-                  <Bot class="h-3.5 w-3.5 shrink-0" />
-                {:else if tab.panel === 'git-changes'}
-                  <GitBranch class="h-3.5 w-3.5 shrink-0" />
-                {:else if tab.panel === 'browser'}
-                  <Globe class="h-3.5 w-3.5 shrink-0" />
-                {:else}
-                  <FileText class="h-3.5 w-3.5 shrink-0" />
-                {/if}
-                <span class="truncate">{tab.label}</span>
-              </Button>
-            </li>
-          {/each}
-        </ul>
-      </div>
+{#snippet row(
+  Icon: typeof Bot,
+  label: string,
+  badge: string | null,
+  badgeClass: string,
+  active: boolean,
+  onclick: () => void
+)}
+  <Button
+    type="button"
+    variant="ghost"
+    class="h-7 w-full justify-start gap-1.5 rounded px-2 text-xs {active
+      ? 'bg-muted text-foreground'
+      : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
+    {onclick}
+  >
+    <Icon class="h-3.5 w-3.5 shrink-0" />
+    <span class="flex-1 truncate text-left">{label}</span>
+    {#if badge}
+      <span class="font-mono text-[11px] {badgeClass}">{badge}</span>
     {/if}
+  </Button>
+{/snippet}
 
-    <div class="px-2 py-2">
-      <div class="mb-1 px-1 text-xs font-medium text-muted-foreground">
-        On {workspaceName || 'workspace'}
-      </div>
+<aside class="divider-edge-l flex w-48 shrink-0 flex-col overflow-hidden bg-muted/20">
+  <div class="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1.5 text-sm">
+    {#if agentChanges}
+      {@render row(
+        Bot,
+        'Agent changes',
+        agentDiffLabel,
+        'text-amber-600 dark:text-amber-400',
+        coderWorkspaceStore.activeTabId === 'changes',
+        () => {
+          coderWorkspaceStore.openChanges();
+          if (threadId) coderSession.refreshChanges(threadId);
+        }
+      )}
+    {/if}
+    {@render row(
+      GitBranch,
+      'Git changes',
+      gitDiffLabel,
+      'text-diff-add-foreground',
+      coderWorkspaceStore.activeTabId === 'git-changes',
+      () => coderWorkspaceStore.openGitChanges()
+    )}
+    {@render row(Globe, 'Browser', null, '', coderWorkspaceStore.activeTabId === 'browser', () =>
+      coderWorkspaceStore.openBrowser()
+    )}
+    {@render row(FileText, 'Files', null, '', coderWorkspaceStore.activeTabId === 'files', () =>
+      coderWorkspaceStore.openFiles()
+    )}
 
-      <!-- Agent changes -->
-      {#if agentChanges}
-        <div class="rounded-md">
-          <Button
-            type="button"
-            variant="ghost"
-            class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
-            onclick={() => {
-              coderWorkspaceStore.expandSection('changes');
-              coderWorkspaceStore.openChanges();
-              if (threadId) coderSession.refreshChanges(threadId);
-            }}
-          >
-            <ChevronRight
-              class="h-3.5 w-3.5 shrink-0 transition-transform {changesExpanded ? 'rotate-90' : ''}"
-            />
-            <Bot class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <span class="flex-1">Agent changes</span>
-            {#if agentDiffLabel}
-              <span class="font-mono text-xs text-amber-600 dark:text-amber-400">
-                {agentDiffLabel}
-              </span>
-            {/if}
-          </Button>
-        </div>
+    {#each fileTabs as tab (tab.id)}
+      {@render row(FileText, tab.label, null, '', coderWorkspaceStore.activeTabId === tab.id, () =>
+        coderWorkspaceStore.selectTab(tab.id)
+      )}
+    {/each}
+
+    <!-- Terminals: always listed, no extra click to reach one -->
+    <div class="flex items-center gap-0.5 pt-1.5">
+      <span
+        class="flex-1 px-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
+      >
+        Terminals
+      </span>
+      {#if threadId}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          class="h-5 w-5 shrink-0 text-muted-foreground"
+          title="New terminal"
+          onclick={createTerminal}
+        >
+          <Plus class="h-3 w-3" />
+        </Button>
       {/if}
-
-      <!-- Git changes -->
-      <div class="rounded-md">
-        <Button
-          type="button"
-          variant="ghost"
-          class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
-          onclick={() => {
-            coderWorkspaceStore.expandSection('git-changes');
-            coderWorkspaceStore.openGitChanges();
-          }}
-        >
-          <ChevronRight
-            class="h-3.5 w-3.5 shrink-0 transition-transform {gitChangesExpanded
-              ? 'rotate-90'
-              : ''}"
-          />
-          <GitBranch class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span class="flex-1">Git changes</span>
-          {#if gitDiffLabel}
-            <span class="font-mono text-xs text-diff-add-foreground">
-              {gitDiffLabel}
-            </span>
-          {/if}
-        </Button>
-      </div>
-
-      <!-- Browser -->
-      <div class="rounded-md">
-        <Button
-          type="button"
-          variant="ghost"
-          class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
-          onclick={() => {
-            coderWorkspaceStore.expandSection('browser');
-            coderWorkspaceStore.openBrowser();
-          }}
-        >
-          <ChevronRight
-            class="h-3.5 w-3.5 shrink-0 transition-transform {browserExpanded ? 'rotate-90' : ''}"
-          />
-          <Globe class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span>Browser</span>
-        </Button>
-      </div>
-
-      <!-- Terminal -->
-      <div class="rounded-md">
-        <Button
-          type="button"
-          variant="ghost"
-          class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
-          onclick={() => {
-            coderWorkspaceStore.toggleSection('terminal');
-            if (terminalTabs.length > 0) {
-              const tab =
-                terminalTabs.find((t) => t.id === coderWorkspaceStore.activeTerminalId()) ??
-                terminalTabs[0];
-              openTerminalTab(tab.id, tab.label);
-            } else if (threadId) {
-              createTerminal();
-            }
-          }}
-        >
-          <ChevronRight
-            class="h-3.5 w-3.5 shrink-0 transition-transform {terminalExpanded ? 'rotate-90' : ''}"
-          />
-          <TerminalIcon class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span class="flex-1">
-            {terminalTabs.length}
-            {terminalTabs.length === 1 ? 'Terminal' : 'Terminals'}
-          </span>
-          {#if threadId}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              class="h-6 w-6 shrink-0 rounded p-0.5 hover:bg-background"
-              title="New terminal"
-              onclick={(e) => {
-                e.stopPropagation();
-                createTerminal();
-              }}
-            >
-              <Plus class="h-3.5 w-3.5" />
-            </Button>
-          {/if}
-        </Button>
-        {#if terminalExpanded}
-          <ul class="divider-edge-l mb-1 ml-6 space-y-0.5 pl-2">
-            {#each terminalTabs as tab (tab.id)}
-              <li>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1 text-xs {coderWorkspaceStore.activeTerminalId() ===
-                  tab.id
-                    ? 'bg-muted text-foreground'
-                    : 'text-muted-foreground hover:bg-muted/60'}"
-                  onclick={() => openTerminalTab(tab.id, tab.label)}
-                >
-                  {#if tab.running}
-                    <span class="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary"></span>
-                  {:else}
-                    <TerminalIcon class="h-3 w-3 shrink-0 opacity-50" />
-                  {/if}
-                  <span class="truncate">{tab.label}</span>
-                </Button>
-              </li>
-            {:else}
-              <li class="px-2 py-1 text-xs text-muted-foreground">
-                {#if threadId}
-                  <Button
-                    type="button"
-                    variant="link"
-                    class="h-auto p-0 text-xs"
-                    onclick={createTerminal}
-                  >
-                    Create terminal
-                  </Button>
-                {:else}
-                  Start a session first
-                {/if}
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </div>
-
-      <!-- Files -->
-      <div class="rounded-md">
-        <Button
-          type="button"
-          variant="ghost"
-          class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
-          onclick={() => {
-            coderWorkspaceStore.expandSection('files');
-            coderWorkspaceStore.openFiles();
-          }}
-        >
-          <ChevronRight
-            class="h-3.5 w-3.5 shrink-0 transition-transform {filesExpanded ? 'rotate-90' : ''}"
-          />
-          <FileText class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span>Files</span>
-        </Button>
-      </div>
     </div>
+    {#each terminalTabs as tab (tab.id)}
+      <Button
+        type="button"
+        variant="ghost"
+        class="h-7 w-full justify-start gap-1.5 rounded px-2 text-xs {coderWorkspaceStore.activeTerminalId() ===
+        tab.id
+          ? 'bg-muted text-foreground'
+          : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
+        onclick={() => openTerminalTab(tab.id, tab.label)}
+      >
+        {#if tab.running}
+          <span class="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary"></span>
+        {:else}
+          <TerminalIcon class="h-3 w-3 shrink-0 opacity-50" />
+        {/if}
+        <span class="truncate">{tab.label}</span>
+      </Button>
+    {:else}
+      <p class="px-2 py-1 text-xs text-muted-foreground">
+        {threadId ? 'None open' : 'Start a session first'}
+      </p>
+    {/each}
   </div>
 </aside>

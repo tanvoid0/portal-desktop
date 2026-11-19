@@ -21,9 +21,9 @@
   }
 </script>
 
-<div class="divider-edge-t divider-edge-full shrink-0 space-y-2 bg-muted/20 px-3 py-2.5">
+<div class="divider-edge-t divider-edge-full shrink-0 space-y-1.5 bg-muted/20 px-3 py-1.5">
   <div class="flex items-center justify-between gap-2">
-    <span class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+    <span class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
       Settings
     </span>
     <div class="flex items-center gap-0.5">

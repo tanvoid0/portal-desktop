@@ -98,19 +98,21 @@
   {#if expanded && threads.length > 0}
     <div class="space-y-1 pt-0.5 pr-1 pb-1 pl-3">
       {#each threads as t (t.id)}
-        <CoderSessionCard
-          thread={t}
-          hideProject
-          onClick={() => onThreadClick?.(t)}
-          onDelete={onDeleteThread}
-          isActive={selectedThreadId === t.id}
-          isRunning={runningThreadIds.has(t.id)}
-          queuedCount={queuedCountFor?.(t.id) ?? 0}
-          subAgentRunning={subAgentSummaryFor?.(t.id).running ?? 0}
-          extraBadges={badgeFor?.(t.id)}
-          {referenceKind}
-          {onLaunchWorkspace}
-        />
+        <div data-session-id={t.id}>
+          <CoderSessionCard
+            thread={t}
+            hideProject
+            onClick={() => onThreadClick?.(t)}
+            onDelete={onDeleteThread}
+            isActive={selectedThreadId === t.id}
+            isRunning={runningThreadIds.has(t.id)}
+            queuedCount={queuedCountFor?.(t.id) ?? 0}
+            subAgentRunning={subAgentSummaryFor?.(t.id).running ?? 0}
+            extraBadges={badgeFor?.(t.id)}
+            {referenceKind}
+            {onLaunchWorkspace}
+          />
+        </div>
       {/each}
     </div>
   {:else if expanded && sessionCount === 0}

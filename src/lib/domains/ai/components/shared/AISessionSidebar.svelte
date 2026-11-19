@@ -7,7 +7,6 @@
   import Plus from '~icons/fa6-solid/plus';
   import Search from '~icons/fa6-solid/magnifying-glass';
   import Loader2 from '~icons/fa6-solid/spinner';
-  import AISidebarStatus from './AISidebarStatus.svelte';
 
   interface Props {
     /** Sidebar name, shown on its own row above the search box. */
@@ -141,6 +140,4 @@
   {#if footer}
     {@render footer()}
   {/if}
-
-  <AISidebarStatus />
 </div>
