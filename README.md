@@ -4,21 +4,16 @@ A cross-platform desktop application built with SvelteKit and Tauri — terminal
 
 **Downloads:** [GitHub Releases](https://github.com/tanvoid0/portal-desktop/releases) (Windows, macOS, Linux; auto-update built in)
 
-## Required: Agent Platform
+## AI backend: bundled agent-platformd
 
-All AI features (chat, tasks, documents, Coder, disk analysis) require a running [**agent-platform**](https://github.com/tanvoid0/agent-platform/) instance. Portal Desktop is the client; LLM providers are configured on the platform.
+All AI features (chat, tasks, documents, Coder, disk analysis) run on [**agent-platform**](https://github.com/tanvoid0/agent-platform/). Portal Desktop bundles and manages `agent-platformd` automatically: it starts the daemon on launch (loopback `:18410`, using your existing agent-platform data), attaches if one is already running, and stops it on exit. No second terminal.
 
 ```bash
-# Terminal 1 — AI backend (required)
-git clone https://github.com/tanvoid0/agent-platform.git
-cd agent-platform && cp .env.example .env && pnpm install && pnpm dev:server
-
-# Terminal 2 — Portal Desktop
 git clone https://github.com/tanvoid0/portal-desktop.git
 cd portal-desktop && pnpm install && pnpm tauri:dev
 ```
 
-Then open **AI → Providers** in the app and point at `http://127.0.0.1:18410`. Full setup: [Agent Platform guide](./docs/getting-started/AGENT_PLATFORM.md).
+In dev the daemon is not downloaded: set `AGENT_PLATFORM_DAEMON_EXE` or build `agent-platformd` in a sibling `agent-platform` checkout. Release builds (`pnpm tauri:build`) fetch the pinned daemon via `pnpm fetch:agent-platformd`. Dev builds keep their own data in `com.tanvoid0.agentplatform.dev`; set `AGENT_PLATFORM_APP_DIR` to relocate it. Setup notes: [Agent Platform guide](./docs/getting-started/AGENT_PLATFORM.md).
 
 ## 🚀 Quick Start
 
@@ -26,7 +21,6 @@ Then open **AI → Providers** in the app and point at `http://127.0.0.1:18410`.
 
 This project requires native compilation for some dependencies. Please ensure you have the required build tools installed:
 
-- **[agent-platform](https://github.com/tanvoid0/agent-platform/)** — running locally or via Docker (see above)
 - **Windows**: Python 3.x + Visual Studio Build Tools
 - **macOS**: Xcode Command Line Tools + Python 3.x
 - **Linux**: build-essential + Python 3.x

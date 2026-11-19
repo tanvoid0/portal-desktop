@@ -168,14 +168,13 @@ pub async fn ai_platform_health(
     Ok(platform_admin::platform_health(&settings_service).await)
 }
 
-/// Launch the installed Agent Platform app (which owns the agent-platformd
-/// child) if nothing is already answering on the platform port. Fails with an
-/// `install_url` when the app is not installed.
+/// Attach to the agent-platform daemon on the platform port, or spawn the
+/// bundled `agent-platformd` sidecar if nothing is there.
 #[portal_rpc_macro::rpc(local_only)]
 pub async fn start_agent_platform(
     settings_service: State<'_, Arc<AISettingsService>>,
 ) -> Result<StartResult, String> {
-    Ok(platform_admin::start_platform(&settings_service).await)
+    Ok(platform_admin::start_platform(&settings_service, super::platform_sidecar::spawn).await)
 }
 
 /// Mint a workspace token with the master key and save it. The key is used for

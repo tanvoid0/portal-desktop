@@ -1,25 +1,25 @@
 //! Health, start and pairing for the local agent-platform server.
 //!
-//! Starting it means starting the **Agent Platform app**, which owns the
-//! `agent-platformd` child — the same way Portal starts Docker Desktop and not
-//! `dockerd`. See [`exe_path`] for why Portal must not spawn the daemon itself.
+//! Portal owns `agent-platformd` directly: it spawns the bundled sidecar with
+//! the user's existing agent-platform data (see [`super::platform_daemon`]) and
+//! kills it on exit. The old arrangement launched the Agent Platform *app* and
+//! refused to spawn the daemon, because a bare spawn serves the wrong database
+//! with no key; [`super::platform_daemon::daemon_env`] is what makes a direct
+//! spawn safe. The actual `Child` lives in the host (`src-tauri`), which passes a
+//! spawn callback to [`start_platform`].
 //!
 //! Secrets: the master key and the minted token only ever travel in an
 //! `Authorization` header or the settings file. No `detail` string or error here
 //! interpolates a reqwest error, response body, header or either secret.
 
 use super::platform_config::{DEFAULT_PLATFORM_BASE, DESKTOP_CLIENT_ID};
+use super::platform_daemon::{self as daemon, Action, PortProbe};
 use super::providers::{ProviderConfig, ProviderType};
 use super::services::AISettingsService;
-use crate::process_ext::NoWindowExt;
 use reqwest::{Client, StatusCode};
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::path::PathBuf;
 use std::time::Duration;
-
-/// Where to get the app when [`exe_path`] finds nothing installed.
-pub const RELEASES_URL: &str = "https://github.com/tanvoid0/agent-platform/releases/latest";
 
 #[derive(Debug, Clone, Serialize)]
 pub struct PlatformHealth {
@@ -28,7 +28,7 @@ pub struct PlatformHealth {
     pub auth_required: bool,
     pub authenticated: bool,
     pub detail: Option<String>,
-    /// Whether the Agent Platform app is installed, independent of `reachable`.
+    /// Whether the `agent-platformd` binary is present, independent of `reachable`.
     pub installed: bool,
 }
 
@@ -38,8 +38,6 @@ pub struct StartResult {
     pub already_running: bool,
     pub pid: Option<u32>,
     pub detail: String,
-    /// Set instead of launching when the app is not installed.
-    pub install_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -89,7 +87,7 @@ async fn probe(base: &str, token: Option<&str>) -> PlatformHealth {
         auth_required: false,
         authenticated: false,
         detail: None,
-        installed: is_installed(),
+        installed: daemon::daemon_exe().is_some(),
     };
     match get(&client, &format!("{base}/health"), 3).send().await {
         Ok(r) => {
@@ -132,79 +130,76 @@ pub async fn platform_health(settings: &AISettingsService) -> PlatformHealth {
     probe(&base_of(&c), token).await
 }
 
-/// The **app**, not the daemon: `AGENT_PLATFORM_APP_EXE` override, else
-/// `%LOCALAPPDATA%\Programs\agent-platform\agent-platform.exe`.
-///
-/// Portal must never spawn `agent-platformd` itself. The daemon takes its
-/// database path, master key, workspace root, media and config dirs entirely
-/// from the environment; spawned bare it falls back to its own defaults —
-/// `data/agent_platform.db` resolved against *our* working directory, and no
-/// master key at all, which is an open server. It then binds the same fixed
-/// port, so the app finds it, reads it as one of ours and attaches to it as a
-/// pure client — now serving a database that is not the user's.
-///
-/// The app is the only thing that knows that environment. It also holds the
-/// single-instance lock and adopts a daemon already on the port instead of
-/// starting a second one, which is exactly what we want from here.
-fn exe_path() -> Option<PathBuf> {
-    if let Some(p) = std::env::var_os("AGENT_PLATFORM_APP_EXE") {
-        return Some(PathBuf::from(p));
+/// `/health` reachable, then does the daemon accept *our* master key. A status
+/// request with no bearer answering 200 is an open (pre-ADR-0019) daemon, still
+/// treated as ours, matching agent-platform's own `port_owner`.
+async fn probe_port(base: &str, key: &str) -> PortProbe {
+    let client = Client::new();
+    if !matches!(get(&client, &format!("{base}/health"), 3).send().await, Ok(r) if r.status().is_success())
+    {
+        return PortProbe::Unreachable;
     }
-    let local = std::env::var_os("LOCALAPPDATA")?;
-    Some(PathBuf::from(local).join("Programs/agent-platform/agent-platform.exe"))
+    let status = format!("{base}/api/v1/system/status");
+    if matches!(get(&client, &status, 5).send().await, Ok(r) if r.status().is_success()) {
+        return PortProbe::AcceptsKey;
+    }
+    match get(&client, &status, 5).bearer_auth(key).send().await {
+        Ok(r) if r.status().is_success() => PortProbe::AcceptsKey,
+        _ => PortProbe::RejectsKey,
+    }
 }
 
-fn is_installed() -> bool {
-    exe_path().filter(|p| p.is_file()).is_some()
-}
-
-pub async fn start_platform(settings: &AISettingsService) -> StartResult {
-    let fail = |detail: String| StartResult {
+/// Attach to a healthy daemon that accepts our key, report (never adopt) a
+/// foreign one, otherwise spawn through `spawn` (which returns the child's pid).
+pub async fn start_platform(
+    settings: &AISettingsService,
+    spawn: impl FnOnce() -> Result<u32, String>,
+) -> StartResult {
+    let fail = |detail: &str, pid: Option<u32>| StartResult {
         started: false,
         already_running: false,
-        pid: None,
-        detail,
-        install_url: None,
+        pid,
+        detail: detail.to_string(),
     };
     let base = base_of(&config(settings));
-    if probe(&base, None).await.reachable {
-        return StartResult {
-            started: false,
-            already_running: true,
-            pid: None,
-            detail: "agent-platform is already running".to_string(),
-            install_url: None,
-        };
+    // A user-configured remote/other-port platform is not ours to start.
+    if base != DEFAULT_PLATFORM_BASE {
+        return fail(
+            "agent-platform is configured at a custom address; start it yourself",
+            None,
+        );
     }
-
-    let Some(exe) = exe_path().filter(|p| p.is_file()) else {
-        return StartResult {
-            started: false,
-            already_running: false,
-            pid: None,
-            detail: "The Agent Platform app is not installed".to_string(),
-            install_url: Some(RELEASES_URL.to_string()),
-        };
+    let key = match daemon::load_or_create_key(&daemon::data_dir()) {
+        Ok(k) => k,
+        Err(_) => {
+            return fail(
+                "Could not read or create the agent-platform master key",
+                None,
+            )
+        }
     };
-
-    let mut cmd = std::process::Command::new(&exe);
-    // Tray-first, like Docker Desktop: the app comes up minimized with its
-    // server running rather than stealing focus from Portal.
-    cmd.arg("--minimized")
-        .no_window()
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null());
-    let child = match cmd.spawn() {
-        Ok(c) => c,
-        Err(e) => return fail(format!("Could not launch {}: {}", exe.display(), e.kind())),
+    match daemon::decide(probe_port(&base, &key).await) {
+        Action::Attach => {
+            return StartResult {
+                started: false,
+                already_running: true,
+                pid: None,
+                detail: "agent-platform is already running".to_string(),
+            }
+        }
+        Action::Foreign => {
+            return fail(
+                "Port 18410 is held by an agent-platform server that rejects this install's key; not starting a second one",
+                None,
+            )
+        }
+        Action::Spawn => {}
+    }
+    let pid = match spawn() {
+        Ok(pid) => pid,
+        Err(detail) => return fail(&detail, None),
     };
-    let pid = child.id();
-    // Detached: dropping a std Child neither kills nor waits on it.
-    drop(child);
-
-    // The app has to boot, take its single-instance lock, then start the daemon,
-    // which runs migrations on a first launch.
+    // First launch runs migrations, so allow a slow boot.
     for _ in 0..120 {
         tokio::time::sleep(Duration::from_millis(500)).await;
         if probe(&base, None).await.reachable {
@@ -212,21 +207,14 @@ pub async fn start_platform(settings: &AISettingsService) -> StartResult {
                 started: true,
                 already_running: false,
                 pid: Some(pid),
-                detail: format!("Started {}", exe.display()),
-                install_url: None,
+                detail: "Started agent-platformd".to_string(),
             };
         }
     }
-    StartResult {
-        started: false,
-        already_running: false,
-        pid: Some(pid),
-        detail: format!(
-            "Launched {} but /health did not answer within 60s",
-            exe.display()
-        ),
-        install_url: None,
-    }
+    fail(
+        "Started agent-platformd but /health did not answer within 60s",
+        Some(pid),
+    )
 }
 
 /// First workspace id from `{"workspaces":[{"id":..}]}` (or a bare array).

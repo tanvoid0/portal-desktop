@@ -50,6 +50,19 @@ runs:
       shell: bash
       run: pnpm install --frozen-lockfile
 
+    # Fetch the agent-platformd daemon as a Tauri externalBin before the build.
+    # The matrix `args` carries `--target <triple>` for the macOS jobs; derive it
+    # so the binary is named for the build target (no `--target` on win/linux ⇒ the
+    # script falls back to the rustc host triple, which equals the build target).
+    - name: Fetch agent-platformd sidecar
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        triple=$(printf '%s' '${{ inputs.args }}' | sed -n 's/.*--target \([^ ]*\).*/\1/p')
+        [ -n "$triple" ] && export TAURI_TARGET_TRIPLE="$triple"
+        node scripts/fetch-agent-platformd.mjs
+
     - name: Build and release
       uses: tauri-apps/tauri-action@v0
       env:
@@ -86,4 +99,7 @@ runs:
         uploadUpdaterJson: true
         uploadUpdaterSignatures: true
         updaterJsonPreferNsis: true
-        args: ${{ inputs.args }}
+        # Merge the sidecar config (bundle.externalBin) only at build time; it is
+        # kept out of tauri.conf.json so cargo check / tauri:dev don't require a
+        # fetched binary. The fetch step above dropped it into src-tauri/binaries/.
+        args: ${{ inputs.args }} --config src-tauri/tauri.sidecar.conf.json

@@ -9,3 +9,5 @@
 pub use portal_core::domains::ai::*;
 
 pub mod commands;
+
+pub mod platform_sidecar;

@@ -96,3 +96,6 @@ src-tauri/.tauri-instance-*.conf.json
 # QA run artifacts — screenshots and scratch fixtures, never tracked
 .claude/qa/shots/
 .qa424-src/
+
+# Fetched agent-platformd sidecar (scripts/fetch-agent-platformd.mjs)
+src-tauri/binaries/

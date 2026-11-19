@@ -350,6 +350,21 @@ pub fn run() {
             log_info!("Tauri", "IDE storage initialized");
             log_info!("Tauri", "Deployment service initialized");
             log_info!("Tauri", "Pipeline services initialized");
+            // Own agent-platformd: attach to a healthy one or spawn the sidecar.
+            // Not awaited — the UI's health gating covers a slow start.
+            domains::ai::platform_sidecar::init();
+            {
+                let ai_settings = app.state::<Arc<AISettingsService>>().inner().clone();
+                tauri::async_runtime::spawn(async move {
+                    let r = domains::ai::platform_admin::start_platform(
+                        &ai_settings,
+                        domains::ai::platform_sidecar::spawn,
+                    )
+                    .await;
+                    log_info!("Tauri", "agent-platformd: {}", r.detail);
+                });
+            }
+
             log_info!("Tauri", "Setup function completed");
 
             Ok(())
@@ -954,6 +969,12 @@ pub fn run() {
             domains::agents::agents_get_session,
             domains::agents::agents_delete_session,
         ])
-        .run(context)
-        .expect("error while running tauri application");
+        .build(context)
+        .expect("error while building tauri application")
+        .run(|_app, event| {
+            // Kills only a daemon we spawned; an attached one is left running.
+            if let tauri::RunEvent::Exit = event {
+                domains::ai::platform_sidecar::stop();
+            }
+        });
 }
