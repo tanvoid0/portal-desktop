@@ -46,24 +46,29 @@ export function appendFolded(log: AgentEventSeq[], item: AgentEventSeq): AgentEv
 export function detailToLog(
   detail: Pick<AgentSessionDetail, 'events' | 'messages'> | null | undefined
 ): AgentEventSeq[] {
+  // Messages and events share one seq counter (service.rs `next_seq`). An
+  // assistant `Message` is persisted to both tables at the same seq; user turns
+  // (the seq-0 prompt, follow-ups) and imported transcripts exist only as
+  // messages. So: every event, plus every message with no event at its seq.
+  const events = detail?.events ?? [];
+  const eventSeqs = new Set(events.map((e) => e.seq));
+  const rows: AgentEventSeq[] = [
+    ...events.map((e) => ({ seq: e.seq, event: e.event })),
+    ...(detail?.messages ?? [])
+      .filter((m) => !eventSeqs.has(m.seq))
+      .map((m) => ({
+        seq: m.seq,
+        event: {
+          type: 'message' as const,
+          role: m.role,
+          text: m.text,
+          parent_tool_use_id: m.parent_tool_use_id,
+        },
+      })),
+  ].sort((a, b) => a.seq - b.seq);
   let log: AgentEventSeq[] = [];
-  const events = [...(detail?.events ?? [])].sort((a, b) => a.seq - b.seq);
-  for (const row of events) log = appendFolded(log, { seq: row.seq, event: row.event });
-  // A resumed import has events only past the old messages; keep the earlier history.
-  const firstSeq = events.length ? events[0].seq : Infinity;
-  const messages = [...(detail?.messages ?? [])]
-    .filter((m) => m.seq < firstSeq)
-    .sort((a, b) => a.seq - b.seq);
-  const history: AgentEventSeq[] = messages.map((m) => ({
-    seq: m.seq,
-    event: {
-      type: 'message',
-      role: m.role,
-      text: m.text,
-      parent_tool_use_id: m.parent_tool_use_id,
-    },
-  }));
-  return [...history, ...log];
+  for (const row of rows) log = appendFolded(log, row);
+  return log;
 }
 
 class AgentRunsState {

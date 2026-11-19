@@ -38,6 +38,29 @@ describe('detailToLog resumed import', () => {
     });
     expect(log.map((i) => i.seq)).toEqual([1, 5]);
   });
+
+  it('interleaves user follow-ups (messages only) and dedupes assistant messages mirrored as events', () => {
+    const msg = (id: string, n: number, role: string, text: string) => ({
+      id,
+      seq: n,
+      role,
+      text,
+      parent_tool_use_id: null,
+      created_at: '',
+    });
+    const log = detailToLog({
+      messages: [
+        msg('p', 0, 'user', 'prompt'),
+        msg('a', 2, 'assistant', 'reply'),
+        msg('f', 3, 'user', 'follow-up'),
+      ],
+      events: [
+        { seq: 1, event: { type: 'session_started' } } as never,
+        { seq: 2, event: { type: 'message', role: 'assistant', text: 'reply' } } as never,
+      ],
+    });
+    expect(log.map((i) => i.seq)).toEqual([0, 1, 2, 3]);
+  });
 });
 
 describe('appendFolded', () => {
