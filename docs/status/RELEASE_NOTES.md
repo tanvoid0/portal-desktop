@@ -1,5 +1,17 @@
 # Portal Desktop - Release Notes
 
+## Version 0.19.0
+
+### Highlights
+
+- Feature: Portal and agent sessions share one Coder shell - session list, header, composer and empty state
+- Feature: Coder tool calls render as IDE-style rows from one tool renderer registry
+- Feature: pipeline runs show coloured step logs and a stage tree
+- Fix: imported Claude transcripts render, ended agent sessions resume, and the feed shows follow-ups and the first prompt
+- Change: quieter Coder chrome, tighter type scale, diff and terminal colour tokens
+
+---
+
 ## Version 0.18.0
 
 ### Highlights
