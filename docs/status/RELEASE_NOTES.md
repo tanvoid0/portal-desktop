@@ -1,5 +1,16 @@
 # Portal Desktop - Release Notes
 
+## Version 0.20.0
+
+### Highlights
+
+- Feature: Portal runs agent-platformd as a managed Tauri sidecar - its own lifecycle, no external daemon
+- Feature: Model-ops console for inspecting and operating platform models
+- Feature: Operator Status & Logs settings screen - daemon status cards and a live log viewer
+- Feature: Shareable deep links to coder sessions, with a Copy link context-menu action; host stats in the sidebar footer
+
+---
+
 ## Version 0.19.0
 
 ### Highlights
