@@ -28,6 +28,18 @@ describe('detailToLog', () => {
   });
 });
 
+describe('detailToLog resumed import', () => {
+  it('keeps messages that precede the first event', () => {
+    const log = detailToLog({
+      messages: [
+        { id: 'a', seq: 1, role: 'user', text: 'old', parent_tool_use_id: null, created_at: '' },
+      ],
+      events: [{ seq: 5, event: { type: 'message', role: 'user', text: 'new' } } as never],
+    });
+    expect(log.map((i) => i.seq)).toEqual([1, 5]);
+  });
+});
+
 describe('appendFolded', () => {
   it('folds consecutive text_delta events from the same parent into one', () => {
     let log: AgentEventSeq[] = [];

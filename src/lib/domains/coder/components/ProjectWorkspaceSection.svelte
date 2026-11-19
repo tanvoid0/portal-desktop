@@ -21,6 +21,8 @@
     queuedCountFor?: (threadId: string) => number;
     subAgentSummaryFor?: (threadId: string) => { running: number; total: number };
     badgeFor?: (threadId: string) => SessionCardBadge[];
+    referenceKind?: string;
+    onLaunchWorkspace?: ((thread: CoderThread) => void) | null;
   }
 
   let {
@@ -37,6 +39,8 @@
     queuedCountFor,
     subAgentSummaryFor,
     badgeFor,
+    referenceKind,
+    onLaunchWorkspace,
   }: Props = $props();
 
   const sessionCount = $derived(threads.length);
@@ -104,6 +108,8 @@
           queuedCount={queuedCountFor?.(t.id) ?? 0}
           subAgentRunning={subAgentSummaryFor?.(t.id).running ?? 0}
           extraBadges={badgeFor?.(t.id)}
+          {referenceKind}
+          {onLaunchWorkspace}
         />
       {/each}
     </div>

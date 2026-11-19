@@ -49,9 +49,12 @@ export function detailToLog(
   let log: AgentEventSeq[] = [];
   const events = [...(detail?.events ?? [])].sort((a, b) => a.seq - b.seq);
   for (const row of events) log = appendFolded(log, { seq: row.seq, event: row.event });
-  if (events.length) return log;
-  const messages = [...(detail?.messages ?? [])].sort((a, b) => a.seq - b.seq);
-  return messages.map((m) => ({
+  // A resumed import has events only past the old messages; keep the earlier history.
+  const firstSeq = events.length ? events[0].seq : Infinity;
+  const messages = [...(detail?.messages ?? [])]
+    .filter((m) => m.seq < firstSeq)
+    .sort((a, b) => a.seq - b.seq);
+  const history: AgentEventSeq[] = messages.map((m) => ({
     seq: m.seq,
     event: {
       type: 'message',
@@ -60,6 +63,7 @@ export function detailToLog(
       parent_tool_use_id: m.parent_tool_use_id,
     },
   }));
+  return [...history, ...log];
 }
 
 class AgentRunsState {
@@ -70,6 +74,8 @@ class AgentRunsState {
   private logs = $state<Record<string, AgentEventSeq[]>>({});
   /** Session ids with a live backend process right now. */
   runningIds = $state<Set<string>>(new Set());
+  /** True once `listRunning` answered — before that `runningIds` is empty, not authoritative. */
+  private runningKnown = $state(false);
   /** Handoff slot for "open Agents and pre-fill a new run" from another page
    *  — consumed once by the run page on mount, same pattern as coder's
    *  `pendingPrompt`. */
@@ -92,6 +98,7 @@ class AgentRunsState {
   private async runInit(): Promise<void> {
     try {
       this.runningIds = new Set(await agentsApi.listRunning());
+      this.runningKnown = true;
     } catch (e) {
       console.error('agents: listRunning failed', e);
     }
@@ -177,7 +184,8 @@ class AgentRunsState {
   /** No live backend process. Imported sessions never emit `exited`, so the
    *  event view alone can't say; the running ids can. */
   isEnded(sessionId: string): boolean {
-    return !this.runningIds.has(sessionId) || this.viewFor(sessionId).ended;
+    if (!this.runningKnown) return this.viewFor(sessionId).ended;
+    return !this.runningIds.has(sessionId);
   }
 
   pendingCountFor(sessionId: string): number {

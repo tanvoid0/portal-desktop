@@ -73,6 +73,9 @@
 
     queuedMessages?: string[];
 
+    /** Whether a message sent mid-run queues behind it (else it goes straight to the run). */
+    queue?: boolean;
+
     onRemoveQueued?: (index: number) => void;
 
     class?: string;
@@ -127,6 +130,8 @@
 
     queuedMessages = [],
 
+    queue = true,
+
     onRemoveQueued,
 
     class: className = '',
@@ -148,11 +153,13 @@
 
   const followUpPlaceholder = $derived(
     running
-      ? queuedMessages.length > 0
-        ? `Queue follow-up (${queuedMessages.length} queued)…`
-        : agentMode === 'multitask'
-          ? 'Queue follow-up… (2+ lines spawns parallel agents)'
-          : 'Queue follow-up…'
+      ? !queue
+        ? 'Send follow-up…'
+        : queuedMessages.length > 0
+          ? `Queue follow-up (${queuedMessages.length} queued)…`
+          : agentMode === 'multitask'
+            ? 'Queue follow-up… (2+ lines spawns parallel agents)'
+            : 'Queue follow-up…'
       : agentMode === 'multitask'
         ? 'One task per line (2+ lines), or paste 2+ GitHub issue URLs…'
         : placeholder
@@ -215,7 +222,7 @@
   {canStop}
   {rows}
   submitOn="modifier-enter"
-  queueSend={true}
+  queueSend={queue}
   onModeCycle={cycleAgentMode}
   class={className}
 >

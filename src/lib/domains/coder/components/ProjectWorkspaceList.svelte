@@ -9,7 +9,7 @@
   import { projectService } from '$lib/domains/projects';
   import type { Project } from '$lib/domains/projects';
   import ProjectWorkspaceSection from './ProjectWorkspaceSection.svelte';
-  import { coderUi } from '../state/coderUi.svelte.js';
+  import { coderUi, type CoderUiState } from '../state/coderUi.svelte.js';
   import {
     groupSessionsByProject,
     sortThreadsForWorkspace,
@@ -33,6 +33,9 @@
     queuedCountFor?: (threadId: string) => number;
     subAgentSummaryFor?: (threadId: string) => { running: number; total: number };
     badgeFor?: (threadId: string) => SessionCardBadge[];
+    ui?: CoderUiState;
+    referenceKind?: string;
+    onLaunchWorkspace?: ((thread: CoderThread) => void) | null;
   }
 
   let {
@@ -47,6 +50,9 @@
     queuedCountFor,
     subAgentSummaryFor,
     badgeFor,
+    ui = coderUi,
+    referenceKind,
+    onLaunchWorkspace,
   }: Props = $props();
 
   let projects = $state<Project[]>([]);
@@ -56,15 +62,15 @@
   let importError = $state<string | null>(null);
 
   onMount(async () => {
-    coderUi.initFromStorage();
+    ui.initFromStorage();
     await loadProjects();
-    coderUi.resolveProjectFromList(projects);
-    if (!coderUi.activeProjectPath && projects.length > 0) {
+    ui.resolveProjectFromList(projects);
+    if (!ui.activeProjectPath && projects.length > 0) {
       const first = projects[0];
       selectProject(first);
-    } else if (coderUi.activeProjectPath) {
-      const match = projects.find((p) => p.path === coderUi.activeProjectPath);
-      onProjectSelect?.(coderUi.activeProjectPath, match?.id);
+    } else if (ui.activeProjectPath) {
+      const match = projects.find((p) => p.path === ui.activeProjectPath);
+      onProjectSelect?.(ui.activeProjectPath, match?.id);
     }
   });
 
@@ -122,7 +128,7 @@
   }
 
   function selectProjectByPath(path: string, projectId?: string) {
-    coderUi.setActiveProject(path, projectId);
+    ui.setActiveProject(path, projectId);
     onProjectSelect?.(path, projectId);
   }
 
@@ -244,13 +250,9 @@
 </div>
 
 {#snippet workspaceRow(workspace: ProjectWorkspace, orphan: boolean)}
-  {@const isActive = workspace.path === coderUi.activeProjectPath}
+  {@const isActive = workspace.path === ui.activeProjectPath}
   {@const expanded =
-    orphan || searching
-      ? true
-      : coderUi.showAllWorkspaces
-        ? coderUi.isExpanded(workspace.path)
-        : isActive}
+    orphan || searching ? true : ui.showAllWorkspaces ? ui.isExpanded(workspace.path) : isActive}
   {@const wsThreads = expanded ? threadsForWorkspace(workspace.path, workspace.threads) : []}
   {#if !searching || wsThreads.length > 0}
     <ProjectWorkspaceSection
@@ -260,7 +262,7 @@
       active={isActive}
       {selectedThreadId}
       {runningThreadIds}
-      onToggle={() => coderUi.toggleExpanded(workspace.path)}
+      onToggle={() => ui.toggleExpanded(workspace.path)}
       onSelectProject={() => {
         const p = projects.find((proj) => proj.path === workspace.path);
         if (p) selectProject(p);
@@ -271,6 +273,8 @@
       {queuedCountFor}
       {subAgentSummaryFor}
       {badgeFor}
+      {referenceKind}
+      {onLaunchWorkspace}
     />
   {/if}
 {/snippet}

@@ -9,7 +9,7 @@
   import AISessionSidebar from '$lib/domains/ai/components/shared/AISessionSidebar.svelte';
   import ProjectWorkspaceList from './ProjectWorkspaceList.svelte';
   import CoderSidebarFooter from './CoderSidebarFooter.svelte';
-  import { coderUi } from '../state/coderUi.svelte.js';
+  import { coderUi as defaultUi, type CoderUiState } from '../state/coderUi.svelte.js';
   import {
     DEFAULT_SESSION_FILTERS,
     SORT_OPTIONS,
@@ -44,6 +44,10 @@
     allowProviderFilter?: boolean;
     /** Provider-specific badges per session, e.g. "Needs approval". */
     badgeFor?: (threadId: string) => SessionCardBadge[];
+    /** Workspace selection state; a provider with its own list passes its own instance. */
+    ui?: CoderUiState;
+    referenceKind?: string;
+    onLaunchWorkspace?: ((thread: CoderThread) => void) | null;
   }
 
   let {
@@ -63,6 +67,9 @@
     showRulesFooter = true,
     allowProviderFilter = true,
     badgeFor,
+    ui: coderUi = defaultUi,
+    referenceKind,
+    onLaunchWorkspace,
   }: Props = $props();
 
   let searchValue = $state('');
@@ -248,5 +255,8 @@
     {queuedCountFor}
     {subAgentSummaryFor}
     {badgeFor}
+    ui={coderUi}
+    {referenceKind}
+    {onLaunchWorkspace}
   />
 </AISessionSidebar>

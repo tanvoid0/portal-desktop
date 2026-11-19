@@ -43,6 +43,12 @@ describe('eventsToMessages', () => {
     expect(view.ended).toBe(true);
   });
 
+  it('reopens the run when a resume starts a new session after an exit', () => {
+    const view = eventsToMessages([...fixture, { type: 'session_started', session_id: 's1' }]);
+    expect(view.ended).toBe(false);
+    expect(view.running).toBe(true);
+  });
+
   it('keeps subagent messages (non-null parent_tool_use_id) out of the main feed', () => {
     const view = eventsToMessages(fixture);
     expect(view.messages.some((m) => m.content === 'subagent note')).toBe(false);

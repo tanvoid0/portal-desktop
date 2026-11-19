@@ -19,6 +19,10 @@
     hideProject?: boolean;
     /** Provider-specific badges, e.g. "Needs approval". */
     extraBadges?: SessionCardBadge[];
+    /** What "Copy reference" calls this row (default: a Portal coder session). */
+    referenceKind?: string;
+    /** Menu action for the workspace; undefined = open it in Portal's Coder, null = omit. */
+    onLaunchWorkspace?: ((thread: CoderThread) => void) | null;
   }
 
   let {
@@ -31,6 +35,8 @@
     subAgentRunning = 0,
     hideProject = false,
     extraBadges = [],
+    referenceKind = 'coder session',
+    onLaunchWorkspace,
   }: Props = $props();
 
   const messageCount = $derived(
@@ -70,16 +76,20 @@
     onCopyReference: () =>
       copyText(
         buildReference({
-          kind: 'coder session',
+          kind: referenceKind,
           id: thread.id,
           title: thread.title,
           fields: { Workspace: thread.workspace_root },
         }),
         'Session reference copied'
       ),
-    onLaunchWorkspace: thread.workspace_root
-      ? () => openCoderSession({ workspaceRoot: thread.workspace_root })
-      : undefined,
+    onLaunchWorkspace:
+      thread.workspace_root && onLaunchWorkspace !== null
+        ? () =>
+            onLaunchWorkspace
+              ? onLaunchWorkspace(thread)
+              : openCoderSession({ workspaceRoot: thread.workspace_root })
+        : undefined,
     onDelete,
   })}
 >

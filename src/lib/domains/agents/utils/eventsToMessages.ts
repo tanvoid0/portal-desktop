@@ -77,6 +77,7 @@ export function eventsToMessages(events: AgentEvent[]): AgentRunView {
       case 'session_started':
         sessionId = e.session_id;
         running = true;
+        ended = false; // a resume reuses the log after an earlier `exited`
         break;
       case 'text_delta':
         streamingText += e.text;

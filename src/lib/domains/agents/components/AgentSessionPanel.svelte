@@ -154,6 +154,7 @@
         await agentRuns.sendUser(id, text);
       }
     } catch (e) {
+      if (!draft) draft = text; // keep the message for a retry
       toast.error(String(e));
     }
   }
@@ -174,7 +175,10 @@
           onRetry={() => backendsQuery.refetch()}
         />
       {:else}
-        <CoderEmptyHero />
+        <CoderEmptyHero
+          title={`Start a ${backend?.display_name ?? 'agent'} session`}
+          description={`Describe a task. ${backend?.display_name ?? 'The agent'} explores, edits, and runs commands in the project you pick.`}
+        />
         <div class="w-full">
           <PageContainer variant="chat" class="px-0">
             <div class="mb-2 px-4">
@@ -191,13 +195,16 @@
               rows={3}
               placeholder="What should the agent do?"
               disabled={starting}
+              queue={caps.queue}
               workspaceRoot={cwd}
               class="px-0 pb-0"
             >
               {#snippet model()}
                 <!-- Launch-only: chosen here, fixed for the run. A backend with no enumerable
                      model list gets free text so the user isn't stuck on its default. -->
-                {#if backend && backend.models.length > 0}
+                {#if caps.modelPicker !== 'launch-only'}
+                  <!-- catalog providers switch models from the topbar instead -->
+                {:else if backend && backend.models.length > 0}
                   <Select
                     aria-label="Model"
                     options={backend.models.map((m) => ({ value: m.id, label: m.label }))}
@@ -291,6 +298,7 @@
         running={view?.running ?? false}
         canStop={(view?.running ?? false) || !!firstPending}
         workspaceRoot={detail?.session.cwd ?? ''}
+        queue={caps.queue}
         class="pt-0"
       />
     </div>

@@ -5,10 +5,27 @@
 
 import { projectUi } from '$lib/domains/projects/state/projectUi.svelte';
 
-const STORAGE_KEY = 'portal-coder-last-workspace';
-const PROJECT_ID_STORAGE_KEY = 'portal-coder-last-project-id';
+export interface CoderUiOptions {
+  storageKey?: string;
+  projectIdKey?: string;
+  /** Mirror the active project into the app-wide projectUi (Portal only). */
+  linkProjectUi?: boolean;
+  /** Start with every workspace expanded. */
+  showAll?: boolean;
+}
 
-class CoderUiState {
+export class CoderUiState {
+  private storageKey: string;
+  private projectIdKey: string;
+  private linkProjectUi: boolean;
+
+  constructor(opts: CoderUiOptions = {}) {
+    this.storageKey = opts.storageKey ?? 'portal-coder-last-workspace';
+    this.projectIdKey = opts.projectIdKey ?? 'portal-coder-last-project-id';
+    this.linkProjectUi = opts.linkProjectUi ?? true;
+    this.showAllWorkspaces = opts.showAll ?? false;
+  }
+
   /** Currently selected workspace path (portal project path). */
   activeProjectPath = $state<string | null>(null);
   /** Portal project id for the active workspace. */
@@ -21,15 +38,15 @@ class CoderUiState {
   initFromStorage(): void {
     if (typeof window === 'undefined') return;
     try {
-      const cached = localStorage.getItem(STORAGE_KEY);
-      const cachedId = localStorage.getItem(PROJECT_ID_STORAGE_KEY);
+      const cached = localStorage.getItem(this.storageKey);
+      const cachedId = localStorage.getItem(this.projectIdKey);
       if (cached) {
         this.activeProjectPath = cached;
         this.expandedProjects = { [cached]: true };
       }
       if (cachedId) {
         this.activeProjectId = cachedId;
-        projectUi.setActiveProject(cachedId);
+        if (this.linkProjectUi) projectUi.setActiveProject(cachedId);
       }
     } catch {
       // ignore
@@ -39,9 +56,9 @@ class CoderUiState {
   persistProject(path: string, projectId?: string | null): void {
     if (typeof window === 'undefined' || !path) return;
     try {
-      localStorage.setItem(STORAGE_KEY, path);
+      localStorage.setItem(this.storageKey, path);
       if (projectId) {
-        localStorage.setItem(PROJECT_ID_STORAGE_KEY, projectId);
+        localStorage.setItem(this.projectIdKey, projectId);
       }
     } catch {
       // ignore
@@ -52,7 +69,7 @@ class CoderUiState {
     this.activeProjectPath = path;
     if (projectId != null) {
       this.activeProjectId = projectId;
-      projectUi.setActiveProject(projectId);
+      if (this.linkProjectUi) projectUi.setActiveProject(projectId);
     }
     if (path) {
       this.expandedProjects = { ...this.expandedProjects, [path]: true };
@@ -65,7 +82,7 @@ class CoderUiState {
     const match = projects.find((p) => p.path === this.activeProjectPath);
     if (match) {
       this.activeProjectId = match.id;
-      projectUi.setActiveProject(match.id);
+      if (this.linkProjectUi) projectUi.setActiveProject(match.id);
       this.persistProject(match.path, match.id);
     } else if (projects.length > 0) {
       // A saved path that is no project here (a /media/... Linux path on Windows) must not seed
@@ -75,7 +92,7 @@ class CoderUiState {
       // (exists + is_dir) would keep those, at the cost of an async check here.
       this.activeProjectPath = null;
       try {
-        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(this.storageKey);
       } catch {
         // ignore
       }
@@ -104,7 +121,7 @@ class CoderUiState {
       this.setActiveProject(workspaceRoot, id);
     } else if (id) {
       this.activeProjectId = id;
-      projectUi.setActiveProject(id);
+      if (this.linkProjectUi) projectUi.setActiveProject(id);
     }
   }
 

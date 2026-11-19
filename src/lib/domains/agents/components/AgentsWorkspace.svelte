@@ -33,7 +33,9 @@
   import { agentRuns } from '../state/agentRuns.svelte.js';
   import { agentBackendsQuery, agentSessionsQuery } from '../queries/agentsQueries.js';
   import { agentsApi } from '../api/agentsApi.js';
-  import { filterSessionsByBackend } from '../utils/groupSessions.js';
+  import { filterSessionsByBackend, groupSessionsByProject } from '../utils/groupSessions.js';
+  import { createProjectsQuery } from '$lib/domains/projects/queries/projectQueries';
+  import { CoderUiState } from '$lib/domains/coder/state/coderUi.svelte.js';
   import { sessionToThread } from '../utils/sessionToThread.js';
   import { queryClient } from '$lib/domains/shared/query/queryClient';
   import { queryKeys } from '$lib/domains/shared/query/keys';
@@ -49,6 +51,13 @@
 
   let { backendId }: Props = $props();
 
+  // Own workspace selection: all groups open, no writes to Portal's last-workspace keys.
+  const listUi = new CoderUiState({
+    storageKey: 'portal-agents-list-workspace',
+    projectIdKey: 'portal-agents-list-project-id',
+    linkProjectUi: false,
+    showAll: true,
+  });
   const caps = $derived(agentCapabilities(backendId));
   let sidebarOpen = $state(false);
   let feedView = $state<'transcript' | 'timeline'>('transcript');
@@ -113,9 +122,16 @@
   const backendName = $derived(
     backendsQuery.data?.find((b) => b.id === backendId)?.display_name ?? 'Agents'
   );
-  const threads = $derived(
-    filterSessionsByBackend(sessionsQuery.data ?? [], backendId).map(sessionToThread)
-  );
+  const projectsQuery = createProjectsQuery();
+  // Resolve each cwd to its project (subfolders, case/slash variants) so rows group under it.
+  const threads = $derived.by(() => {
+    const own = filterSessionsByBackend(sessionsQuery.data ?? [], backendId);
+    const projectOf = new Map<string, string>();
+    for (const g of groupSessionsByProject(own, projectsQuery.data ?? [])) {
+      if (g.projectId) for (const s of g.sessions) projectOf.set(s.id, g.projectId);
+    }
+    return own.map((s) => sessionToThread(s, projectOf.get(s.id)));
+  });
   // Only this tab's own sessions: a running id from another backend would show as a stray row.
   const runningThreadIds = $derived(
     new Set(threads.filter((t) => agentRuns.runningIds.has(t.id)).map((t) => t.id))
@@ -151,9 +167,9 @@
     syncUrl(id);
   }
 
-  function newRun() {
+  function newRun(cwd?: string) {
     sidebarOpen = false;
-    prefillCwd = undefined;
+    prefillCwd = cwd;
     prefillPrompt = undefined;
     prefillTaskId = null;
     syncUrl(null);
@@ -220,13 +236,15 @@
     selectedThreadId={focusedId}
     {runningThreadIds}
     showRulesFooter={caps.rememberRule}
-    allowProviderFilter={caps.modelPicker === 'catalog'}
     badgeFor={(id) =>
       agentRuns.pendingCountFor(id) > 0
         ? [{ label: 'Needs approval', variant: 'destructive' }]
         : []}
     onThreadClick={(t) => selectSession(t.id)}
-    onCreateNew={newRun}
+    ui={listUi}
+    referenceKind="agent session"
+    onLaunchWorkspace={(t) => newRun(t.workspace_root)}
+    onCreateNew={() => newRun()}
     onDeleteThread={deleteThread}
   />
 {/snippet}

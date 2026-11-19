@@ -89,7 +89,7 @@
 {#snippet banner()}
   <PlatformStatusBanner blocks="Sending, retry and approvals" />
 
-  {#if p.multitaskMode && p.thread?.thread_kind === 'coordinator'}
+  {#if caps.subAgents && p.multitaskMode && p.thread?.thread_kind === 'coordinator'}
     <CoderMultitaskBar
       subAgents={p.subAgents}
       coordinatorId={p.thread.id}
@@ -122,19 +122,22 @@
             running={p.running}
             queuedMessages={p.queuedMessages}
             onRemoveQueued={p.removeQueued}
-            agentMode={coderSession.agentMode}
+            agentMode={caps.agentModes ? coderSession.agentMode : undefined}
             effectiveMode={p.effectiveMode}
-            onAgentModeChange={(m) => coderSession.changeAgentMode(m)}
-            permissionMode={coderSession.permissionMode}
-            onPermissionModeChange={(m) => coderSession.changePermissionMode(m)}
+            onAgentModeChange={caps.agentModes ? (m) => coderSession.changeAgentMode(m) : undefined}
+            permissionMode={caps.permissionModes ? coderSession.permissionMode : undefined}
+            onPermissionModeChange={caps.permissionModes
+              ? (m) => coderSession.changePermissionMode(m)
+              : undefined}
+            queue={caps.queue}
             workspaceRoot={coderSession.workspaceRoot}
             onToggleChanges={p.openChanges}
             onToggleGitChanges={() => coderWorkspaceStore.openGitChanges()}
             showChanges={p.showChanges}
             showGitChanges={p.showGitChanges}
             pendingChangeCount={p.pendingChangeCount}
-            contextUsage={p.contextUsage}
-            llmUsage={p.llmUsage}
+            contextUsage={caps.contextUsage ? p.contextUsage : null}
+            llmUsage={caps.contextUsage ? p.llmUsage : null}
             class="px-0 pb-0"
           />
         </PageContainer>
@@ -157,16 +160,16 @@
           running={p.running}
           pending={p.pending}
           error={p.error}
-          showRetry={p.showRetry}
+          showRetry={caps.retry && p.showRetry}
           showRemember={caps.rememberRule}
-          showSubAgentInline={p.showSubAgentInline}
+          showSubAgentInline={caps.subAgents && p.showSubAgentInline}
           subAgents={p.subAgents}
           coordinatorId={p.thread?.id}
           workspaceRoot={p.workspaceRoot}
           threadId={p.activeThreadId ?? undefined}
-          canEdit={p.canEditMessages}
+          canEdit={caps.editRerun && p.canEditMessages}
           onEditMessage={(idx, text) => void coderSession.editMessage(idx, text)}
-          onRetry={p.platformBlocked ? undefined : () => coderSession.retry()}
+          onRetry={caps.retry && !p.platformBlocked ? () => coderSession.retry() : undefined}
           decisionsDisabled={p.platformBlocked}
           onOpenSubAgent={(childId, coordId) => void p.openSubAgent(childId, coordId)}
           onCancelSubAgent={(id) => void coderSession.cancelSubAgent(id)}
@@ -190,11 +193,14 @@
       canStop={p.running || !!p.pending}
       queuedMessages={p.queuedMessages}
       onRemoveQueued={p.removeQueued}
-      agentMode={coderSession.agentMode}
+      agentMode={caps.agentModes ? coderSession.agentMode : undefined}
       effectiveMode={p.effectiveMode}
-      onAgentModeChange={(m) => coderSession.changeAgentMode(m)}
-      permissionMode={coderSession.permissionMode}
-      onPermissionModeChange={(m) => coderSession.changePermissionMode(m)}
+      onAgentModeChange={caps.agentModes ? (m) => coderSession.changeAgentMode(m) : undefined}
+      permissionMode={caps.permissionModes ? coderSession.permissionMode : undefined}
+      onPermissionModeChange={caps.permissionModes
+        ? (m) => coderSession.changePermissionMode(m)
+        : undefined}
+      queue={caps.queue}
       workspaceRoot={coderSession.workspaceRoot}
       onToggleChanges={p.openChanges}
       onToggleGitChanges={() => coderWorkspaceStore.openGitChanges()}
@@ -202,8 +208,8 @@
       showGitChanges={p.showGitChanges}
       pendingChangeCount={p.pendingChangeCount}
       changesRevision={p.changesRevision}
-      contextUsage={p.contextUsage}
-      llmUsage={p.llmUsage}
+      contextUsage={caps.contextUsage ? p.contextUsage : null}
+      llmUsage={caps.contextUsage ? p.llmUsage : null}
       class="pt-0"
     />
   </div>

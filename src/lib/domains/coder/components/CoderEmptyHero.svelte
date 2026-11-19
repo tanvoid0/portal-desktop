@@ -1,6 +1,16 @@
 <!-- "What should we build?" heading shown above the composer in an empty session. -->
 <script lang="ts">
   import Bot from '~icons/fa6-solid/robot';
+
+  interface Props {
+    title?: string;
+    description?: string;
+  }
+
+  let {
+    title = 'What should we build?',
+    description = 'Describe a task. The agent explores, edits, and runs commands — mode controls how it operates.',
+  }: Props = $props();
 </script>
 
 <div class="mb-6 text-center [@media(max-height:700px)]:mb-2">
@@ -9,8 +19,8 @@
   >
     <Bot class="h-6 w-6 text-primary" />
   </div>
-  <h3 class="text-lg font-semibold">What should we build?</h3>
+  <h3 class="text-lg font-semibold">{title}</h3>
   <p class="mt-1 max-w-md text-sm text-muted-foreground [@media(max-height:700px)]:hidden">
-    Describe a task. The agent explores, edits, and runs commands — mode controls how it operates.
+    {description}
   </p>
 </div>
