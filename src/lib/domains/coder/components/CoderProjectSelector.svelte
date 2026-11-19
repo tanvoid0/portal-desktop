@@ -12,17 +12,22 @@
     value: string;
     disabled?: boolean;
     onSelect?: (path: string, projectId?: string) => void;
+    /** localStorage key for the last-picked workspace; each provider keeps its own. */
+    storageKey?: string;
   }
 
-  let { value = $bindable(''), disabled = false, onSelect }: Props = $props();
+  let {
+    value = $bindable(''),
+    disabled = false,
+    onSelect,
+    storageKey: STORAGE_KEY = 'portal-coder-last-workspace',
+  }: Props = $props();
 
   let projects = $state<Project[]>([]);
   let loading = $state(false);
   let importPath = $state<string | null>(null);
   let importing = $state(false);
   let importError = $state<string | null>(null);
-
-  const STORAGE_KEY = 'portal-coder-last-workspace';
 
   function loadLastWorkspace(): string | null {
     if (typeof window === 'undefined') return null;

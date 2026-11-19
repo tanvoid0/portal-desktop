@@ -8,12 +8,15 @@
   import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import { Textarea } from '$lib/components/ui/textarea';
   import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { PageContainer, PageLoading, PageError } from '$lib/components/shell';
   import CoderFeed from '$lib/domains/coder/components/CoderFeed.svelte';
   import ApprovalBanner from '$lib/domains/coder/components/ApprovalBanner.svelte';
-  import RunLauncherForm from './RunLauncherForm.svelte';
+  import CoderComposer from '$lib/domains/coder/components/CoderComposer.svelte';
+  import CoderEmptyHero from '$lib/domains/coder/components/CoderEmptyHero.svelte';
+  import CoderProjectSelector from '$lib/domains/coder/components/CoderProjectSelector.svelte';
+  import Select from '$lib/components/ui/select.svelte';
+  import { Input } from '$lib/components/ui/input';
   import AgentSessionTimeline from './AgentSessionTimeline.svelte';
   import { agentCapabilities } from '$lib/domains/coder/config/capabilities.js';
   import { agentRuns } from '../state/agentRuns.svelte.js';
@@ -22,6 +25,8 @@
   import { createProjectsQuery } from '$lib/domains/projects/queries/projectQueries';
   import { createTaskQuery } from '$lib/domains/tasks/queries/taskQueries';
   import { toast } from '$lib/utils/toast';
+
+  const CWD_STORAGE_KEY = 'portal-agents-last-cwd';
 
   interface Props {
     backendId: string;
@@ -42,9 +47,7 @@
   }: Props = $props();
 
   const backendsQuery = createQuery(agentBackendsQuery);
-  // Only this tab's own backend — RunLauncherForm hides its picker once it
-  // sees a single-element list.
-  const backends = $derived((backendsQuery.data ?? []).filter((b) => b.id === backendId));
+  const backend = $derived((backendsQuery.data ?? []).find((b) => b.id === backendId));
   const sessionDetailQuery = createQuery(() => ({
     ...agentSessionQuery(sessionId ?? ''),
     enabled: !!sessionId,
@@ -52,6 +55,9 @@
 
   let starting = $state(false);
   let draft = $state('');
+  // Launch settings for a new run; the model is fixed once the run starts (QA-085).
+  let cwd = $state(initialCwd ?? '');
+  let modelName = $state('');
   let timelineView = $state<'transcript' | 'timeline'>('transcript');
   let scrollViewport = $state<HTMLElement | null>(null);
   let pinnedToBottom = $state(true);
@@ -63,8 +69,8 @@
   // A fresh session starts on the transcript with an empty composer, not
   // wherever the previously-focused one left off.
   $effect(() => {
-    sessionId;
-    draft = '';
+    draft = sessionId ? '' : (initialPrompt ?? '');
+    if (!sessionId && initialCwd) cwd = initialCwd;
     timelineView = 'transcript';
   });
 
@@ -110,10 +116,23 @@
     }
   });
 
-  async function handleStart(backendId: string, cwd: string, prompt: string, model: string | null) {
+  async function handleStart() {
+    const prompt = draft.trim();
+    if (!prompt) return;
+    if (!cwd.trim()) {
+      toast.error('Select a project first');
+      return;
+    }
     starting = true;
     try {
-      const id = await agentRuns.start(backendId, cwd, prompt, model, taskId);
+      const id = await agentRuns.start(
+        backendId,
+        cwd.trim(),
+        prompt,
+        modelName.trim() || null,
+        taskId
+      );
+      draft = '';
       onStarted(id);
     } catch (e) {
       toast.error(String(e));
@@ -139,13 +158,6 @@
     }
   }
 
-  function onComposerKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      void send();
-    }
-  }
-
   async function handleCancel() {
     if (!sessionId) return;
     try {
@@ -158,7 +170,9 @@
 
 <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
   {#if !sessionId}
-    <div class="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-8">
+    <div
+      class="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-4 pb-8 [@media(max-height:700px)]:pb-2"
+    >
       {#if backendsQuery.isPending}
         <PageLoading message="Loading agent backends…" />
       {:else if backendsQuery.isError}
@@ -169,13 +183,49 @@
           onRetry={() => backendsQuery.refetch()}
         />
       {:else}
-        <RunLauncherForm
-          {backends}
-          busy={starting}
-          {initialCwd}
-          {initialPrompt}
-          onStart={handleStart}
-        />
+        <CoderEmptyHero />
+        <div class="w-full">
+          <PageContainer variant="chat" class="px-0">
+            <div class="mb-2 px-4">
+              <CoderProjectSelector bind:value={cwd} storageKey={CWD_STORAGE_KEY} />
+            </div>
+            {#if backend && !backend.available}
+              <p class="mb-2 px-4 text-xs text-destructive">
+                {backend.display_name} wasn't found on PATH — install it to run this.
+              </p>
+            {/if}
+            <CoderComposer
+              bind:value={draft}
+              onSend={handleStart}
+              rows={3}
+              placeholder="What should the agent do?"
+              disabled={starting}
+              workspaceRoot={cwd}
+              class="px-0 pb-0"
+            >
+              {#snippet model()}
+                <!-- Launch-only: chosen here, fixed for the run. A backend with no enumerable
+                     model list gets free text so the user isn't stuck on its default. -->
+                {#if backend && backend.models.length > 0}
+                  <Select
+                    aria-label="Model"
+                    options={backend.models.map((m) => ({ value: m.id, label: m.label }))}
+                    bind:value={modelName}
+                    placeholder="Default model"
+                    class="h-8 w-44 text-xs"
+                  />
+                {:else}
+                  <Input
+                    aria-label="Model"
+                    bind:value={modelName}
+                    placeholder="Default model"
+                    class="h-8 w-40 text-xs"
+                  />
+                {/if}
+              {/snippet}
+            </CoderComposer>
+          </PageContainer>
+        </div>
       {/if}
     </div>
   {:else}
@@ -266,23 +316,17 @@
       </ScrollArea>
     {/if}
 
-    <div class="divider-edge-t flex shrink-0 items-end gap-2 p-3">
-      <Textarea
+    <div class="shrink-0 bg-gradient-to-t from-background via-background to-transparent pt-2">
+      <CoderComposer
         bind:value={draft}
+        onSend={send}
+        onStop={() => sessionId && void agentRuns.interrupt(sessionId)}
         placeholder={ended ? 'Send a message to resume…' : 'Send a follow-up…'}
-        rows={2}
-        class="flex-1 resize-none"
-        onkeydown={onComposerKeydown}
+        running={view?.running ?? false}
+        canStop={(view?.running ?? false) || !!firstPending}
+        workspaceRoot={detail?.session.cwd ?? ''}
+        class="pt-0"
       />
-      {#if view?.running}
-        <Button variant="outline" onclick={() => sessionId && agentRuns.interrupt(sessionId)}>
-          Stop
-        </Button>
-      {:else}
-        <Button disabled={!draft.trim()} onclick={send}>
-          {ended ? 'Resume' : 'Send'}
-        </Button>
-      {/if}
     </div>
   {/if}
 </div>

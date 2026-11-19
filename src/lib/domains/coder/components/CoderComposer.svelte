@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, type Snippet } from 'svelte';
 
   import { Button } from '$lib/components/ui/button';
 
@@ -39,13 +39,16 @@
      *  so Stop stays reachable while paused on an approval banner (QA-119). */
     canStop?: boolean;
 
-    agentMode: CoderAgentMode;
+    /** Mode/permission chips render only when their value and handler are both given. */
+    agentMode?: CoderAgentMode;
 
     effectiveMode?: CoderAgentMode | null;
 
-    onAgentModeChange: (mode: CoderAgentMode) => void;
-    permissionMode: PermissionMode;
-    onPermissionModeChange: (mode: PermissionMode) => void;
+    onAgentModeChange?: (mode: CoderAgentMode) => void;
+    permissionMode?: PermissionMode;
+    onPermissionModeChange?: (mode: PermissionMode) => void;
+    /** Provider-specific model control, rendered after the mode chips. */
+    model?: Snippet;
     workspaceRoot: string;
 
     onToggleChanges?: () => void;
@@ -99,6 +102,8 @@
     permissionMode,
 
     onPermissionModeChange,
+
+    model,
 
     workspaceRoot,
 
@@ -156,7 +161,7 @@
   const queueCount = $derived(queuedMessages.length);
 
   function cycleAgentMode() {
-    onAgentModeChange(nextAgentMode(agentMode));
+    if (agentMode && onAgentModeChange) onAgentModeChange(nextAgentMode(agentMode));
   }
 
   onMount(() => {
@@ -323,19 +328,25 @@
   {/snippet}
 
   {#snippet trailing()}
-    <CoderPermissionModeSelector
-      mode={permissionMode}
-      onModeChange={onPermissionModeChange}
-      inert={agentMode === 'ask'}
-      {disabled}
-    />
+    {#if permissionMode && onPermissionModeChange}
+      <CoderPermissionModeSelector
+        mode={permissionMode}
+        onModeChange={onPermissionModeChange}
+        inert={agentMode === 'ask'}
+        {disabled}
+      />
+    {/if}
 
-    <CoderAgentModeSelector
-      mode={agentMode}
-      {effectiveMode}
-      onModeChange={onAgentModeChange}
-      {disabled}
-    />
+    {#if agentMode && onAgentModeChange}
+      <CoderAgentModeSelector
+        mode={agentMode}
+        {effectiveMode}
+        onModeChange={onAgentModeChange}
+        {disabled}
+      />
+    {/if}
+
+    {@render model?.()}
   {/snippet}
 
   {#snippet footer()}
@@ -357,7 +368,9 @@
           <span class="truncate">{workspaceName || 'This PC'}</span>
         </span>
 
-        <span class="truncate"> Ctrl+Enter · send · Shift+Tab · cycle mode </span>
+        <span class="truncate">
+          Ctrl+Enter · send{agentMode && onAgentModeChange ? ' · Shift+Tab · cycle mode' : ''}
+        </span>
       </div>
 
       <AIContextBar variant="ring" {contextUsage} {llmUsage} />
