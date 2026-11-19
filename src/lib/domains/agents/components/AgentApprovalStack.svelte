@@ -6,6 +6,7 @@
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
   import ApprovalBanner from '$lib/domains/coder/components/ApprovalBanner.svelte';
+  import { agentCapabilities } from '$lib/domains/coder/config/capabilities.js';
   import { isAgentTabRoute } from '$lib/config/agents-tabs';
   import { agentRuns } from '../state/agentRuns.svelte.js';
   import { agentSessionsQuery } from '../queries/agentsQueries.js';
@@ -20,6 +21,7 @@
     const out: {
       id: string;
       title: string;
+      backendId: string;
       pending: ReturnType<typeof agentRuns.viewFor>['pending'];
     }[] = [];
     for (const id of agentRuns.runningIds) {
@@ -27,7 +29,12 @@
       const view = agentRuns.viewFor(id);
       if (view.pending.length === 0) continue;
       const summary = sessions.find((s) => s.id === id);
-      out.push({ id, title: summary?.title || summary?.backend_id || id, pending: view.pending });
+      out.push({
+        id,
+        title: summary?.title || summary?.backend_id || id,
+        backendId: summary?.backend_id ?? '',
+        pending: view.pending,
+      });
     }
     return out;
   });
@@ -45,7 +52,7 @@
         {#each stack.pending as approval (approval.call_id)}
           <ApprovalBanner
             pending={approval}
-            showRemember={false}
+            showRemember={agentCapabilities(stack.backendId).rememberRule}
             onDecision={(approve) => agentRuns.decide(stack.id, approval.call_id, approve)}
           />
         {/each}

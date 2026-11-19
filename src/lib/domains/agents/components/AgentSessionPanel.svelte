@@ -15,6 +15,7 @@
   import ApprovalBanner from '$lib/domains/coder/components/ApprovalBanner.svelte';
   import RunLauncherForm from './RunLauncherForm.svelte';
   import AgentSessionTimeline from './AgentSessionTimeline.svelte';
+  import { agentCapabilities } from '$lib/domains/coder/config/capabilities.js';
   import { agentRuns } from '../state/agentRuns.svelte.js';
   import { agentBackendsQuery, agentSessionQuery } from '../queries/agentsQueries.js';
   import { groupSessionsByProject } from '../utils/groupSessions.js';
@@ -67,6 +68,7 @@
     timelineView = 'transcript';
   });
 
+  const caps = $derived(agentCapabilities(backendId));
   const view = $derived(sessionId ? agentRuns.viewFor(sessionId) : null);
   const detail = $derived(sessionDetailQuery.data ?? null);
   const title = $derived(detail?.session.title || detail?.session.backend_id || 'Session');
@@ -249,14 +251,14 @@
             streamingText={view?.streamingText ?? ''}
             running={view?.running ?? false}
             pending={firstPending}
-            showRemember={false}
+            showRemember={caps.rememberRule}
             onDecision={(approve) =>
               firstPending && agentRuns.decide(sessionId ?? '', firstPending.call_id, approve)}
           />
           {#each extraPending as approval (approval.call_id)}
             <ApprovalBanner
               pending={approval}
-              showRemember={false}
+              showRemember={caps.rememberRule}
               onDecision={(approve) => agentRuns.decide(sessionId ?? '', approval.call_id, approve)}
             />
           {/each}
