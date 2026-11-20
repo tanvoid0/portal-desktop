@@ -262,8 +262,7 @@
 
 {#snippet workspaceRow(workspace: ProjectWorkspace, orphan: boolean)}
   {@const isActive = workspace.path === ui.activeProjectPath}
-  {@const expanded =
-    orphan || searching ? true : ui.showAllWorkspaces ? ui.isExpanded(workspace.path) : isActive}
+  {@const expanded = orphan || searching ? true : ui.isExpanded(workspace.path)}
   {@const wsThreads = expanded ? threadsForWorkspace(workspace.path, workspace.threads) : []}
   {#if !searching || wsThreads.length > 0}
     <ProjectWorkspaceSection
