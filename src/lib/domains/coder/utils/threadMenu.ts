@@ -21,7 +21,7 @@ export function buildCoderThreadMenu(thread: CoderThread, h: CoderThreadMenuHand
   if (h.onOpen) items.push({ label: 'Open', icon: FaEye, onSelect: () => h.onOpen!(thread) });
   if (h.onCopyReference) {
     items.push({
-      label: 'Copy reference',
+      label: 'Copy ID',
       icon: FaClipboard,
       separatorBefore: true,
       onSelect: () => h.onCopyReference!(thread),

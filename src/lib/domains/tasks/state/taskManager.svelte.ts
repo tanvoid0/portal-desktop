@@ -17,7 +17,7 @@ import type { Task, TaskStatus, TaskPriority } from '../types';
 import { copyText } from '$lib/domains/shared/utils/clipboard';
 import { openCoderSession } from '$lib/domains/coder/utils/launch';
 import { openAgentsSession } from '$lib/domains/agents/utils/launch';
-import { buildTaskReference, buildCoderPrompt } from '../utils/taskReference';
+import { buildCoderPrompt } from '../utils/taskReference';
 
 export type TaskView = 'board' | 'list' | 'archive';
 
@@ -218,7 +218,7 @@ export class TaskManagerState {
   };
 
   handleCopyReference = (task: Task) => {
-    void copyText(buildTaskReference(task, this.taskProject(task).name), 'Task reference copied');
+    void copyText(task.id, 'Task ID copied');
   };
 
   handleLaunchCoder = (task: Task) => {

@@ -46,7 +46,6 @@
     badgeFor?: (threadId: string) => SessionCardBadge[];
     /** Workspace selection state; a provider with its own list passes its own instance. */
     ui?: CoderUiState;
-    referenceKind?: string;
     onLaunchWorkspace?: ((thread: CoderThread) => void) | null;
   }
 
@@ -68,7 +67,6 @@
     allowProviderFilter = true,
     badgeFor,
     ui: coderUi = defaultUi,
-    referenceKind,
     onLaunchWorkspace,
   }: Props = $props();
 
@@ -256,7 +254,6 @@
     {subAgentSummaryFor}
     {badgeFor}
     ui={coderUi}
-    {referenceKind}
     {onLaunchWorkspace}
   />
 </AISessionSidebar>

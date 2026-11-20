@@ -7,7 +7,6 @@ import FaRobot from '~icons/fa6-solid/robot';
 import FaBolt from '~icons/fa6-solid/bolt';
 import FaTrash from '~icons/fa6-solid/trash';
 import type { MenuItem } from '$lib/components/menu/types';
-import { buildReference } from '$lib/domains/shared/utils/entityReference';
 import { copyText } from '$lib/domains/shared/utils/clipboard';
 import type { Project } from '../types';
 
@@ -20,22 +19,9 @@ export interface ProjectMenuHandlers {
   onDelete?: (project: Project) => void;
 }
 
-/** Copies a markdown reference to the project; shared by the card and the row. */
-export function copyProjectReference(project: Project, branch?: string | null): void {
-  copyText(
-    buildReference({
-      kind: 'project',
-      id: project.id,
-      title: project.name,
-      fields: {
-        Stage: project.stage ?? undefined,
-        Branch: branch ?? undefined,
-        Path: project.path,
-      },
-      body: project.description ?? undefined,
-    }),
-    'Project reference copied'
-  );
+/** Copies the project's id; shared by the card and the row. */
+export function copyProjectReference(project: Project): void {
+  copyText(String(project.id), 'Project ID copied');
 }
 
 /** Right-click actions for a project card/row. Items without a handler are dropped. */
@@ -61,7 +47,7 @@ export function buildProjectMenu(project: Project, h: ProjectMenuHandlers): Menu
 
   if (h.onCopyReference) {
     items.push({
-      label: 'Copy reference',
+      label: 'Copy ID',
       icon: FaClipboard,
       separatorBefore: true,
       onSelect: () => h.onCopyReference!(project),

@@ -23,7 +23,7 @@ export function buildDeploymentMenu(h: DeploymentMenuHandlers): MenuItem[] {
   }
   if (h.onCopyReference) {
     items.push({
-      label: 'Copy reference',
+      label: 'Copy ID',
       icon: FaClipboard,
       separatorBefore: true,
       onSelect: h.onCopyReference,

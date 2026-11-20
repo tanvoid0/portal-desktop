@@ -242,7 +242,6 @@
         : []}
     onThreadClick={(t) => selectSession(t.id)}
     ui={listUi}
-    referenceKind="agent session"
     onLaunchWorkspace={(t) => newRun(t.workspace_root)}
     onCreateNew={() => newRun()}
     onDeleteThread={deleteThread}

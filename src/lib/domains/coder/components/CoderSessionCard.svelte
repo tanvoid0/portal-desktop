@@ -1,7 +1,6 @@
 <script lang="ts">
   import AISessionCard from '$lib/domains/ai/components/shared/AISessionCard.svelte';
   import ContextMenuList from '$lib/components/menu/ContextMenuList.svelte';
-  import { buildReference } from '$lib/domains/shared/utils/entityReference';
   import { copyText } from '$lib/domains/shared/utils/clipboard';
   import { PORTAL_ENGINE_TAB, sessionPath } from '$lib/config/agents-tabs';
   import type { SessionCardBadge } from '$lib/domains/ai/components/shared/AISessionCard.svelte';
@@ -20,8 +19,6 @@
     hideProject?: boolean;
     /** Provider-specific badges, e.g. "Needs approval". */
     extraBadges?: SessionCardBadge[];
-    /** What "Copy reference" calls this row (default: a Portal coder session). */
-    referenceKind?: string;
     /** Menu action for the workspace; undefined = open it in Portal's Coder, null = omit. */
     onLaunchWorkspace?: ((thread: CoderThread) => void) | null;
   }
@@ -36,7 +33,6 @@
     subAgentRunning = 0,
     hideProject = false,
     extraBadges = [],
-    referenceKind = 'coder session',
     onLaunchWorkspace,
   }: Props = $props();
 
@@ -74,16 +70,7 @@
 <ContextMenuList
   items={buildCoderThreadMenu(thread, {
     onOpen: onClick ? () => onClick() : undefined,
-    onCopyReference: () =>
-      copyText(
-        buildReference({
-          kind: referenceKind,
-          id: thread.id,
-          title: thread.title,
-          fields: { Workspace: thread.workspace_root },
-        }),
-        'Session reference copied'
-      ),
+    onCopyReference: () => copyText(String(thread.id), 'Session ID copied'),
     onCopyLink: () => copyText(sessionPath(PORTAL_ENGINE_TAB.id, thread.id), 'Session link copied'),
     onLaunchWorkspace:
       thread.workspace_root && onLaunchWorkspace !== null

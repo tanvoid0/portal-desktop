@@ -45,7 +45,7 @@ export function buildTaskMenu(task: Task, h: TaskMenuHandlers): MenuItem[] {
 
   if (h.onCopyReference) {
     items.push({
-      label: 'Copy reference',
+      label: 'Copy ID',
       icon: FaClipboard,
       separatorBefore: true,
       onSelect: () => h.onCopyReference!(task),

@@ -34,7 +34,6 @@
     subAgentSummaryFor?: (threadId: string) => { running: number; total: number };
     badgeFor?: (threadId: string) => SessionCardBadge[];
     ui?: CoderUiState;
-    referenceKind?: string;
     onLaunchWorkspace?: ((thread: CoderThread) => void) | null;
   }
 
@@ -51,7 +50,6 @@
     subAgentSummaryFor,
     badgeFor,
     ui = coderUi,
-    referenceKind,
     onLaunchWorkspace,
   }: Props = $props();
 
@@ -283,7 +281,6 @@
       {queuedCountFor}
       {subAgentSummaryFor}
       {badgeFor}
-      {referenceKind}
       {onLaunchWorkspace}
     />
   {/if}

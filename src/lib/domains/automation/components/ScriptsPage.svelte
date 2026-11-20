@@ -33,7 +33,6 @@
   } from '$lib/domains/projects/pipelines';
   import ContextMenuList from '$lib/components/menu/ContextMenuList.svelte';
   import { buildScriptMenu } from '../utils/scriptMenu';
-  import { buildReference } from '$lib/domains/shared/utils/entityReference';
   import { copyText } from '$lib/domains/shared/utils/clipboard';
   import { toast } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
@@ -132,15 +131,7 @@
   }
 
   function handleCopyReference(script: Block) {
-    void copyText(
-      buildReference({
-        kind: 'script',
-        id: script.id,
-        title: script.name,
-        body: script.command || undefined,
-      }),
-      'Script reference copied'
-    );
+    void copyText(String(script.id), 'Script ID copied');
   }
 
   function handleImportJson() {

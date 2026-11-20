@@ -14,7 +14,6 @@
   import Terminal from '~icons/fa6-solid/terminal';
   import { openExternalUrl } from '$lib/utils/tauri';
   import ContextMenuList from '$lib/components/menu/ContextMenuList.svelte';
-  import { buildReference } from '$lib/domains/shared/utils/entityReference';
   import { copyText } from '$lib/domains/shared/utils/clipboard';
   import { buildDeploymentMenu } from '../utils/deploymentMenu';
 
@@ -43,16 +42,7 @@
       onStart: !isRunning && !isBusy && onStart ? () => onStart(deployment.id) : undefined,
       onStop: isRunning && onStop ? () => onStop(deployment.id) : undefined,
       onOpenUrl: menuUrl ? () => openExternalUrl(menuUrl) : undefined,
-      onCopyReference: () =>
-        copyText(
-          buildReference({
-            kind: 'deployment',
-            id: deployment.id,
-            title: deployment.name,
-            fields: { Status: deployment.status },
-          }),
-          'Deployment reference copied'
-        ),
+      onCopyReference: () => copyText(String(deployment.id), 'Deployment ID copied'),
       onDelete: onDelete ? () => onDelete(deployment.id) : undefined,
     })
   );

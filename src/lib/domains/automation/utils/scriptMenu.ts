@@ -29,7 +29,7 @@ export function buildScriptMenu(script: Block, h: ScriptMenuHandlers): MenuItem[
   }
   if (h.onCopyReference) {
     items.push({
-      label: 'Copy reference',
+      label: 'Copy ID',
       icon: FaClipboard,
       separatorBefore: true,
       onSelect: () => h.onCopyReference!(script),

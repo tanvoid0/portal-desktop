@@ -98,7 +98,7 @@
   items={buildProjectMenu(project, {
     onToggleStar,
     onSetArchived,
-    onCopyReference: (p) => copyProjectReference(p, branch),
+    onCopyReference: (p) => copyProjectReference(p),
     onLaunchCoder: launchInCoder,
     onLaunchAgents: launchInAgents,
     onDelete,
