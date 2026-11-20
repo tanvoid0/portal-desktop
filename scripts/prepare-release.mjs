@@ -80,13 +80,14 @@ function readVersions() {
 
 /** @param {string} version */
 function writeVersions(version) {
-  const pkg = JSON.parse(readFileSync(FILES.packageJson, 'utf8'));
-  pkg.version = version;
-  writeFileSync(FILES.packageJson, `${JSON.stringify(pkg, null, 2)}\n`);
-
-  const tauri = JSON.parse(readFileSync(FILES.tauriConf, 'utf8'));
-  tauri.version = version;
-  writeFileSync(FILES.tauriConf, `${JSON.stringify(tauri, null, 2)}\n`);
+  // Patch the top-level (2-space indent) "version" line in place. Re-serialising with
+  // JSON.stringify expands hand-formatted inline blocks and fails `prettier --check`.
+  for (const file of [FILES.packageJson, FILES.tauriConf]) {
+    const raw = readFileSync(file, 'utf8');
+    const updated = raw.replace(/^(  "version"\s*:\s*)"[^"]*"/m, `$1"${version}"`);
+    if (updated === raw) throw new Error(`Could not update version in ${file}`);
+    writeFileSync(file, updated);
+  }
 
   const cargo = readFileSync(FILES.cargoToml, 'utf8');
   const updatedCargo = cargo.replace(/^version\s*=\s*"[^"]+"/m, `version = "${version}"`);
