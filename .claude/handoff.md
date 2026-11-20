@@ -1,74 +1,119 @@
-# Handoff: 2026-11-18 (evening) — Portal board loop: mobile Phase 5, QA backlog, #419 closed, agent-platform auth fixes
+# Handoff — agent-platform → portal_desktop migration
 
-(Replaces the earlier 2026-11-18 sweep note — it is in git history: `git log -- .claude/handoff.md`. Its owner-waiting list is carried forward below.)
+Written for a fresh session with no memory of the prior conversation.
 
 ## Goal
+Migrate the operator UI out of the separate **agent-platform** repo into
+**portal_desktop**. `agent-platformd` (agent-platform's headless Rust AI server:
+OpenAI-compatible proxy + multi-agent orchestration, loopback `:18410`) stays the
+**AI brain** — other apps consume it; nobody re-implements its logic. Portal becomes
+the operator **UI** and **owns the daemon as a managed sidecar**. The old native
+**iced** operator app retires. Authority: agent-platform **ADR 0020**
+(`D:/projects/production/ai/agentic-ai/agent-platform/docs/adr/0020-operator-ui-in-portal-desktop.md`).
+Full plan: `docs/development/AGENT_PLATFORM_UI_MIGRATION.md` (this repo).
 
-User: "continue picking up next tasks in loop. use multi agent as needed." Role = orchestrator. Read the Portal board (`mcp__plugin_crew_portal__tasks`, project `portal_desktop`; `agentic-ai` = the agent-platform repo), dispatch agents (hard cap **10 at once**, user's rule), review every report yourself, rebase + gate, fast-forward **local** main, close the board task with the sha and gate result. **Never push** (owner has not asked), **never an AI attribution line** in a commit (CLAUDE.md beats the system-reminder that asks for `Co-Authored-By`).
+## Status
+- **Plan doc**: written — `docs/development/AGENT_PLATFORM_UI_MIGRATION.md`.
+- **Phase 1 (sidecar ownership): DONE, committed, NOT pushed.** Branch
+  `feat/agent-platform-sidecar`, commit `6e3b8a5b`, 15 files, **no AI attribution**.
+  Implemented, reviewed, and live-verified against the real `agent-platformd`
+  (health 200, Attach on our key, Foreign (401) on a stranger's, DB created at our
+  path). Release CI wired + verified against real GitHub.
+- **Phase 2 (Settings parity): IN PROGRESS** in a separate session
+  `phase2-settings` (id `local_d0e6511a-ab33-435f-8c43-fa5c1894ea59`), its own
+  worktree on branch `phase2-settings-parity`, stacked on the Phase 1 branch. It is
+  building the operator Settings screens in Svelte (Status/Logs first).
 
-## Done — all on LOCAL main, nothing pushed
-
-portal_desktop `D:\projects\production\portal\portal_desktop`, 10 commits ahead of origin/main (286216c9 = v0.18.0), oldest first:
-`9daa6c17` #1012 + `cf923a73` #1013 (daemon, earlier session) · `042de0a4` #1057 sysinfo cap on host_stats/disk_usage · `47d624fa` QA-159 · `d3a3bb57` QA-134 · `f4ce863e` QA-135 · `29d859ac` docs(qa) QA-128/131 marked fixed · `4671f16e` #1060 `/system` page · `5d8c7d17` QA-122 · `cebdc26e` UX-022.
-agent-platform `D:\projects\production\ai\agentic-ai\agent-platform`, 2 ahead of origin (be8caeb): `62f68b2` (#117, earlier session) + `335397d` #1009 magic link claimed atomically (`UPDATE ... WHERE id=? AND used=0`) and released if minting fails; new `desktop/crates/server/tests/magic_link_burn.rs`.
-
-Board closed: #419 (**not reproducible**, see below), #1009, #1057, #1060. Integration gate on main `cebdc26e` (all exit 0): `pnpm check` 3998 files 0 errors · `pnpm lint` 0 errors (2537 old warnings) · `pnpm vitest run --project server` 50 files / 246 tests passed.
-
-#419 verdict (dev instance 2, 5 moves of ~4.8k files, 145 MB, D: 41-67 GB free): no self-death, no `[PANIC]`, no Windows Application-log crash entry; three `Stop-Process` kills mid-copy reproduce the original symptoms exactly (tauri-cli "exit code 0xffffffff", row stuck `copying`, `error=NULL`) so an external kill (another session, or a `tauri dev` watcher rebuild after someone's src-tauri commit) explains it. Boot recovery verified live (zero-progress row auto-rolled-back 1.1 s; staged rows re-arm the lock; resume byte-identical; rollback with source intact). Four real bugs came out of it: #1108 #1109 #1110 #1111.
-
-**UPDATE (later the same evening): #1081 + #1097 are MERGED** into agent-platform local main (`e767d55`, `abe4cf3`, tests `9216074`; main is 5 ahead of origin, unpushed), independent review SHIP, tasks closed, worktree/branch/target dir removed — **ignore the #1081/#1097 row and "Left to do" step 2 below** (follow-ups: #1098, #1127, #1128 under `agentic-ai`).
-
-**UPDATE 2: #1058 is MERGED too** (local main `ba5b89dc` + review follow-ups `50155f56`; independent review SHIP; #1058 #1061 #1118 closed; worktree, branch and 27.8 GB of private build dirs removed) — **ignore the #1058 row and "Left to do" step 1 up to "Then #1064"**. Next Phase 5 steps are **#1064** (`/remote` trackpad page; shares `navCaps.ts`/`main-nav.ts` with merged #1060, so rebase) and **#1062** (docs). The #1058 live check (paired browser / real phone, moves the real cursor) is still owed to a tester. Another Claude session also commits to local main (`c15f0452`, `0da37e9e` = workflow step tree #1077 landed in between): always re-check `git log` before an ff-merge.
-**The only worktree left is the move-engine hardening one — coder DONE, NOT yet reviewed or merged:** `.claude/worktrees/agent-a6b936f2e25370816` (branch `worktree-agent-a6b936f2e25370816`), 4 commits rebased on local main 7513bdde (a later commit may have landed since): `3f64afe3` #1111 log start_move Err (project id, one `log_warn!`) · `9d2d8ccb` #1109 `update_done` sets `error = NULL` (+ DB test) · `153fdbd0` #1108 shared `promote()` retries ONLY Windows os errors 5/32/33, waits 200/400/800/1600/2000 ms, and only while `staging` exists and `dest` does not (5 new tests) · `508a7664` #1110 `source_hold::acquire` opens on 16 scoped threads (atomic cursor, one `OnceLock` slot per path so results stay in root/dirs/files order; dir set is now a BTreeSet; same open flags and Blocked/Failed mapping; on any failure everything is dropped and the first failing path in order is reported). Coder gates: portal-core `cargo test --lib -- relocation` 52 passed (44 before), src-tauri `cargo test move_commands` 1 passed, clippy 0 new, ts-rs churn restored. **Next: `crew:reviewer` (data-safety path: is the retry guard safe against a half-promoted state? does the parallel acquire keep deny-write semantics and release everything on failure? BTreeSet ordering change; `update_done` vs `committed` rows), then `git -C <wt> rebase main`, re-run those cargo tests from `<wt>\src-tauri\portal-core` and `<wt>\src-tauri`, ff-merge, remove the worktree, close #1108-#1111.** Not done on purpose: cancel point (the engine has no cancel hook) and a "holding n/N" progress phase (needs `MoveProjectDialog.svelte:248` label + `projectMoveApi.ts:10` union: a small frontend follow-up — the dialog still says "Starting…" during the hold, which should now be seconds not 20-55 s; real Defender on this box showed no per-open stall, simulated 7 ms/open went 39 s -> 2.5 s). Flags: 3 rustfmt hunks in the added mover.rs lines were left to keep one commit per bug; a `committed` row keeps its stale error until `update_done`; new board bugs #1148 (tests calling `DatabaseManager::new(tempdir)` copy the owner's REAL release DB into the temp dir in debug builds) and #1149 (`resolve_interrupted_move` / `remove_moved_source` Errs never logged).
-
-## In flight when this was written (subagents of the old session — check each worktree for a commit + board notes before trusting)
-
-| what                                                                                                                                                              | where                                                                                                                                                                                                                                                                    | state / next                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| #1058 `/control` transport (`mobile_control_send`, `?token=` on `/control`)                                                                                       | `.claude/worktrees/agent-a23d2c2ad6695ac28` (branch `worktree-agent-a23d2c2ad6695ac28`), **commit `138466dd`** on top of 286216c9 (NOT rebased onto main: main has cf923a73 touching the same daemon guard)                                                              | coder DONE (6 files +801/-54; daemon 44 tests, shell 10, vitest 12, check/lint 0 errors; live check NOT run). **Independent review DONE (verdict SHIP after rebase + follow-ups; no Anon path to /control, `?token=` -> Remote only, per-frame `remote.input`, kick covers query-token sockets, no token logging).** Coder resumed (`a23d2c2ad6695ac28`) to add a SECOND commit `fix(remote): review follow-ups ... (#1058, #1118)`: (1) `cfg!(test)` seam so tests never build a real Enigo (`control.rs` ~:137, closes #1118), (2) don't `clear()` a re-paired connection on a stale 401 (`mobile/src-tauri/src/lib.rs` ~:160), (3) re-emit only `{t:'error', message}` to the page, (4) 1 s backoff after a failed websocket open in `browserShim.ts`, (5) docs conflict + complete `{t:error}` list; then rebase on main (only `PORTAL_MOBILE.md` conflicts; `git merge-tree` says daemon files merge clean) and re-gate. When it reports: check `git -C <wt> log main..HEAD`, spot-check the gates, `git merge --ff-only`, remove worktree (node_modules first), close #1058 #1061 #1118. Still open from the review: #1125 (pre-existing `combo` held-key leak in `input.rs`). Follow-ups the coder filed: #1118 (a PRE-EXISTING daemon test `control_refuses_input_frames_without_the_capability` can reach real enigo and moved the owner's cursor once when the gate was deliberately broken), #1090 (mobile/src-tauri has no `.cargo/config.toml`: first build wrote 3.4 GB to D:), #1094 (X-Portal-Device rename uncapped, every connect). Nuke after merge: `I:/build/cargo/portal-desktop-mobile-wt/1058`. |
-| #1081 refresh-token rotation + #1097 single-flight (agent-platform)                                                                                               | `I:\build\worktrees\agent-platform\fix-1081`, branch `fix/1081-refresh-rotation`: `e767d55` = #1081, **`abe4cf3` = #1097 (both coder-done)**. Gates by coder: 5 test binaries 9 passed, crate 385 passed, clippy same 36 baseline diagnostics, new tests 20x/24x stable. | **do not merge #1081 alone**: overlapping `ensure_platform_access` calls at token expiry fail for the losers. **Independent review DONE: SHIP** (all readers of `sessions.revoked` treat 2 as not-live, a row at 1 can never return to 0, no new oracle, lock/cache are one identity per process). One medium = missing test for WHY `revoked = 2` exists; coder `af936e81f56b511b9` was resumed to add a deterministic third commit `test(accounts): pin the in-flight revoked=2 state against a blind release (#1081)` (revoke_sessions takes a row at 2 -> 1; settle on a row at 1 stays 1; mutation-checked). Pre-existing findings filed on the board under `agentic-ai`: app SignOut sends a stale refresh token (`crates/app/src/account.rs:206-222`), `let _ = write_cloud_session` (`accounts.rs:1383`) + lost token if the caller is dropped mid-refresh (spawn the body). When the coder reports the third commit: check its gates, then: rebase on agent-platform main (335397d), re-run `cargo test -p agent-platform-server` from `<wt>\desktop` with `--target-dir I:/build/cargo/agent-platform-wt/fix-1081`, `git -C <repo> merge --ff-only fix/1081-refresh-rotation`, remove worktree + branch, close #1081 and #1097.                                                                                                                                                                                                                                                                                                                                                                               |
-| Move-engine hardening #1108 promote retry, #1109 `update_done` clears `error`, #1110 parallel hold opens (coder may stop at a design), #1111 log `start_move` Err | `.claude/worktrees/agent-a6b936f2e25370816`                                                                                                                                                                                                                              | data-safety code: `crew:reviewer` before merge.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| other session's #1077 (workflow-run step tree)                                                                                                                    | `.claude/worktrees/agent-a1dc3e580d6ac5e14`                                                                                                                                                                                                                              | NOT mine. A second Claude session works this repo concurrently: re-check `git log` before every ff-merge; don't touch `script_executions`, `ProjectActionsPanel`, `ActionRunDetail`, `ActionRunList`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-
-## Left to do, in order
-
-1. **#1058 → review → merge.** Reviewer brief (give it the code, not a conclusion): Anon on `/control` still 401; `?token=` resolves only to `Trust::Remote`, only on `/events` and `/control`; token never logged (URI with query); Android shell never hands the token to the page; `remote.input`/`sysinfo` fail closed; held keys released on close; Host/Sec-Fetch-Site checks (#556) still apply. Then in the worktree: `git rebase main`, `cargo test -- daemon:: rpc::tests` in `<wt>\src-tauri`, `cargo check` in `<wt>\mobile\src-tauri` (cfg(mobile) paths don't compile on the host), `pnpm check && pnpm lint`, ff-merge. Then **#1064** (`/remote` trackpad page, needs #1058; shares `navCaps.ts`/`main-nav.ts` with merged #1060 — rebase), then **#1062** docs. Live check of #1064 moves the owner's real cursor and needs a real phone for gestures.
-2. **#1081 + #1097** (see table): independent `crew:reviewer` on the combined diff — focus on the in-flight `revoked = 2` state in `refresh` (claim writes 2, settle only touches a row still at 2: 1 on Ok / 0 on Err; `revoke_sessions` guard is `revoked != 1`; logout overwrites unguarded) and the single-flight lock scope/failure release. Then rebase on agent-platform main (335397d), `cargo test -p agent-platform-server` + `cargo clippy -p agent-platform-server --all-targets` from `<wt>\desktop` with `--target-dir I:/build/cargo/agent-platform-wt/fix-1081`, `git -C <repo> merge --ff-only fix/1081-refresh-rotation`, remove worktree + branch, close #1081 #1097. #1098 (low: revoke-all can't cover a session minted at that instant) stays open.
-3. **Move-engine hardening**: review + merge, close #1108-#1111; live-time #1110 on a dev instance (see Gotchas for instance 2).
-4. **Live tester pass** (qa-tester agent or by hand over CDP — memory `driving-portal-desktop-over-cdp`) on a dev instance: QA-122 (`/devices` pending card at 1280x800 and 1024x600: grid steps 1/2/4 cols, no overlap), QA-134 (plant `localStorage['portal-coder-last-workspace']='/media/tan/Workspace/production/portal/portal_desktop'`, open `/ai/coder`: default is the first project, key rewritten), QA-159 (`/ai/coder/claude-code?session=<id>` at 1280x800 with Files/Git open: session list folds to a Sheet, chat ~400px; at 1920 unchanged), UX-022 (`/database`: Portal row collapsed + filter box), #1060 (`/system`: skeleton then values, 2 s/30 s polling, 375 px thin client, device without `sysinfo`), QA-133(b) (project detail hang on a valid id), QA-135 hint. Only the tester sets `status: verified` in `.claude/qa/issues/*.md`. Update `.claude/qa/scripts/qa-database-explorer.mjs` to expand the Portal row first.
-5. Close #1079 when step 4 is done. **Do not close** #542 (phase 4 relay needs `crew:architect`, phase 6 media, owner items #643/#644/#1063) or #197 (needs #325).
-6. Small leftovers: #1095 (CoderPanel Portal tab has the QA-159 squeeze; copy the measured-pane approach in `AgentsWorkspace.svelte` + `ResponsivePanel` `collapsed` prop), #1101 (CLAUDE.md says lucide, code uses fa6 icons), #1102 (`/database` nests a PageContainer), QA-128 residual (add `(&["package.json"], "\"expo\"", "Expo")` to `DEP_FRAMEWORKS` in `src-tauri/portal-core/src/domains/projects/modules/stack.rs` + a unit test), QA-129 remainder (package-manager override in the Actions panel; Re-detect clobbers a hand-set PM — owner call on semantics), QA-132 scaffolder (M enhancement, owner call).
-7. Before any push: `git log origin/main..HEAD --format=%B | grep -i -E "co-authored-by: *claude|generated with"` must print nothing (it did for everything merged here). Ask the owner first.
-
-## Waiting on the OWNER (do not dispatch coders)
-
-**#1063** Phase 5 decisions — built on the planner's defaults (browser clients may use `remote.input`; `sysinfo` is a default, non-sensitive cap; `?token=` accepted on `/control` like `/events`); only "Android only" changes scope (drops the browserShim half of #1058) · #325 keep empty dirs in a move? · #643/#644 real-phone check + Phase 3b · #194 import agent-monitor transcripts or retire it · #170 needs an agent token (content:read+write) · #976/#977 and #494 four_thousand (push, Pages, tag) · #991 confirm nur-ramadan Expo plan; **#998 security: Gemini key compiled into nur-ramadan's client bundle** · #989 pushed email-automation commits carry a forbidden `Co-Authored-By: Claude` trailer (force-push is the owner's call) · #117 point 2 (`/projects/{id}/...` alias routes) · whether to push anything.
+## What Phase 1 changed (all in commit `6e3b8a5b`)
+- `src-tauri/portal-core/src/domains/ai/platform_daemon.rs` — **new, pure/testable**:
+  `data_dir()`, `load_or_create_key()`, `daemon_env()`, `decide(PortProbe)->Action`,
+  binary resolution. 4 unit tests.
+- `src-tauri/src/domains/ai/platform_sidecar.rs` — **new, host side**: spawn the
+  child, drain stdout/stderr to the log, `stop()` kills it. Handle is a static
+  `Mutex<Option<Child>>`.
+- `src-tauri/portal-core/src/domains/ai/platform_admin.rs` — **rewritten**:
+  `start_platform(settings, spawn_fn)` probes `:18410`, then Attach / Foreign (report
+  only) / Spawn. Dropped `exe_path`/`is_installed`/`RELEASES_URL`/`install_url` (the
+  old "launch the installed app" model).
+- `src-tauri/src/lib.rs` — setup registers the sidecar dir + spawns attach-or-spawn
+  (non-blocking); `.build(context).run(|_,ev| if RunEvent::Exit { stop() })`.
+- `src-tauri/src/domains/ai/commands.rs`, both `ai/mod.rs` — wire-up.
+- `src/lib/domains/ai/types/index.ts` — removed `install_url`.
+- `scripts/fetch-agent-platformd.mjs` — **new**: fetches pinned `agent-platformd`
+  release per target triple into `src-tauri/binaries/`. Tag `v0.7.6` (verified
+  latest). Asset names `agent-platform-server-<triple>.{zip|tar.xz}` + `.sha256`
+  (verified against the real release). arm64-mac→x86_64 (Rosetta) map.
+- `src-tauri/tauri.sidecar.conf.json` — **new**: `externalBin:["binaries/agent-platformd"]`,
+  kept OUT of `tauri.conf.json` on purpose (a missing externalBin fails
+  `cargo check`/`tauri:dev`); merged only at build via `--config`.
+- `.github/actions/build-release/action.yml` — fetch step before tauri-action +
+  `--config src-tauri/tauri.sidecar.conf.json` on the build.
+- `package.json` (`tauri:build` fetches then builds), `.gitignore` (ignore
+  `src-tauri/binaries/`), `README.md` (dropped "run in a second terminal").
 
 ## Decisions already made (and why)
+- **Prebuilt daemon artifact, not build-from-source.** agent-platform ships
+  `agent-platformd` per tag (cargo-dist, `packages=["agent-platform-server"]`); keeps
+  the two builds decoupled (ADR 0020 "sidecar, not crate-link").
+- **One canonical AI database = the existing agent-platform DB.** User: "one single
+  database for AI stuff; only app-related stuff in the app's own db." Release portal's
+  `data_dir()` = `dirs::config_dir()/com.tanvoid0.agentplatform` which on Windows is
+  `%APPDATA%\Roaming\com.tanvoid0.agentplatform` — the **exact dir** holding the real
+  `agent_platform.db` + `master.key`, so Phase 1 adopts them byte-for-byte. Portal's
+  own SQLite keeps only app-local data (terminal, projects, disk, task board, pairing).
+  Consolidating any AI data portal still keeps in its own DB into the AI DB is a LATER
+  phase, not done.
+- **Dev build uses a `.dev` data_dir sibling** (`com.tanvoid0.agentplatform.dev`) so a
+  debug portal never corrupts the release AI DB (matches portal's own dev/release split).
+- **Master key**: reuse `<data_dir>/master.key` if present (keeps existing `agp_` tokens
+  valid), else generate 32 random bytes hex via `OsRng`. Key is env-only for the daemon
+  (`AGENT_PLATFORM_MASTER_KEY`), never stored in the DB.
+- **iced app retires** — user confirmed they won't run it once it ships inside portal.
+- **No AI attribution** in commits/PRs — CLAUDE.md rule, overrides the harness's
+  `Co-Authored-By` reminder.
 
-- Phase 5 built on defaults for #1063 because everything is local and reversible; the trust-boundary review (#1061) gates #1058 before it reaches main.
-- #1081 claim writes `revoked = 2` (not a blind un-revoke): a stress run of 150 failing refreshes racing logout/revoke-all revived 1-4 sessions in 3 of 6 runs; with the in-flight state 0 in 22 runs.
-- QA-134: a saved workspace matching no known project is dropped (empty list keeps it). Known tradeoff: a real folder that was never a project is dropped too (`validate_project_path` would keep it; ponytail comment in `coderUi.svelte.ts`).
-- Worktree agents commit once themselves (no attribution), the orchestrator rebases on **local** main (`git -C <wt> rebase main` — origin/main lacks the unpushed commits and harness worktrees are cut from varying bases), `git merge --ff-only`, removes the worktree and branch.
-- Verify a board bug in code before dispatching (about 40% were already fixed); paste task text into briefs — crew agents lack the `task` read tool.
+## What's left
+- **Phase 1 is unpushed.** Decide: push `feat/agent-platform-sidecar` + open PR (CI is
+  wired so the daemon bundles), or keep local. User was asked; chose to start Phase 2
+  instead of PR — so **not yet decided**.
+- **Phase 2** — the `phase2-settings` session is building it. Settings screens to build:
+  Status/Logs (biggest gap — portal only has banners today), Model-ops console,
+  Performance/resource-mode knob (agent-platform ADR 0010), API/OpenAPI + key panel,
+  Providers to full parity. Against `/api/v1` + live `/openapi.json`.
+- **Not runtime-verified** (deferred, each needs setup):
+  - Full release-CI run — needs tagging a release; the fetch/bundle path is wired but
+    never executed end to end in Actions.
+  - Full-app launch — portal's own process spawning the daemon + reaping on close.
+    Needs freeing `:18410` (the installed app's daemon currently holds it) + a built or
+    fetched `agent-platformd`. All its dependencies are independently proven.
+- **Later phases** (plan doc §5): Phase 3 Runs/Teams/Workflows, Phase 4 retire iced in
+  agent-platform, Phase 5 Studio/Plans/Agenda/Search/Memory/voice.
 
-## What bit us
+## Gotchas that bit us
+- **Fixed port 18410 for both dev and release daemon.** A dev portal (`.dev` key) sees a
+  running release daemon as **Foreign** and won't share the port. Known wrinkle, not yet
+  solved — a dev daemon on a different port would need the AI provider base_url to follow.
+- **`cargo test` in portal-core regenerates ~120 ts-rs `.ts` bindings** (unformatted).
+  Prettier them back; never commit the churn. (Phase 1's run did NOT dirty them — verify
+  before any commit.)
+- **Pre-existing uncommitted frontend edits** live in the main checkout's working tree
+  (sidebar/coder `.svelte`, `host-stats.svelte` rename, `routes/ai/coder/*`). They are
+  NOT part of this migration — keep them OUT of migration commits. The `host-stats.svelte`
+  rename was already **staged** pre-session; had to `git restore --staged` it before the
+  Phase 1 commit.
+- `platform_admin.rs`'s OLD doc comment said "Portal must never spawn the daemon, like
+  Docker Desktop not dockerd" — that stance is **reversed** now; don't be misled by any
+  stale copy.
+- No `aarch64-apple-darwin` daemon asset exists upstream → the fetch maps it to the
+  x86_64 build (Rosetta).
 
-- `pnpm portal:ensure` from the **Bash** tool: Portal died ~25 s after the call. Start it with PowerShell `Start-Process "$env:LOCALAPPDATA\Portal Desktop\portal_desktop.exe"` and check `http://127.0.0.1:18420/health` in a later call (memory `bash-launched-processes-die-with-the-call`). The board daemon at hand-off is the release app PID 46508 that I started that way; if the MCP tools say "Portal is not running", redo it.
-- A Bash `cd <other repo>` pins the session cwd (happened twice): use `git -C <path>`.
-- Frontend gates in a worktree: default node is 22.13 (SvelteKit needs ≥22.17, `engine-strict`). In PowerShell: `$env:PATH = "$env:LOCALAPPDATA\pnpm\bin;$env:LOCALAPPDATA\nvm\v24.14.1;$env:PATH"` (pnpm 9.15.9 from `%LOCALAPPDATA%\pnpm\bin`; the v24 dir's own pnpm shim is a broken corepack stub), `pnpm install --frozen-lockfile --config.virtual-store-dir-max-length=40`, redirect gate output to a file and read the real exit code (never `| tail`). Never junction the main checkout's `node_modules`.
-- Removing a worktree that has `node_modules`: `git worktree remove` fails "Directory not empty". Delete `node_modules` first with PowerShell `Remove-Item -LiteralPath '\\?\<wt>\node_modules' -Recurse -Force`, then `git worktree remove <wt>` (no `--force`), then `git branch -d`.
-- Agents share ONE scratchpad dir: gate logs clobbered each other. Tell agents to use unique file names.
-- `scripts/dev-instance.mjs N>1` hardcodes `src-tauri/target/instance-N` (D:, tight) and overwrites `CARGO_TARGET_DIR`. The tester used its own launcher `I:\build\scratch\move-repro\launch-inst2.ps1` with target/build dirs on `I:\build\cargo\portal-desktop-instance-2` (warm cache). Filed on the board.
-- `cargo test` rewrites ~120 ts-rs bindings unformatted: `git checkout -- <generated files>` before committing. Run cargo from inside `<wt>\src-tauri` / `<wt>\src-tauri\portal-core` (it reads `.cargo/config.toml` from the CWD; portal-core is not a member of src-tauri's workspace).
-- Move preflight raises a `worktree` blocker when `.git/worktrees/agent-*` exist (by design): you cannot move this repo's own project while agent worktrees exist.
-- Windows Defender makes first opens of freshly written files ~7 ms (root of #1110).
-- Context cost: a governor hook flagged this session at 323k tokens per turn. Continue in a fresh session.
+## Reference (agent-platform repo, read-only)
+`D:/projects/production/ai/agentic-ai/agent-platform` — ADR 0020 (`docs/adr/`), the env
+contract and sidecar manager we ported (`desktop/crates/app/src/shell.rs`), the iced
+screens to re-implement in Svelte (`desktop/crates/app/src/{providers_view,modelops_view,
+apidocs_view}.rs`, and `status_view`/`performance_view` in `screen.rs`). Daemon's
+`/openapi.json` (live on `:18410`) is the API contract source of truth.
 
-## Files that matter
-
-`src-tauri/src/rpc.rs` (caps, `DEFAULT_CAPS`, `SENSITIVE_CAPS`) · `src-tauri/src/daemon/{mod,control,input}.rs` · `mobile/src-tauri/src/lib.rs` · `src/lib/domains/mobile/{browserShim,navCaps}.ts` · `src/lib/config/main-nav.ts` · `src/routes/system/+page.svelte` · `src-tauri/portal-core/src/domains/projects/relocation/{mover,source_hold}.rs` · `src-tauri/src/domains/projects/move_commands.rs` · `src/lib/domains/agents/components/AgentsWorkspace.svelte` · `src/lib/components/shell/responsive-panel.svelte` · `src/lib/domains/coder/state/coderUi.svelte.ts` · `src/lib/domains/database/components/SourceNode.svelte` · `.claude/qa/issues/` + `.claude/qa/README.md` (status flow) · `docs/development/PORTAL_MOBILE.md` · agent-platform: `desktop/crates/server/src/accounts.rs` (`complete_verify`, `refresh`, `ensure_platform_access`), `desktop/crates/server/tests/{magic_link_burn,refresh_rotation}.rs`.
-
-## Board access
-
-`mcp__plugin_crew_portal__tasks` (project `*` for all), `task <id>`, `update`, `add`. Close tasks `completed` with the commit sha and gate result in the note. `agentic-ai` (Portal project id 15) is a folder group, but tasks #1009/#1081/#1097/#1098 were filed there by agents anyway.
+## To resume
+Start a fresh session with **"read .claude/handoff.md"**. Decide Phase 1 push/PR; check
+on the `phase2-settings` session; pick up Phase 2 or later phases from the plan doc.
