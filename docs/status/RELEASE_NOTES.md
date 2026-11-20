@@ -1,5 +1,15 @@
 # Portal Desktop - Release Notes
 
+## Version 0.21.0
+
+### Highlights
+
+- Devices: extend a paired device's expiry without re-pairing
+- Mobile: forget-PC, stable host id, continuous discovery, VPN notice, Android 16 LAN pairing fix
+- Daemon: removed OS input-injection
+
+---
+
 ## Version 0.20.0
 
 ### Highlights

@@ -3,6 +3,7 @@
 Written for a fresh session with no memory of the prior conversation.
 
 ## Goal
+
 Migrate the operator UI out of the separate **agent-platform** repo into
 **portal_desktop**. `agent-platformd` (agent-platform's headless Rust AI server:
 OpenAI-compatible proxy + multi-agent orchestration, loopback `:18410`) stays the
@@ -13,6 +14,7 @@ the operator **UI** and **owns the daemon as a managed sidecar**. The old native
 Full plan: `docs/development/AGENT_PLATFORM_UI_MIGRATION.md` (this repo).
 
 ## Status
+
 - **Plan doc**: written — `docs/development/AGENT_PLATFORM_UI_MIGRATION.md`.
 - **Phase 1 (sidecar ownership): DONE, committed, NOT pushed.** Branch
   `feat/agent-platform-sidecar`, commit `6e3b8a5b`, 15 files, **no AI attribution**.
@@ -25,6 +27,7 @@ Full plan: `docs/development/AGENT_PLATFORM_UI_MIGRATION.md` (this repo).
   building the operator Settings screens in Svelte (Status/Logs first).
 
 ## What Phase 1 changed (all in commit `6e3b8a5b`)
+
 - `src-tauri/portal-core/src/domains/ai/platform_daemon.rs` — **new, pure/testable**:
   `data_dir()`, `load_or_create_key()`, `daemon_env()`, `decide(PortProbe)->Action`,
   binary resolution. 4 unit tests.
@@ -52,6 +55,7 @@ Full plan: `docs/development/AGENT_PLATFORM_UI_MIGRATION.md` (this repo).
   `src-tauri/binaries/`), `README.md` (dropped "run in a second terminal").
 
 ## Decisions already made (and why)
+
 - **Prebuilt daemon artifact, not build-from-source.** agent-platform ships
   `agent-platformd` per tag (cargo-dist, `packages=["agent-platform-server"]`); keeps
   the two builds decoupled (ADR 0020 "sidecar, not crate-link").
@@ -73,6 +77,7 @@ Full plan: `docs/development/AGENT_PLATFORM_UI_MIGRATION.md` (this repo).
   `Co-Authored-By` reminder.
 
 ## What's left
+
 - **Phase 1 is unpushed.** Decide: push `feat/agent-platform-sidecar` + open PR (CI is
   wired so the daemon bundles), or keep local. User was asked; chose to start Phase 2
   instead of PR — so **not yet decided**.
@@ -90,6 +95,7 @@ Full plan: `docs/development/AGENT_PLATFORM_UI_MIGRATION.md` (this repo).
   agent-platform, Phase 5 Studio/Plans/Agenda/Search/Memory/voice.
 
 ## Gotchas that bit us
+
 - **Fixed port 18410 for both dev and release daemon.** A dev portal (`.dev` key) sees a
   running release daemon as **Foreign** and won't share the port. Known wrinkle, not yet
   solved — a dev daemon on a different port would need the AI provider base_url to follow.
@@ -108,6 +114,7 @@ Full plan: `docs/development/AGENT_PLATFORM_UI_MIGRATION.md` (this repo).
   x86_64 build (Rosetta).
 
 ## Reference (agent-platform repo, read-only)
+
 `D:/projects/production/ai/agentic-ai/agent-platform` — ADR 0020 (`docs/adr/`), the env
 contract and sidecar manager we ported (`desktop/crates/app/src/shell.rs`), the iced
 screens to re-implement in Svelte (`desktop/crates/app/src/{providers_view,modelops_view,
@@ -115,5 +122,6 @@ apidocs_view}.rs`, and `status_view`/`performance_view` in `screen.rs`). Daemon'
 `/openapi.json` (live on `:18410`) is the API contract source of truth.
 
 ## To resume
+
 Start a fresh session with **"read .claude/handoff.md"**. Decide Phase 1 push/PR; check
 on the `phase2-settings` session; pick up Phase 2 or later phases from the plan doc.
