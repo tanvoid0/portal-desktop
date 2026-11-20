@@ -33,6 +33,14 @@ pub struct AppSettings {
     /// `0.0.0.0` (vs. loopback-only). Off by default — see `daemon::spawn`.
     #[serde(default)]
     pub remote_lan_enabled: bool,
+
+    /// This PC's stable id, so a phone client can recognize it across a DHCP IP
+    /// change (`discovery::spawn_responder` fills it into the UDP reply). Generated
+    /// once by [`SettingsService::get_or_create_host_id`] on first use, not a
+    /// hardware id — ponytail: tied to this settings file, not reinstall-proof;
+    /// swap for a hardware-derived id if that ever matters.
+    #[serde(default)]
+    pub host_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -335,6 +343,7 @@ impl SettingsService {
                 },
                 integrations: IntegrationSettings::default(),
                 remote_lan_enabled: false,
+                host_id: None,
             },
             editor: EditorSettings {
                 font_family: "Monaco, Consolas, 'Courier New', monospace".to_string(),
@@ -458,6 +467,19 @@ impl SettingsService {
         settings.app.remote_lan_enabled = enabled;
         settings.updated_at = Utc::now();
         self.save_settings(&settings)
+    }
+
+    /// This PC's stable id for discovery, generating and persisting one on first call.
+    pub fn get_or_create_host_id(&self) -> Result<String, String> {
+        let mut settings = self.load_settings()?;
+        if let Some(id) = settings.app.host_id.filter(|id| !id.is_empty()) {
+            return Ok(id);
+        }
+        let id = uuid::Uuid::new_v4().to_string();
+        settings.app.host_id = Some(id.clone());
+        settings.updated_at = Utc::now();
+        self.save_settings(&settings)?;
+        Ok(id)
     }
 
     /// Reset settings to defaults

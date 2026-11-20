@@ -6,9 +6,20 @@
   import SidebarTooltip from '$lib/components/shell/sidebar-tooltip.svelte';
   import { isMobileShell } from '$lib/domains/mobile/shell';
   import { mobileConnection } from '$lib/domains/mobile/connection.svelte';
+  import { confirmAction } from '$lib/utils/confirm';
   import HostStats from './host-stats.svelte';
   import Gear from '~icons/fa6-solid/gear';
   import Unplug from '~icons/fa6-solid/link-slash';
+
+  // Forgets the paired PC (drops the stored token — re-pairing needs a fresh
+  // approval on that PC), so it's confirmed rather than one accidental tap away.
+  async function forget() {
+    const ok = await confirmAction(
+      'This phone will need to pair again, and the PC will have to approve a new request.',
+      'Forget this PC?'
+    );
+    if (ok) void mobileConnection.disconnect();
+  }
 </script>
 
 <!-- Sidebar Footer — stacks into a single icon column when collapsed,
@@ -31,12 +42,12 @@
           variant="ghost"
           size="sm"
           class="h-8 gap-2 px-2"
-          onclick={() => mobileConnection.disconnect()}
-          aria-label="Disconnect"
+          onclick={forget}
+          aria-label="Forget this PC"
         >
           <Unplug class="h-4 w-4" />
           <span class="max-w-32 truncate text-xs">
-            Disconnect {mobileConnection.status?.name ?? ''}
+            Forget {mobileConnection.status?.name ?? ''}
           </span>
         </Button>
       {:else}

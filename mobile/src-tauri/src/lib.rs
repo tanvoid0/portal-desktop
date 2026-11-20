@@ -44,6 +44,11 @@ struct Conn {
     /// the desktop can label a grant. Absent in files written before it existed.
     #[serde(default)]
     device: Option<String>,
+    /// The desktop's stable id (`AppSettings::host_id`, carried in its discovery
+    /// reply), when known — lets `discover()` recognize this same PC again after
+    /// its LAN IP changes. Absent for a manual/QR pairing, which never saw one.
+    #[serde(default)]
+    id: Option<String>,
 }
 
 struct Inner {
@@ -552,6 +557,8 @@ fn parse_reply(buf: &[u8], from: std::net::IpAddr) -> Option<Value> {
         "port": v["port"].as_u64()?,
         "name": v["name"].as_str().unwrap_or("Portal Desktop"),
         "version": v["version"].as_str().unwrap_or(""),
+        "id": v["id"].as_str(),
+        "paired": false,
     }))
 }
 
@@ -562,6 +569,8 @@ struct Args {
     token: Option<String>,
     device: Option<String>,
     frame: Option<Value>,
+    /// The desktop's stable id, when pairing from a `mobile_discover` result row.
+    id: Option<String>,
 }
 
 async fn local(app: AppHandle, m: Mobile, cmd: &str, args: Value) -> Result<Value, String> {
@@ -574,14 +583,14 @@ async fn local(app: AppHandle, m: Mobile, cmd: &str, args: Value) -> Result<Valu
             m.clear(&app);
             Ok(m.status())
         }
-        "mobile_discover" => Ok(discover().await),
+        "mobile_discover" => Ok(discover_marking_paired(&app, &m).await),
         "mobile_connect" => {
             let host = need(a.host, "host")?;
             let port = a.port.ok_or("missing `port`")?;
             let token = need(a.token, "token")?;
             let who = whoami(&host, port, &token).await.map_err(|e| e.msg)?;
             let name = who["name"].as_str().unwrap_or("Portal Desktop").to_string();
-            m.set(&app, Conn { host, port, token, name, device: a.device });
+            m.set(&app, Conn { host, port, token, name, device: a.device, id: a.id });
             Ok(m.status())
         }
         "mobile_pair" => {
@@ -604,7 +613,10 @@ async fn local(app: AppHandle, m: Mobile, cmd: &str, args: Value) -> Result<Valu
             let token = v["token"].as_str().ok_or("pairing reply had no token")?;
             let name = v["name"].as_str().unwrap_or("Portal Desktop").to_string();
             let port = v["port"].as_u64().map_or(port, |p| p as u16);
-            m.set(&app, Conn { host, port, token: token.to_string(), name, device: Some(device) });
+            m.set(
+                &app,
+                Conn { host, port, token: token.to_string(), name, device: Some(device), id: a.id },
+            );
             Ok(m.status())
         }
         // Fire-and-forget: the frame is only queued; the socket, its token and its
@@ -648,6 +660,41 @@ async fn discover() -> Value {
     })
     .await;
     json!(found)
+}
+
+/// Tags each row of a `discover()` result `"paired": bool` against `conn`'s `id`
+/// (when it has one), and returns an updated [`Conn`] when the matching row's
+/// host/port moved — the paired PC's id is the same even after a DHCP lease
+/// changes its address, so this is what a caller re-persists to follow it.
+/// Pure and synchronous so the matching logic is tested without a real socket.
+fn mark_paired(rows: &mut Value, conn: &Conn) -> Option<Conn> {
+    let id = conn.id.as_deref().filter(|id| !id.is_empty())?;
+    let arr = rows.as_array_mut()?;
+    for row in arr {
+        if row["id"].as_str() != Some(id) {
+            continue;
+        }
+        row["paired"] = json!(true);
+        let (Some(host), Some(port)) = (row["host"].as_str(), row["port"].as_u64()) else {
+            continue;
+        };
+        if host != conn.host || port as u16 != conn.port {
+            return Some(Conn { host: host.to_string(), port: port as u16, ..conn.clone() });
+        }
+    }
+    None
+}
+
+/// [`discover`], then [`mark_paired`] against the stored connection and, if it
+/// moved, persisted via [`Mobile::set`] so the next reconnect dials the right address.
+async fn discover_marking_paired(app: &AppHandle, m: &Mobile) -> Value {
+    let mut rows = discover().await;
+    if let Some(conn) = m.conn() {
+        if let Some(moved) = mark_paired(&mut rows, &conn) {
+            m.set(app, moved);
+        }
+    }
+    rows
 }
 
 async fn forward(app: AppHandle, m: Mobile, cmd: String, args: Value) -> Result<Value, String> {
@@ -812,6 +859,33 @@ mod tests {
     }
 
     #[test]
+    fn mark_paired_flags_the_matching_id_and_follows_it_to_a_new_address() {
+        let paired = Conn { id: Some("abc".into()), ..conn() };
+
+        // No match: nothing flagged, no address update.
+        let mut rows = json!([{ "host": "10.0.0.9", "port": 1, "id": "other" }]);
+        assert!(mark_paired(&mut rows, &paired).is_none());
+        assert_eq!(rows[0]["paired"], Value::Null);
+
+        // Same id, same address: flagged, nothing to follow.
+        let mut rows = json!([{ "host": paired.host, "port": paired.port, "id": "abc" }]);
+        assert!(mark_paired(&mut rows, &paired).is_none());
+        assert_eq!(rows[0]["paired"], json!(true));
+
+        // Same id, moved address: flagged, and the caller gets the new address to persist.
+        let mut rows = json!([{ "host": "10.0.0.9", "port": 9999, "id": "abc" }]);
+        let moved = mark_paired(&mut rows, &paired).unwrap();
+        assert_eq!(rows[0]["paired"], json!(true));
+        assert_eq!(moved.host, "10.0.0.9");
+        assert_eq!(moved.port, 9999);
+        assert_eq!(moved.token, paired.token); // everything else carries over unchanged
+
+        // A connection with no id (manual/QR pairing) never matches.
+        let mut rows = json!([{ "host": "10.0.0.9", "port": 1, "id": "abc" }]);
+        assert!(mark_paired(&mut rows, &Conn { id: None, ..conn() }).is_none());
+    }
+
+    #[test]
     fn alert_for_default_none() {
         assert!(alert_for("mobile://connection", &json!({})).is_none());
     }
@@ -823,6 +897,7 @@ mod tests {
             token: "s3cret".into(),
             name: "PC".into(),
             device: None,
+            id: None,
         }
     }
 

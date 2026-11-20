@@ -7,6 +7,8 @@ use std::net::SocketAddr;
 use socket2::{Domain, Socket, Type};
 use tokio::net::UdpSocket;
 
+use crate::domains::settings::services::settings_service::SettingsService;
+
 /// The literal probe Android broadcasts. Not JSON — just these bytes.
 const PROBE: &[u8] = b"PORTALREMOTE?";
 
@@ -16,7 +18,10 @@ const PROBE: &[u8] = b"PORTALREMOTE?";
 const DISCOVERY_PORT: u16 = 8765;
 
 /// Bind `0.0.0.0:8765` with `SO_REUSEADDR` and answer every `PROBE` with
-/// `{port, name, version, id: null}`, sent back to the sender's own address.
+/// `{port, name, version, id}` — `id` is this PC's stable id (persisted via
+/// `SettingsService`, see `AppSettings::host_id`), so a phone that already paired
+/// can recognize this PC again after its LAN IP changes — sent back to the
+/// sender's own address.
 /// `SO_REUSEADDR` (rather than a plain `UdpSocket::bind`) matters once more
 /// than one Portal Desktop process is running on this machine — each dev
 /// instance binds the same port and a broadcast probe is delivered to all of
@@ -28,6 +33,7 @@ const DISCOVERY_PORT: u16 = 8765;
 /// enable condition — see `spawn` in `daemon::mod`.
 pub fn spawn_responder(port: u16) {
     let host_name = super::host_name();
+    let host_id = SettingsService::new().get_or_create_host_id().unwrap_or_default();
     tauri::async_runtime::spawn(async move {
         let addr: SocketAddr = ([0, 0, 0, 0], DISCOVERY_PORT).into();
         let socket = match bind_reusable(addr) {
@@ -49,7 +55,7 @@ pub fn spawn_responder(port: u16) {
                 "port": port,
                 "name": host_name,
                 "version": env!("CARGO_PKG_VERSION"),
-                "id": null,
+                "id": host_id,
             })
             .to_string();
             let _ = socket.send_to(reply.as_bytes(), from).await;

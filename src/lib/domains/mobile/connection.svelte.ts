@@ -14,6 +14,11 @@ export interface DiscoveredDesktop {
   port: number;
   name: string;
   version: string;
+  /** This desktop's stable id (null for an older daemon that predates it). */
+  id: string | null;
+  /** Whether this row's `id` matches the currently stored connection's — the
+   * same PC previously paired, even if its host/port moved since (DHCP). */
+  paired: boolean;
 }
 
 class MobileConnection {
@@ -36,8 +41,8 @@ class MobileConnection {
     }
   }
 
-  pair(host: string, port: number, device: string) {
-    return invoke<MobileStatus>('mobile_pair', { host, port, device });
+  pair(host: string, port: number, device: string, id: string | null = null) {
+    return invoke<MobileStatus>('mobile_pair', { host, port, device, id });
   }
 
   connect(host: string, port: number, token: string) {

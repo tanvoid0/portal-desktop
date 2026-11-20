@@ -5,15 +5,22 @@
   import { Label } from '$lib/components/ui/label';
   import * as Card from '$lib/components/ui/card';
   import { Alert, AlertDescription } from '$lib/components/ui/alert';
+  import { Badge } from '$lib/components/ui/badge';
   import { mobileConnection, type DiscoveredDesktop } from '$lib/domains/mobile/connection.svelte';
   import { parsePairUrl } from '$lib/domains/mobile/pairUrl';
   import { getErrorMessage } from '$lib/utils/errorMessage';
   import { isBrowserClient } from '$lib/domains/mobile/browserShim';
 
   const DEFAULT_PORT = 18420;
+  // How long discovery keeps re-probing before it gives up and shows the empty state,
+  // and how often it re-broadcasts while doing so — matches portal_remote's PairScreen.
+  const SEARCH_WINDOW_MS = 10_000;
+  const PROBE_INTERVAL_MS = 800;
 
   let desktops = $state<DiscoveredDesktop[]>([]);
   let searching = $state(true);
+  // True once the 10s window above has elapsed and nothing was found.
+  let searchTimedOut = $state(false);
   let deviceName = $state(isBrowserClient ? 'This browser' : 'Android phone');
   // The daemon has no CORS layer, so a browser client's fetch can only ever reach the
   // origin the page itself was served from — prefill it rather than let someone type a
@@ -30,27 +37,57 @@
   let attempt = 0;
 
   const busy = $derived(waitingFor !== null || connecting);
+  // Discovery came up empty and a connect attempt (manual entry or QR) also failed —
+  // on a phone a VPN is the usual cause: it routes traffic off the LAN entirely, so
+  // nothing here was ever reachable to begin with.
+  const vpnLikely = $derived(searchTimedOut && error !== null);
+  // The previously-paired PC (by stable id, survives its IP changing) sorts first.
+  const sortedDesktops = $derived.by(() =>
+    [...desktops].sort((a, b) => Number(b.paired) - Number(a.paired))
+  );
+
+  // Bumped so a stale discover() loop (unmounted, or superseded by a fresh "Search
+  // again") stops touching state and stops re-probing.
+  let discoverGen = 0;
 
   async function discover() {
+    const gen = ++discoverGen;
     searching = true;
-    try {
-      desktops = await mobileConnection.discover();
-    } catch {
-      desktops = [];
-    } finally {
+    searchTimedOut = false;
+    desktops = [];
+    const found = new Map<string, DiscoveredDesktop>();
+    const probe = async () => {
+      try {
+        for (const d of await mobileConnection.discover()) found.set(`${d.host}:${d.port}`, d);
+        if (gen === discoverGen) desktops = [...found.values()];
+      } catch {
+        // one failed broadcast doesn't end the search — the deadline below does
+      }
+    };
+    const deadline = Date.now() + SEARCH_WINDOW_MS;
+    await probe();
+    while (gen === discoverGen && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, PROBE_INTERVAL_MS));
+      if (gen === discoverGen) void probe();
+    }
+    if (gen === discoverGen) {
       searching = false;
+      searchTimedOut = found.size === 0;
     }
   }
 
-  onMount(discover);
+  onMount(() => {
+    void discover();
+    return () => discoverGen++; // leaving the page cancels the loop above
+  });
 
   // Successful pair/connect navigates via the root layout gate (status event).
-  async function pair(h: string, p: number, label: string) {
+  async function pair(h: string, p: number, label: string, id: string | null = null) {
     const mine = ++attempt;
     error = null;
     waitingFor = label;
     try {
-      await mobileConnection.pair(h, p, deviceName.trim() || 'Android phone');
+      await mobileConnection.pair(h, p, deviceName.trim() || 'Android phone', id);
     } catch (e) {
       if (mine === attempt) error = getErrorMessage(e, 'Connection failed');
     } finally {
@@ -104,12 +141,24 @@
     <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>
   {/if}
 
+  {#if vpnLikely}
+    <Alert>
+      <AlertDescription>
+        Still nothing? A VPN on this phone can route traffic away from your local network, so a PC
+        on the same Wi-Fi becomes unreachable. Try turning it off, or allow local network access in
+        its settings.
+      </AlertDescription>
+    </Alert>
+  {/if}
+
   {#if waitingFor}
     <Card.Root>
-      <Card.Header>
-        <Card.Title>Approve on your PC…</Card.Title>
+      <Card.Header class="items-center text-center">
+        <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+        <Card.Title>Waiting for {waitingFor}</Card.Title>
         <Card.Description>
-          Click Allow on the pairing request from {deviceName || 'this phone'} on {waitingFor}.
+          Approve the request on {waitingFor}'s screen — it's asking there as {deviceName ||
+            'this phone'}.
         </Card.Description>
       </Card.Header>
       <Card.Footer>
@@ -131,21 +180,30 @@
         <Card.Title>Desktops on this network</Card.Title>
       </Card.Header>
       <Card.Content class="grid gap-2">
-        {#each desktops as d (d.host + d.port)}
+        {#each sortedDesktops as d (d.host + d.port)}
           <Button
             variant="outline"
             class="h-auto justify-start py-3"
             disabled={busy}
-            onclick={() => pair(d.host, d.port, d.name)}
+            onclick={() => pair(d.host, d.port, d.name, d.id)}
           >
-            <span class="flex flex-col items-start">
+            <span class="flex flex-1 flex-col items-start">
               <span class="font-medium">{d.name}</span>
               <span class="text-xs text-muted-foreground">{d.host}:{d.port}</span>
             </span>
+            {#if d.paired}
+              <Badge variant="secondary">Previously paired</Badge>
+            {/if}
           </Button>
         {:else}
           <p class="text-sm text-muted-foreground">
-            {searching ? 'Searching…' : 'No desktops found.'}
+            {#if searching}
+              Searching…
+            {:else if searchTimedOut}
+              No desktops found after 10s. Make sure your phone is on the same Wi-Fi as your PC.
+            {:else}
+              No desktops found.
+            {/if}
           </p>
         {/each}
         <Button variant="ghost" size="sm" onclick={discover} disabled={searching || busy}>
