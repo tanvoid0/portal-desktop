@@ -421,7 +421,11 @@ class Bridge {
       throw `cannot reach ${conn.host}:${conn.port}: ${String(e)}`;
     }
     const body = await res.text();
-    if (res.status === 401) this.clear(); // token revoked on the desktop
+    // Only clear when this request's token is still the connection's current one.
+    // A 401 for a token already replaced by a re-pair must not wipe the fresh
+    // connection (the /control reset(Some(token)) and /events generation guards
+    // protect their paths the same way; forward() is the untracked one-shot).
+    if (res.status === 401 && loadConn()?.token === conn.token) this.clear();
     if (!res.ok) throw rpcError(res.status, body);
     if (!body) return null;
     try {

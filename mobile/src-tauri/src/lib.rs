@@ -349,8 +349,8 @@ async fn dial(req: Request) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>
     }
 }
 
-/// The only `/control` frame the page needs: a `{t:"error"}` refusal (say, no
-/// `remote.input`), re-emitted as just `{t, message}` with the message capped — the
+/// The only `/control` frame the page needs: a `{t:"error"}` refusal (an
+/// unimplemented frame type), re-emitted as just `{t, message}` with the message capped — the
 /// daemon chooses the frame, so nothing else in it is handed on. `hello` and the fanout
 /// the daemon forwards on this socket are already delivered by `/events`, so everything
 /// else is dropped.
@@ -666,7 +666,14 @@ async fn forward(app: AppHandle, m: Mobile, cmd: String, args: Value) -> Result<
     let status = res.status();
     let body = res.text().await.unwrap_or_default();
     if status.as_u16() == 401 {
-        m.clear(&app); // token revoked on the desktop
+        // Only clear when this request's token is still the stored one. A 401
+        // for a token already replaced by a re-pair must not wipe the fresh
+        // connection (the /control reset(Some(token)) and /events generation
+        // guards protect their paths the same way; forward() is the untracked
+        // one-shot).
+        if m.conn().is_some_and(|cur| cur.token == conn.token) {
+            m.clear(&app);
+        }
     }
     if !status.is_success() {
         return Err(rpc_error(status.as_u16(), &body));
