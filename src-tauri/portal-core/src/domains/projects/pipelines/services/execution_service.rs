@@ -1082,7 +1082,7 @@ impl ExecutionService {
     }
 
     fn emit_execution_update(&self, events: &Arc<dyn EventSink>, execution: Value) {
-        events.emit("pipeline-execution-update", execution);
+        events.emit("pipeline-execution-update", tick_payload(execution));
     }
 
     fn emit_step_log(
@@ -1562,7 +1562,7 @@ async fn record_progress(
     .await;
     if progress_emit_due(execution_id) {
         if let Ok(Some(e)) = repo.get_by_id(execution_id).await {
-            events.emit("pipeline-execution-update", ExecutionService::execution_to_json(&e));
+            events.emit("pipeline-execution-update", tick_payload(ExecutionService::execution_to_json(&e)));
         }
     }
 }
@@ -1592,10 +1592,41 @@ async fn write_step_logs(
                 step.output.push_str(l);
                 step.output.push('\n');
             }
+            cap_step_logs(step);
         }
         true
     })
     .await;
+}
+
+/// Most log lines kept per step; a dev server printing for hours must not
+/// grow the blob that every batch rewrites.
+const MAX_STEP_LOG_LINES: usize = 2000;
+/// Log lines a progress tick carries for an action run (the UI fetches the rest).
+const TICK_LOG_TAIL: usize = 200;
+
+/// Ring buffer: drop the oldest lines past the cap and rebuild `output` to match.
+fn cap_step_logs(step: &mut StepExecutionState) {
+    if step.logs.len() > MAX_STEP_LOG_LINES {
+        step.logs.drain(..step.logs.len() - MAX_STEP_LOG_LINES);
+        step.output = step.logs.iter().map(|l| format!("{l}\n")).collect();
+    }
+}
+
+/// Trim an action run's per-step logs to the tail (and drop `output`) before
+/// emitting a progress tick. Pipelines keep full ticks: their monitor reads them.
+fn tick_payload(mut exec: Value) -> Value {
+    if exec["kind"] == "action" {
+        if let Some(steps) = exec["stepExecutions"].as_array_mut() {
+            for s in steps {
+                if let Some(logs) = s["logs"].as_array_mut() {
+                    logs.drain(..logs.len().saturating_sub(TICK_LOG_TAIL));
+                }
+                s["output"] = json!("");
+            }
+        }
+    }
+    exec
 }
 
 /// Copies one of a step's output pipes into its log, line by line. Lines are
@@ -2037,6 +2068,24 @@ async fn signal_group(signal: &str, pid: u32) {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn step_logs_ring_buffer_and_action_tick_tail() {
+        let mut step = build_initial_step_executions(&[json!({ "id": "s" })], &HashMap::new())
+            .remove(0);
+        step.logs = (0..MAX_STEP_LOG_LINES + 5).map(|i| i.to_string()).collect();
+        cap_step_logs(&mut step);
+        assert_eq!(step.logs.len(), MAX_STEP_LOG_LINES);
+        assert_eq!(step.logs[0], "5");
+        assert!(step.output.starts_with("5\n"));
+
+        let tick = |kind| {
+            tick_payload(json!({ "kind": kind, "stepExecutions": [{
+                "logs": step.logs, "output": "x" }] }))
+        };
+        assert_eq!(tick("action")["stepExecutions"][0]["logs"].as_array().unwrap().len(), TICK_LOG_TAIL);
+        assert_eq!(tick("pipeline")["stepExecutions"][0]["logs"].as_array().unwrap().len(), MAX_STEP_LOG_LINES);
+    }
 
     #[test]
     fn step_timeout_honors_explicit_value_else_defaults() {
