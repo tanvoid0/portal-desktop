@@ -256,6 +256,118 @@ impl ExecutionService {
         .await
     }
 
+    /// Retry a failed run in place: rerun its non-`success` steps — the failed node
+    /// and everything after it — on the same execution row, keeping the steps that
+    /// already succeeded. Reloads the pipeline's current steps and reuses the run's
+    /// stored variables, so a release retry keeps `RELEASE_DRY_RUN` (a rehearsal
+    /// stays a rehearsal, a ship stays a ship). The command is `local_only`: this
+    /// can re-trigger a production ship.
+    pub async fn retry_execution(
+        &self,
+        execution_id: &str,
+        events: Arc<dyn EventSink>,
+    ) -> Result<Value, String> {
+        if self.is_running(execution_id) {
+            return Err("This run is still going; stop it before retrying.".to_string());
+        }
+        let exec = self
+            .execution_repo
+            .get_by_id(execution_id)
+            .await?
+            .ok_or_else(|| "Execution not found".to_string())?;
+        if exec.status != "failed" {
+            return Err(format!(
+                "Only a failed run can be retried (this one is {}).",
+                exec.status
+            ));
+        }
+        let pipeline_id = exec
+            .pipeline_id
+            .ok_or_else(|| "This run has no pipeline to retry".to_string())?;
+        let pipeline = self
+            .pipeline_repo
+            .get_by_id(pipeline_id)
+            .await?
+            .ok_or_else(|| "The pipeline for this run no longer exists".to_string())?;
+        let project = self
+            .project_repo
+            .get_by_id(pipeline.project_id)
+            .await?
+            .ok_or_else(|| "Project not found".to_string())?;
+        move_lock::ensure_unlocked(Path::new(&project.path))?;
+
+        let steps: Vec<Value> = serde_json::from_str(&pipeline.steps_json).unwrap_or_default();
+        reject_steps_after_long_running(&steps)?;
+        let variables: HashMap<String, String> =
+            serde_json::from_str(&exec.variables_json).unwrap_or_default();
+        let detected_pm = resolve_package_manager(&project);
+
+        // The ETA bars read the same history a first run would.
+        let step_ids: Vec<String> = steps
+            .iter()
+            .filter_map(|s| s.get("id")?.as_str().map(String::from))
+            .collect();
+        let history: Vec<HistoryRun> = self
+            .execution_repo
+            .get_by_pipeline(pipeline_id, Some(20))
+            .await?
+            .iter()
+            .map(|e| {
+                serde_json::from_str::<Vec<StepExecutionState>>(&e.step_executions_json)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|s| (s.stepId, s.status, s.duration))
+                    .collect()
+            })
+            .collect();
+        let expected = expected_durations(&history, &step_ids);
+
+        // Rebuild the step states from the pipeline as it is now, carrying over any
+        // step that already succeeded (by id); everything else restarts `pending`.
+        // Building from the current steps also absorbs steps added or removed since
+        // the failed run.
+        let succeeded: HashMap<String, StepExecutionState> =
+            serde_json::from_str::<Vec<StepExecutionState>>(&exec.step_executions_json)
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|s| s.status == "success")
+                .map(|s| (s.stepId.clone(), s))
+                .collect();
+        let mut states = build_initial_step_executions(&steps, &expected);
+        for st in &mut states {
+            match succeeded.get(&st.stepId) {
+                Some(prev) => *st = prev.clone(),
+                None => st.retryCount += 1,
+            }
+        }
+        let states_json = serde_json::to_string(&states)
+            .map_err(|e| format!("Failed to serialize steps: {}", e))?;
+        self.execution_repo
+            .update_step_executions(execution_id, states_json)
+            .await?;
+        self.execution_repo.reopen(execution_id).await?;
+
+        self.spawn_run(
+            execution_id.to_string(),
+            RunSpec {
+                pipeline_id: Some(pipeline_id),
+                project_id: Some(pipeline.project_id),
+                cwd: project.path,
+                steps,
+                variables,
+                triggered_by: exec.triggered_by.clone(),
+                detected_pm: Some(detected_pm),
+                expected,
+                ..Default::default()
+            },
+            events,
+        );
+
+        self.get_execution(execution_id)
+            .await?
+            .ok_or_else(|| "Execution not found after retry".to_string())
+    }
+
     /// The ETA for an action's step: the median of its own recent successful runs
     /// (see [`ExecutionRepository::get_action_history`]), for `RunSpec::expected`.
     /// An action is one step whatever a workflow names it, so every one-step run in
@@ -326,6 +438,27 @@ impl ExecutionService {
             })
             .await?;
 
+        if let Err(e) = self
+            .execution_repo
+            .update_status(&execution_id, "queued".to_string(), None)
+            .await
+        {
+            // Nothing will drive this run: close the row.
+            let _ = self
+                .execution_repo
+                .update_status(&execution_id, "failed".to_string(), Some(e.clone()))
+                .await;
+            return Err(e);
+        }
+
+        self.spawn_run(execution_id.clone(), spec, events);
+        Ok(execution_id)
+    }
+
+    /// Register a `queued` run so Stop can reach it, then drive it on a background
+    /// task; `run_execution` marks it `running`. Shared by a first run
+    /// ([`Self::execute_steps`]) and a retry ([`Self::retry_execution`]).
+    fn spawn_run(&self, execution_id: String, spec: RunSpec, events: Arc<dyn EventSink>) {
         let (cancel_tx, cancel_rx) = watch::channel(false);
         let children: Arc<Mutex<Vec<Child>>> = Arc::new(Mutex::new(Vec::new()));
 
@@ -342,23 +475,8 @@ impl ExecutionService {
             );
         }
 
-        if let Err(e) = self
-            .execution_repo
-            .update_status(&execution_id, "queued".to_string(), None)
-            .await
-        {
-            // Nothing will drive this run: unregister it (a leaked entry would
-            // block relocation all session) and close the row.
-            self.running.lock().unwrap().remove(&execution_id);
-            let _ = self
-                .execution_repo
-                .update_status(&execution_id, "failed".to_string(), Some(e.clone()))
-                .await;
-            return Err(e);
-        }
-
         let service = self.clone();
-        let exec_id = execution_id.clone();
+        let exec_id = execution_id;
         let events_handle = events.clone();
 
         tokio::spawn(async move {
@@ -385,8 +503,6 @@ impl ExecutionService {
             let mut running = service.running.lock().unwrap();
             running.remove(&exec_id);
         });
-
-        Ok(execution_id)
     }
 
     async fn run_execution(
@@ -416,6 +532,23 @@ impl ExecutionService {
             self.emit_execution_update(&events, exec);
         }
 
+        // Steps already `success` on this row — which a retry preserves — are
+        // skipped below, so a retry reruns only the failed node and its downstream.
+        // Empty on a first run, where every step is still `pending`.
+        let already_done: std::collections::HashSet<String> = self
+            .execution_repo
+            .get_by_id(&execution_id)
+            .await?
+            .map(|e| {
+                serde_json::from_str::<Vec<StepExecutionState>>(&e.step_executions_json)
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|s| s.status == "success")
+            .map(|s| s.stepId)
+            .collect();
+
         let order = resolve_execution_order(&steps)?;
         let step_map: HashMap<String, Value> = steps
             .iter()
@@ -436,6 +569,10 @@ impl ExecutionService {
                         .await?;
                     self.mark_cancelled(&execution_id, &events).await;
                     return Ok(());
+                }
+
+                if already_done.contains(&step_id) {
+                    continue;
                 }
 
                 let step = step_map
@@ -2128,6 +2265,103 @@ mod tests {
         assert_eq!(run.status, "failed");
         assert_eq!(run.error.as_deref(), Some("Exit code 3\noops"));
         assert_eq!(svc.get_step_logs(&id, "s").await.unwrap(), ["oops"]);
+    }
+
+    /// Retry reruns the failed node and everything after it, on the same run, while
+    /// steps that already succeeded are left alone (not rerun).
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn retry_reruns_the_failed_step_and_after_keeping_successes() {
+        let (svc, dir) = service_with_execution().await;
+        let path = dir.path().to_path_buf();
+        let pipeline_id = svc
+            .execution_repo
+            .get_by_id("e")
+            .await
+            .unwrap()
+            .unwrap()
+            .pipeline_id
+            .unwrap();
+
+        // s1 succeeds (appends a line); s2 fails until a marker file exists, so it
+        // fails on the first run and passes on the retry; s3 (after s2) writes a file.
+        let (s1, s2, s3) = if cfg!(windows) {
+            (
+                "echo x>> count.txt",
+                "if exist marker (exit 0) else (type nul>marker& exit 1)",
+                "echo done> done.txt",
+            )
+        } else {
+            (
+                "echo x >> count.txt",
+                "if [ -f marker ]; then exit 0; else : > marker; exit 1; fi",
+                "echo done > done.txt",
+            )
+        };
+        let step = |id: &str, needs: Value, command: &str| {
+            json!({ "id": id, "name": id, "dependsOn": needs, "config": { "command": command } })
+        };
+        let steps = json!([
+            step("s1", json!([]), s1),
+            step("s2", json!(["s1"]), s2),
+            step("s3", json!(["s2"]), s3),
+        ])
+        .to_string();
+        svc.pipeline_repo
+            .update(
+                pipeline_id,
+                None,
+                None,
+                Some(steps),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        let request = || ExecutionRequestData {
+            pipeline_id: pipeline_id.to_string(),
+            variables: None,
+            secrets: None,
+            triggered_by: None,
+        };
+        let count_lines = || {
+            std::fs::read_to_string(path.join("count.txt"))
+                .unwrap()
+                .lines()
+                .count()
+        };
+
+        let id = svc.execute_pipeline(request(), Arc::new(Quiet)).await.unwrap();
+        let run = finished(&svc, &id).await;
+        assert_eq!(run.status, "failed");
+        assert!(!path.join("done.txt").exists(), "s3 must not run after s2 fails");
+        assert_eq!(count_lines(), 1);
+
+        // Same run, retried: s1 is skipped, s2 now passes, s3 runs.
+        svc.retry_execution(&id, Arc::new(Quiet)).await.unwrap();
+        let run = finished(&svc, &id).await;
+        assert_eq!(run.status, "success");
+        assert_eq!(run.error, None, "the old failure's error is cleared");
+        assert_eq!(count_lines(), 1, "the succeeded step s1 is not rerun");
+        assert!(path.join("done.txt").exists(), "s3 runs on the retry");
+
+        let steps: Vec<StepExecutionState> =
+            serde_json::from_str(&run.step_executions_json).unwrap();
+        let status = |id: &str| {
+            steps
+                .iter()
+                .find(|s| s.stepId == id)
+                .map(|s| s.status.clone())
+                .unwrap()
+        };
+        assert_eq!(
+            (status("s1"), status("s2"), status("s3")),
+            ("success".into(), "success".into(), "success".into())
+        );
     }
 
     /// An action's ETA history is its block's successful runs (plus the block-less

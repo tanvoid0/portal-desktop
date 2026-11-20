@@ -374,6 +374,28 @@ impl ExecutionRepository {
             .map_err(|e| format!("Failed to update step executions: {}", e))?;
         Ok(())
     }
+
+    /// Reopen a finished run for a retry: back to `queued`, with the old error and
+    /// `finished_at` cleared so a successful retry does not keep the failure's
+    /// error text. The caller has checked the run is `failed` and not running, so
+    /// no Stop can race this (unlike [`Self::update_status`], which guards against it).
+    pub async fn reopen(&self, id: &str) -> Result<(), String> {
+        let connection = self.db_manager.get_connection();
+        let model = ExecutionEntity::find_by_id(id)
+            .one(connection)
+            .await
+            .map_err(|e| format!("Failed to fetch execution: {}", e))?
+            .ok_or_else(|| "Execution not found".to_string())?;
+        let mut active: ExecutionActiveModel = model.into();
+        active.status = Set("queued".to_string());
+        active.error = Set(None);
+        active.finished_at = Set(None);
+        active
+            .update(connection)
+            .await
+            .map_err(|e| format!("Failed to reopen execution: {}", e))?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

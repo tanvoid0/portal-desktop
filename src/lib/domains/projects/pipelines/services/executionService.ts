@@ -199,15 +199,16 @@ export class ExecutionService {
   }
 
   /**
-   * Retry a failed step
+   * Retry a failed run: reruns its non-success steps (the failed node and
+   * everything after it) on the same execution.
    */
-  async retryStep(executionId: string, stepId: string): Promise<void> {
+  async retryExecution(executionId: string): Promise<void> {
     try {
-      log.info('Retrying step', { executionId, stepId });
-      await invoke('retry_step_execution', { executionId, stepId });
-      log.info('Step retry initiated', { executionId, stepId });
+      log.info('Retrying execution', { executionId });
+      await invoke('retry_execution', { executionId });
+      log.info('Execution retry initiated', { executionId });
     } catch (error) {
-      log.error('Failed to retry step', { error });
+      log.error('Failed to retry execution', { error });
       throw error;
     }
   }

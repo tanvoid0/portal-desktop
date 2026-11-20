@@ -544,7 +544,7 @@ pub fn run() {
             domains::projects::pipelines::update_block,
             domains::projects::pipelines::delete_block,
             domains::projects::pipelines::get_step_execution_logs,
-            domains::projects::pipelines::retry_step_execution,
+            domains::projects::pipelines::retry_execution,
             // Task commands
             domains::tasks::create_task,
             domains::tasks::update_task,

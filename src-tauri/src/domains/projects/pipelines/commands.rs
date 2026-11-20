@@ -144,15 +144,17 @@ pub async fn get_step_execution_logs(
     service.get_step_logs(&execution_id, &step_id).await
 }
 
-#[portal_rpc_macro::rpc]
-pub async fn retry_step_execution(
-    _execution_id: String,
-    _step_id: String,
-    _service: State<'_, Arc<ExecutionService>>,
-) -> Result<(), String> {
-    // FUTURE: Step retry functionality - requires execution state management
-    // Planned for future release - will allow retrying failed steps from checkpoint
-    Ok(())
+/// Retry a failed run in place: rerun its non-`success` steps (the failed node and
+/// everything after it) on the same execution row, keeping the steps that already
+/// succeeded. `local_only`: it reuses the run's stored variables, so a retry of a
+/// release ship is another real ship — only this app's window may start it.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn retry_execution(
+    execution_id: String,
+    events: State<'_, Events>,
+    service: State<'_, Arc<ExecutionService>>,
+) -> Result<Value, String> {
+    service.retry_execution(&execution_id, events.sink()).await
 }
 
 #[portal_rpc_macro::rpc]

@@ -15,6 +15,7 @@
   import Clock from '~icons/fa6-solid/clock';
   import Copy from '~icons/fa6-solid/copy';
   import Check from '~icons/fa6-solid/check';
+  import ArrowsRotate from '~icons/fa6-solid/arrows-rotate';
   import { toast } from '$lib/utils/toast';
   import { PageHeader, PageError, PageLoading } from '$lib/components/shell';
   import type { PipelineExecution, StepExecution } from '../types';
@@ -39,6 +40,7 @@
   let unlistenExecution: (() => void) | null = null;
   let unlistenStepLog: (() => void) | null = null;
   let cancelling = $state(false);
+  let retrying = $state(false);
   let errorCopied = $state(false);
   let loadError = $state<string | null>(null);
   let subscribed = false;
@@ -192,6 +194,13 @@
       return;
     }
 
+    startPoll();
+  }
+
+  // Poll while the run is live; the interval clears itself at a terminal status.
+  // A retry restarts it, since the first poll is gone once the run finishes.
+  function startPoll() {
+    if (pollInterval) return;
     pollInterval = setInterval(async () => {
       if (execution && ['pending', 'running'].includes(execution.status)) {
         await refreshExecution();
@@ -261,6 +270,21 @@
       cancelling = false;
     }
   }
+
+  async function handleRetry() {
+    if (!execution || retrying || execution.status !== 'failed') return;
+
+    try {
+      retrying = true;
+      await executionService.retryExecution(executionId);
+      await refreshExecution();
+      startPoll();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      retrying = false;
+    }
+  }
 </script>
 
 <!-- @container: the steps/logs split follows this component's own width, so the same
@@ -289,6 +313,17 @@
             Stopping...
           {:else}
             {cancelLabel}
+          {/if}
+        </Button>
+      {/if}
+      {#if execution && execution.status === 'failed'}
+        <Button variant="outline" size="sm" onclick={handleRetry} disabled={retrying}>
+          {#if retrying}
+            <Loader2 class="mr-2 h-4 w-4 animate-spin" />
+            Retrying...
+          {:else}
+            <ArrowsRotate class="mr-2 h-4 w-4" />
+            Retry failed
           {/if}
         </Button>
       {/if}

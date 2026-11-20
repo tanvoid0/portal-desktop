@@ -83,9 +83,15 @@ Project -> Actions shows a **Release** card (Rehearse / Ship). Commands, all in
 | `release_list {projectId, limit?}` | yes                       | recent release executions                |
 | `release_rehearse {projectId}`     | yes                       | runs `rehearse` with `RELEASE_DRY_RUN=1` |
 | `release_ship {projectId}`         | **no** (`local_only`)     | runs `ship` with `RELEASE_DRY_RUN=0`     |
+| `retry_execution {executionId}`    | **no** (`local_only`)     | reruns a failed run's non-success steps  |
 
 Watch and stop with the existing `get_pipeline_execution` and
-`cancel_pipeline_execution`. Runs are ordinary pipeline executions (the file's
+`cancel_pipeline_execution`. A failed run shows a **Retry failed** button on its
+run page: it reruns only the step that failed and the steps after it, keeping the
+ones that already succeeded, on the same execution. It reuses the run's stored
+variables, so retrying a ship is another real ship (hence `local_only`) and
+retrying a rehearsal stays a rehearsal. The pipeline's steps are re-read, so a
+fix to `.portal/pipeline.yml` is picked up on the retry. Runs are ordinary pipeline executions (the file's
 workflow is written to a `pipelines` row with `preset_key = "release:<workflow>"`
 on each run). Cancel kills the process tree on Windows, but not detached Gradle
 daemons, and a Cloud Run deploy already submitted may still finish. Closing the
