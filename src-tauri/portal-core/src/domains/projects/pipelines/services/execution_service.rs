@@ -296,11 +296,24 @@ impl ExecutionService {
             .ok_or_else(|| "Project not found".to_string())?;
         move_lock::ensure_unlocked(Path::new(&project.path))?;
 
-        let steps: Vec<Value> = serde_json::from_str(&pipeline.steps_json).unwrap_or_default();
+        let mut steps: Vec<Value> = serde_json::from_str(&pipeline.steps_json).unwrap_or_default();
         reject_steps_after_long_running(&steps)?;
         let variables: HashMap<String, String> =
             serde_json::from_str(&exec.variables_json).unwrap_or_default();
         let detected_pm = resolve_package_manager(&project);
+
+        // Re-apply this run's variables onto each step's `env`, overwriting any value
+        // the shared pipeline row still carries from a later run of the same workflow
+        // id. This keeps the retry's own `RELEASE_DRY_RUN` (a ship retry stays a ship,
+        // a rehearsal stays a rehearsal) instead of whatever ran last. Mirrors the
+        // baking in `execute_file_workflow`, but authoritative — overwrite, not fill.
+        for step in &mut steps {
+            if let Some(env) = step["config"]["env"].as_object_mut() {
+                for (k, v) in &variables {
+                    env.insert(k.clone(), json!(v));
+                }
+            }
+        }
 
         // The ETA bars read the same history a first run would.
         let step_ids: Vec<String> = steps
@@ -326,28 +339,49 @@ impl ExecutionService {
         // step that already succeeded (by id); everything else restarts `pending`.
         // Building from the current steps also absorbs steps added or removed since
         // the failed run.
-        let succeeded: HashMap<String, StepExecutionState> =
+        let prev: HashMap<String, StepExecutionState> =
             serde_json::from_str::<Vec<StepExecutionState>>(&exec.step_executions_json)
                 .unwrap_or_default()
                 .into_iter()
-                .filter(|s| s.status == "success")
                 .map(|s| (s.stepId.clone(), s))
                 .collect();
         let mut states = build_initial_step_executions(&steps, &expected);
         for st in &mut states {
-            match succeeded.get(&st.stepId) {
-                Some(prev) => *st = prev.clone(),
-                None => st.retryCount += 1,
+            match prev.get(&st.stepId) {
+                // A step that already succeeded is carried over as-is (and skipped by
+                // `run_execution`); anything else restarts `pending` with its retry
+                // count bumped. A step new to the pipeline since the failure stays 0.
+                Some(p) if p.status == "success" => *st = p.clone(),
+                Some(p) => st.retryCount = p.retryCount + 1,
+                None => {}
             }
         }
         let states_json = serde_json::to_string(&states)
             .map_err(|e| format!("Failed to serialize steps: {}", e))?;
-        self.execution_repo
-            .update_step_executions(execution_id, states_json)
-            .await?;
-        self.execution_repo.reopen(execution_id).await?;
 
-        self.spawn_run(
+        // Reserve the run slot before the writes below, so two concurrent retries of
+        // the same run cannot both drive it (which would, for a release, ship twice).
+        // The top `is_running` check is only a fast path; this is the real guard.
+        let Some((cancel_rx, children)) =
+            self.reserve_run(execution_id, project.path.clone(), false)
+        else {
+            return Err("This run is still going; stop it before retrying.".to_string());
+        };
+
+        if let Err(e) = self
+            .execution_repo
+            .update_step_executions(execution_id, states_json)
+            .await
+        {
+            self.running.lock().unwrap().remove(execution_id);
+            return Err(e);
+        }
+        if let Err(e) = self.execution_repo.reopen(execution_id).await {
+            self.running.lock().unwrap().remove(execution_id);
+            return Err(e);
+        }
+
+        self.drive_run(
             execution_id.to_string(),
             RunSpec {
                 pipeline_id: Some(pipeline_id),
@@ -361,6 +395,8 @@ impl ExecutionService {
                 ..Default::default()
             },
             events,
+            cancel_rx,
+            children,
         );
 
         self.get_execution(execution_id)
@@ -438,12 +474,20 @@ impl ExecutionService {
             })
             .await?;
 
+        let Some((cancel_rx, children)) =
+            self.reserve_run(&execution_id, spec.cwd.clone(), spec.action.is_some())
+        else {
+            // A freshly minted id cannot already be running.
+            return Err("Execution already running".to_string());
+        };
+
         if let Err(e) = self
             .execution_repo
             .update_status(&execution_id, "queued".to_string(), None)
             .await
         {
-            // Nothing will drive this run: close the row.
+            // Nothing will drive this run: unregister it and close the row.
+            self.running.lock().unwrap().remove(&execution_id);
             let _ = self
                 .execution_repo
                 .update_status(&execution_id, "failed".to_string(), Some(e.clone()))
@@ -451,30 +495,51 @@ impl ExecutionService {
             return Err(e);
         }
 
-        self.spawn_run(execution_id.clone(), spec, events);
+        self.drive_run(execution_id.clone(), spec, events, cancel_rx, children);
         Ok(execution_id)
     }
 
-    /// Register a `queued` run so Stop can reach it, then drive it on a background
-    /// task; `run_execution` marks it `running`. Shared by a first run
-    /// ([`Self::execute_steps`]) and a retry ([`Self::retry_execution`]).
-    fn spawn_run(&self, execution_id: String, spec: RunSpec, events: Arc<dyn EventSink>) {
+    /// Reserve the run slot for `execution_id` so exactly one task drives it, and
+    /// hand back the cancel receiver and child-process handle. `None` when a task is
+    /// already driving this id — the check-and-insert is atomic under the lock, so it
+    /// is the real guard against two drivers of one run (a fresh run mints a unique
+    /// id and never collides; a retry reuses the id and could).
+    fn reserve_run(
+        &self,
+        execution_id: &str,
+        project_path: String,
+        action: bool,
+    ) -> Option<(watch::Receiver<bool>, Arc<Mutex<Vec<Child>>>)> {
         let (cancel_tx, cancel_rx) = watch::channel(false);
         let children: Arc<Mutex<Vec<Child>>> = Arc::new(Mutex::new(Vec::new()));
-
-        {
-            let mut running = self.running.lock().unwrap();
-            running.insert(
-                execution_id.clone(),
-                RunningExecution {
-                    cancel_tx,
-                    children: Arc::clone(&children),
-                    project_path: spec.cwd.clone(),
-                    action: spec.action.is_some(),
-                },
-            );
+        let mut running = self.running.lock().unwrap();
+        if running.contains_key(execution_id) {
+            return None;
         }
+        running.insert(
+            execution_id.to_string(),
+            RunningExecution {
+                cancel_tx,
+                children: Arc::clone(&children),
+                project_path,
+                action,
+            },
+        );
+        Some((cancel_rx, children))
+    }
 
+    /// Drive a reserved `queued` run on a background task; `run_execution` marks it
+    /// `running`. Shared by a first run ([`Self::execute_steps`]) and a retry
+    /// ([`Self::retry_execution`]); both reserve the slot with [`Self::reserve_run`]
+    /// first.
+    fn drive_run(
+        &self,
+        execution_id: String,
+        spec: RunSpec,
+        events: Arc<dyn EventSink>,
+        cancel_rx: watch::Receiver<bool>,
+        children: Arc<Mutex<Vec<Child>>>,
+    ) {
         let service = self.clone();
         let exec_id = execution_id;
         let events_handle = events.clone();
@@ -2361,6 +2426,74 @@ mod tests {
         assert_eq!(
             (status("s1"), status("s2"), status("s3")),
             ("success".into(), "success".into(), "success".into())
+        );
+    }
+
+    /// A retry runs with the run's own variables, not whatever env the shared
+    /// pipeline row still carries from a later run of the same workflow — so a
+    /// rehearsal retried after a ship stays a rehearsal (the release-safety property).
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn retry_reapplies_the_runs_variables_over_the_pipelines_baked_env() {
+        let (svc, dir) = service_with_execution().await;
+        let path = dir.path().to_path_buf();
+        let seed = svc.execution_repo.get_by_id("e").await.unwrap().unwrap();
+        let pipeline_id = seed.pipeline_id.unwrap();
+        let project_id = seed.project_id.unwrap();
+
+        // The shared pipeline row carries a step whose env was baked MODE=ship by an
+        // earlier run; the step writes $MODE to a file.
+        let cmd = if cfg!(windows) {
+            "echo %MODE%>mode.txt"
+        } else {
+            "printf '%s' \"$MODE\" > mode.txt"
+        };
+        let steps = json!([{
+            "id": "s", "name": "s", "dependsOn": [],
+            "config": { "command": cmd, "env": { "MODE": "ship" } }
+        }])
+        .to_string();
+        svc.pipeline_repo
+            .update(
+                pipeline_id,
+                None,
+                None,
+                Some(steps),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        // A failed run of that pipeline whose OWN variables say MODE=rehearse.
+        svc.execution_repo
+            .insert(NewRun {
+                id: "r".into(),
+                pipeline_id: Some(pipeline_id),
+                project_id: Some(project_id),
+                status: "failed".into(),
+                triggered_by: "user".into(),
+                step_executions_json: json!([{
+                    "id": "x", "stepId": "s", "stepName": "s", "status": "failed",
+                    "startedAt": "", "output": "", "retryCount": 0, "logs": []
+                }])
+                .to_string(),
+                variables_json: json!({ "MODE": "rehearse" }).to_string(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        svc.retry_execution("r", Arc::new(Quiet)).await.unwrap();
+        let run = finished(&svc, "r").await;
+        assert_eq!(run.status, "success");
+        assert_eq!(
+            std::fs::read_to_string(path.join("mode.txt")).unwrap().trim(),
+            "rehearse",
+            "the retry must use the run's own MODE, not the pipeline's baked env"
         );
     }
 
