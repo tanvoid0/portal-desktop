@@ -2,6 +2,9 @@ import { open } from './app.mjs';
 const app = await open('database');
 const p = app.page;
 const log = (...a) => console.log(...a);
+// UX-022: sources with >30 tables start collapsed; expand Portal first.
+await p.getByRole('button', { name: 'Portal (this app) tables' }).click().catch(() => {});
+await p.waitForTimeout(500);
 // check 1
 log('source visible:', await p.getByText('Portal (this app)').count());
 log('kind labels table:', await p.getByText('table', { exact: true }).count(), 'view:', await p.getByText('view', { exact: true }).count());

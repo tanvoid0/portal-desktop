@@ -1,7 +1,7 @@
 ---
 id: QA-122
 title: Pending-request capability grid overlaps itself inside the narrow pairing card
-status: fixed
+status: verified
 severity: major
 kind: bug
 area: devices/pairing
@@ -88,4 +88,4 @@ every width up to 456px; after, none overflow at any width and none wrap from 29
 
 ## Verification
 
-<!-- qa-tester: date, mode, what was rerun, result -->
+2026-11-20, tauri (dev instance, CDP :9222, release daemon Foreign). Dev data has no pending pairing request, so the pending card itself could not be rendered. Rerun instead: `scripts/QA-122-verify.mjs` (real "Pair a phone" grid at 1280/1024: 4 and 3 columns, 0 cells overflowing) and `scripts/QA-122-verify-narrow.mjs` (clones the real CapabilityChecklist grid into 138/290/330/456px boxes: 1/1/1/2 columns, 0 overflowing cells, the Sensitive badge wraps under the label instead of past the cell). Shot: `.claude/qa/shots/QA-122-after-narrow-clone-widths.png`, `QA-122-after-devices-grid.png`. Result: gone. Not seen on a real pending card (none available).

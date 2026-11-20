@@ -1,7 +1,7 @@
 ---
 id: QA-159
 title: Agent tab with Files/Git panel open squeezes the chat column to ~220px at 1280x800
-status: fixed
+status: verified
 severity: minor
 kind: ux
 area: ai/coder/claude-code (AgentsWorkspace)
@@ -46,3 +46,5 @@ Root cause: four columns with no width budget - session list `w-80`, chat `flex-
 - Checks: `pnpm check` exit 0 (0 errors), `pnpm lint` exit 0 (prettier clean, eslint 0 errors, shadcn check passed). Not run in the live app - needs a live look at 1280x800.
 
 ## Verification
+
+2026-11-20, tauri (dev instance). `scripts/QA-159-verify.mjs`: claude-code session focused, workspace sidebar + Files panel open. Chat column / composer width: 1280 -> 400 / 346, 1440 -> 480 / 426, 1920 -> 552 / 498 (was ~220 at 1280). Session list folds into the Sheet at 1280 and 1440 and docks (320) at 1920. Tabs not clipped, composer placeholder on one line at 1280. Shots: `.claude/qa/shots/QA-159-after-agent-files-1280.png`, `-1440.png`, `-1920.png`. Result: gone. (A "Vault locked" dialog overlays the dev instance in the shots; unrelated.)

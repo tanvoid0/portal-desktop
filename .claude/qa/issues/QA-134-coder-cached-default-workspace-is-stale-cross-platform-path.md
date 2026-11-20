@@ -1,7 +1,7 @@
 ---
 id: QA-134
 title: "AI > Code: the coder's cached default workspace is a stale cross-platform path (`/media/tan/...` Linux mount) pre-selected on Windows, so a new session defaults to a non-existent directory"
-status: fixed
+status: verified
 severity: minor
 kind: bug
 area: ai/coder
@@ -82,4 +82,4 @@ browser/client build is affected).
 
 ## Verification
 
-<!-- qa-tester: date, mode, what was rerun, result -->
+2026-11-20, tauri (dev instance). `scripts/QA-134-verify.mjs`: planted `localStorage['portal-coder-last-workspace']='/media/tan/Workspace/production/portal/portal_desktop'`, loaded `/ai/coder` with the real project list (170 projects). Result: key rewritten to the first project's path, no `/media/tan` text anywhere in the page, a real project path replanted stays. Shot: `.claude/qa/shots/QA-134-after-stale-dropped.png`. Original localStorage value restored afterwards. Known tradeoff (never-a-project folder is dropped too) not reopened.

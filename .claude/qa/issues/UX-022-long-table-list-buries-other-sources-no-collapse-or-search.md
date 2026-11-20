@@ -1,7 +1,7 @@
 ---
 id: UX-022
 title: Portal's own 280+ table list is always expanded and un-searchable, burying every other source
-status: fixed
+status: verified
 severity: minor
 kind: ux
 area: database
@@ -76,4 +76,4 @@ the new `tableList.test.ts`). Not driven live (no dev instance was run).
 
 ## Verification
 
-<!-- qa-tester: date, mode, what was rerun, result -->
+2026-11-20, tauri (dev instance). `scripts/UX-022-verify.mjs`: Portal source (53 tables in the dev copy, >30) loads collapsed (`aria-expanded=false`, 0 rows, filter box visible); chevron expands to 53 rows; filter `agent_` -> "3 of 53 tables"; `zzzqq` -> "No tables match"; collapsing clears the filter. Shots: `.claude/qa/shots/UX-022-after-collapsed-initial-2.png`, `UX-022-after-expanded.png`, `UX-022-after-filter-agent.png`. `scripts/qa-database-explorer.mjs` now expands the Portal row first. Result: gone. Nit, not reopened: Portal's source label truncates to "Portal ..." (the accepted chevron trade-off).
