@@ -81,9 +81,6 @@ once_cell = "1.21.3"
 jwalk = "0.8"
 trash = "5"
 rusqlite = { version = "0.32", features = ["bundled"] }
-# OS input injection for `/control`'s mouse/keyboard frames — Win32 SendInput
-# under the hood on Windows, X11/Wayland/macOS elsewhere.
-enigo = "0.6.1"
 tauri-plugin-deep-link = "2"
 
 [dev-dependencies]

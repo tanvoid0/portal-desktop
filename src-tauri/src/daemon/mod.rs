@@ -59,7 +59,6 @@
 mod control;
 mod discovery;
 pub mod firewall;
-mod input;
 pub mod pairing;
 
 use std::collections::HashMap;

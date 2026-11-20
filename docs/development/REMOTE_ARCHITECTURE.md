@@ -1,7 +1,13 @@
 # Remote architecture — making Portal Desktop's features reachable from anywhere
 
 **Status:** phases 0, 1, 2 and 3 done — phase 3 with one part deliberately not
-done, see it below. Phases 4 and 5 not started.
+done, see it below. Phase 4's pairing/LAN/discovery/firewall shipped (see
+`src-tauri/src/daemon/`); its Win32 input-injection piece (`daemon/input.rs`,
+the `remote.input` cap) was built then removed (2026-11-20) — we decided
+against using Portal Desktop for full PC remote control (trackpad/mouse,
+screen mirror), so it's gone rather than dead code. Phase 5 never happened as
+written below: [Portal Mobile](PORTAL_MOBILE.md) superseded it with a new
+Tauri Android app instead of extending Portal Remote's Kotlin one.
 
 **Phase 2 ran before phase 1.** The crate split only buys a compiler-enforced
 boundary and the option of a headless binary — the daemon works inside
@@ -353,11 +359,17 @@ drift. `ts-rs` is the intended pick — build-time only, no runtime dependency, 
 framework lock-in. Confirm the current version before committing to it. Independent
 of the origin question, so it can go first.
 
-### Phase 4 — pairing and LAN
+### Phase 4 — pairing and LAN `[done, except input injection — see below]`
 
 The existing passcode/approval commands become daemon middleware instead of Tauri
 commands. Add a UDP discovery responder (~80 lines, port of Portal Remote's
 `Pairing/DiscoveryResponder.cs`). Bind `0.0.0.0` only when explicitly enabled.
+
+(The input-injection half of this phase — `remote.input`, `daemon/input.rs`'s
+`enigo`-based mouse/keyboard — did ship but was removed 2026-11-20: we are not
+using Portal Desktop for PC remote control. Pairing, LAN, discovery and the
+firewall self-repair below are unaffected and stay; Portal Mobile depends on
+them.)
 
 **Security gate — this phase does not ship without capability scoping.** Portal
 Remote's model is a single shared token where holding the token is equivalent to
@@ -430,18 +442,28 @@ parent, open count) or rescans the stored `path`. Discovery, relocation and
 `.env` access were already loopback-only. A command written by hand on this
 machine is still trusted as before: Run does not ask again.
 
-### Phase 5 — Android client
+### Phase 5 — Android client `[superseded — see Portal Mobile]`
 
 Point Portal Remote's existing Android app at the daemon. Its `net/WsClient.kt`
 and `net/PairApi.kt` already model this exact flow — discover, pair, hold a token,
 one WebSocket plus plain HTTP for bulk. New tabs for coder and terminal; the rest
 of the app is unchanged.
 
-## What happens to Portal Remote
+Not what happened: [Portal Mobile](PORTAL_MOBILE.md) built a new Tauri Android
+app from this repo's own `src/` instead (rejected "extend Portal Remote" as an
+option — different UI toolkit, doubles every future feature). Kept here as the
+design record for why that path was considered.
+
+## What happens to Portal Remote `[moot — neither option taken]`
+
+Decided: neither. We are not pointing Portal Remote at this daemon, and not
+porting its Windows-only half in either shape below. Portal Remote stays its
+own separate app with its own C# server; Portal Desktop does PC-control-free
+developer workflows (Portal Mobile) instead. Kept as the design record.
 
 Its Windows-only half — Win32 `SendInput`, screen mirroring, WASAPI loopback, the
 WinRT media session, DLNA/Roku casting — does not belong in a cross-platform core.
-Two options:
+Two options were on the table:
 
 - **(a) keep it as an optional Windows sidecar**, with the daemon proxying `/win/*`
   to it. No rewrite; two installers.

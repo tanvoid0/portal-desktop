@@ -89,8 +89,8 @@ phone                                         desktop
 - **Security model is the daemon's, unchanged:** per-device token, capabilities
   chosen at approval, credentials/vault never remote, sensitive caps opt-in.
 - `mobile/src-tauri` is a separate crate on purpose: it must not link
-  `portal-core` (pty, enigo, sqlite have no business on a phone), and the
-  desktop build cannot be broken by it.
+  `portal-core` (pty, sqlite have no business on a phone), and the desktop
+  build cannot be broken by it.
 
 ## Phases
 
@@ -141,13 +141,16 @@ Each ships on its own.
    exec), then the relay itself. The phone side is a one-file change: the
    connection becomes a URL instead of `host:port`; `/rpc` and `/events` keep
    their shape. Not built until LAN use is solid.
-5. **PC control in Svelte** — trackpad + keyboard page over `/control`
-   (`remote.input` is already served by the daemon; the transport for both
-   clients is `mobile_control_send`, see "Other clients"), resource monitor (the
-   existing `host_stats` + `disk_usage` commands, served under the default
-   read-only `sysinfo` cap, plus a page the desktop gets for free too).
-6. **Media-remote features** — screen mirror, files, now-playing/volume. Port
-   from Portal Remote's C# server into the daemon only as each is wanted.
+5. **~~PC control in Svelte~~ — cancelled (2026-11-20).** Was: trackpad +
+   keyboard page over `/control`. The daemon-side plumbing (`daemon/input.rs`'s
+   `enigo` injection, the `remote.input` cap) was built toward this but is now
+   removed — we are not using Portal Desktop for full remote/media control of
+   the PC, by this app or by Portal Remote. The resource-monitor half of this
+   phase (`host_stats` + `disk_usage` under the default `sysinfo` cap) is
+   unaffected and still open.
+6. **~~Media-remote features~~ — cancelled (2026-11-20).** Was: screen mirror,
+   files, now-playing/volume, ported from Portal Remote's C# server. Same
+   reasoning as phase 5 — out of scope for this app.
 
 ## Phase 0 spec (for whoever executes)
 
@@ -293,25 +296,22 @@ plain `WebSocket` and the same capped-backoff reconnect as the Rust client. No
 transport code in the rest of the frontend changes — `invoke`/`listen` stay
 exactly what the desktop app already calls.
 
-**`/control` from both clients (phase 5 transport):**
-`invoke('mobile_control_send', { frame })` queues one `/control` frame (wire
-shapes in `daemon/input.rs`, e.g. `{ t: 'mouse_move', dx: 50, dy: 0 }`) and
-returns at once. Each client opens one `/control` socket lazily, reuses it, and
-opens a fresh one on the next call after it closes. The Android shell
-authenticates with `Authorization: Bearer` (plus `X-Portal-Device` when it knows
-the device's name) and keeps the token in Rust — the page only hands over the
-frame; the browser has no header to set, so it uses `?token=` as it does for
-`/events`, and does not retry a handshake that failed for a second (it cannot
-tell a revoked token from any other refusal, so a trackpad drag would otherwise
-open a socket per frame). The `hello` and the event fanout the daemon also sends
-on `/control` are dropped (already on `/events`); its `{t:"error"}` replies
-arrive as the `mobile://control-error` event, re-emitted as just
-`{ t: 'error', message }` with the message capped at 200 characters. They say
-this device lacks `remote.input` ("not permitted to send input"), input
-injection is unavailable on the PC, the input call failed ("input failed: …",
-e.g. an unknown key name), or the frame type is not served yet ("not
-implemented yet: …"). `remote.input` stays the opt-in cap per device, browsers
-included.
+**`/control` from both clients:** `invoke('mobile_control_send', { frame })`
+queues one `/control` frame (e.g. `{ t: 'ping', seq: 1 }`) and returns at once.
+Each client opens one `/control` socket lazily, reuses it, and opens a fresh
+one on the next call after it closes. The Android shell authenticates with
+`Authorization: Bearer` (plus `X-Portal-Device` when it knows the device's
+name) and keeps the token in Rust — the page only hands over the frame; the
+browser has no header to set, so it uses `?token=` as it does for `/events`,
+and does not retry a handshake that failed for a second. The `hello` and the
+event fanout the daemon also sends on `/control` are dropped (already on
+`/events`); its `{t:"error"}` replies arrive as the `mobile://control-error`
+event, re-emitted as just `{ t: 'error', message }` with the message capped at
+200 characters — today that's only the frame type "not implemented yet: …",
+since the daemon only otherwise answers `ping`. No frame type is actually
+served over `/control` yet: the `remote.input` cap and its `daemon/input.rs`
+backend (trackpad/keyboard injection, phase 5 above) were removed
+(2026-11-20) — we are not using this transport for PC remote control.
 
 **Serving it:** `pnpm build:client` builds the SvelteKit frontend with
 `VITE_PORTAL_MOBILE=1` to its own `build-client/` output dir (NOT `build/` —

@@ -4,6 +4,6 @@
  * One row of `remote_list_capabilities` — a capability name plus whether
  * granting it reaches outside the app's own data (`rpc::SENSITIVE_CAPS`).
  * The approval checklist uses `is_sensitive` to keep its "Select all" from
- * sweeping in `terminal.exec`/`agents.exec`/`remote.input` and the like.
+ * sweeping in `terminal.exec`/`agents.exec` and the like.
  */
 export type CapabilityInfo = { name: string, is_sensitive: boolean, };

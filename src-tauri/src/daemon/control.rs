@@ -1,9 +1,8 @@
 //! `GET /control` — the thin clients' live socket (Android's, and a browser's
-//! over `?token=`): a `hello` frame on connect, then ping/pong, mouse/keyboard
-//! input (gated on the `remote.input` capability — see [`input`]), and this
+//! over `?token=`): a `hello` frame on connect, then ping/pong, and this
 //! app's existing event fanout, filtered by capability exactly like `/events`.
-//! Mirror/audio/casting are later phases; any other client frame gets an
-//! explicit "not implemented yet" rather than silently hanging.
+//! Any other client frame gets an explicit "not implemented yet" rather than
+//! silently hanging.
 //!
 //! A remote socket closes when its device is revoked, its capabilities change,
 //! or its grant expires ([`pairing::drop_device`], plus the 60 s expiry
@@ -18,7 +17,6 @@ use tokio::sync::broadcast;
 
 use crate::domains::network::services::pairing_service;
 
-use super::input;
 use super::pairing::{until_cut_off, Cutoff};
 use super::{forward_one, AppState, Shared, Trust};
 
@@ -39,8 +37,8 @@ pub async fn control(
     // The guard has already refused anyone with neither a loopback pass nor a
     // live token (`/control` is not in `is_public_path`), so trust here is Local
     // or Remote. A browser's `WebSocket` (`?token=`, see `socket_query_token`)
-    // gets in as a Remote like any paired device: `input_allowed` below holds it
-    // to `remote.input` exactly as it holds Android.
+    // gets in as a Remote like any paired device, scoped by `caps` below same as
+    // Android.
     let cutoff = Cutoff::new(&trust, &state);
     let caps = super::stream_caps(&trust);
 
@@ -71,46 +69,17 @@ fn hello(host_name: &str) -> Message {
     )
 }
 
-/// Whether `caps` (`None` for a local, unrestricted peer) covers remote
-/// input. Fail-closed like `frame_allowed`: a remote peer that never
-/// mentions `remote.input` gets nothing.
-fn input_allowed(caps: &Option<Vec<String>>) -> bool {
-    match caps {
-        None => true,
-        Some(caps) => caps.iter().any(|c| c == crate::rpc::REMOTE_INPUT_CAP),
-    }
-}
-
 /// One client-sent frame, as the reply text to send back (if any). `ping` is
-/// answered unconditionally. A mouse/keyboard frame ([`input::FRAME_TYPES`])
-/// is applied through `input` when the peer holds `remote.input`
-/// ([`input_allowed`]) and injection is available on this PC; otherwise it
-/// gets back an explicit refusal rather than silent failure, so a phone
-/// granted only e.g. `coder` learns why its trackpad does nothing. Every
-/// other frame gets an explicit "not implemented yet" so nothing on the
-/// client waits forever for a reply that will never come. `None` for a frame
-/// with no `t` at all, or that isn't JSON — dropped rather than answered.
-fn handle_client_frame(
-    text: &str,
-    input: &mut Option<input::State>,
-    caps: &Option<Vec<String>>,
-) -> Option<String> {
+/// answered unconditionally. Every other frame gets an explicit "not
+/// implemented yet" so nothing on the client waits forever for a reply that
+/// will never come. `None` for a frame with no `t` at all, or that isn't
+/// JSON — dropped rather than answered.
+fn handle_client_frame(text: &str) -> Option<String> {
     let value: Value = serde_json::from_str(text).ok()?;
     let t = value.get("t")?.as_str()?;
 
     let reply = if t == "ping" {
         json!({ "t": "pong", "seq": value.get("seq") })
-    } else if input::FRAME_TYPES.contains(&t) {
-        if !input_allowed(caps) {
-            json!({ "t": "error", "message": "this device is not permitted to send input" })
-        } else if let Some(state) = input {
-            match state.dispatch(t, &value) {
-                Ok(()) => return None,
-                Err(message) => json!({ "t": "error", "message": format!("input failed: {message}") }),
-            }
-        } else {
-            json!({ "t": "error", "message": "input injection is unavailable on this PC" })
-        }
     } else {
         json!({ "t": "error", "message": format!("not implemented yet: {t}") })
     };
@@ -130,36 +99,19 @@ async fn run(
     if socket.send(hello(&host_name)).await.is_err() {
         return;
     }
-
-    // Never the real OS input under `cargo test` (#1118): a test that sends an input
-    // frame as Local, or a gate that regresses, would move the owner's actual mouse.
-    let mut input_state = if cfg!(test) {
-        None
-    } else {
-        input::State::new()
-    };
-    pump_control(&mut socket, &mut rx, &caps, &mut input_state, cutoff).await;
-    // However the loop below exited — client gone, send failure, device cut
-    // off (`pairing::drop_device`), server shutting down — a key or mouse
-    // button this phone pressed and never released must not stay down on the
-    // real keyboard and mouse.
-    if let Some(state) = &mut input_state {
-        state.release_held();
-    }
+    pump_control(&mut socket, &mut rx, &caps, cutoff).await;
 }
 
 /// The read/forward loop itself, split out from [`run`] so every exit path
-/// runs through one `return` and [`run`] can guarantee the held-keys cleanup
-/// after it rather than repeating it at each `return` here.
+/// runs through one `return`.
 async fn pump_control(
     socket: &mut WebSocket,
     rx: &mut broadcast::Receiver<Shared>,
     caps: &Option<Vec<String>>,
-    input_state: &mut Option<input::State>,
     cutoff: Option<Cutoff>,
 ) {
     // Inside the select the first re-check races the first frame, so a revoked
-    // device's first input could be dispatched before it lands. Settle it first.
+    // device's first frame could be dispatched before it lands. Settle it first.
     if let Some(c) = &cutoff {
         if !c.still_granted().await {
             return;
@@ -178,7 +130,7 @@ async fn pump_control(
             msg = socket.recv() => {
                 let Some(Ok(msg)) = msg else { return };
                 let Message::Text(text) = msg else { continue };
-                let Some(reply) = handle_client_frame(&text, input_state, caps) else { continue };
+                let Some(reply) = handle_client_frame(&text) else { continue };
                 if socket.send(Message::Text(reply.into())).await.is_err() {
                     return;
                 }
@@ -262,14 +214,10 @@ mod tests {
         assert_eq!(next_json(&mut ws).await, json!({ "t": "pong", "seq": 42 }));
     }
 
-    /// A remote peer holding some other capability (`coder`, same as
-    /// `control_answers_ping_with_pong`) must not be able to move the mouse —
-    /// this is the test that would catch `remote.input` being forgotten from
-    /// the gate. A regressed gate fails it cleanly ("unavailable", not "not
-    /// permitted"): `run` has no input backend under test, so nothing can
-    /// reach the real mouse either way.
+    /// An unrecognized frame type gets the explicit "not implemented yet"
+    /// reply rather than being silently dropped or hanging the client.
     #[tokio::test]
-    async fn control_refuses_input_frames_without_the_capability() {
+    async fn control_answers_unknown_frames_with_not_implemented() {
         let addr = spawn_control(Trust::Remote {
             device_id: "dev-1".to_string(),
             caps: vec!["coder".to_string()],
@@ -287,83 +235,9 @@ mod tests {
         .unwrap();
         let reply = next_json(&mut ws).await;
         assert_eq!(reply["t"], "error");
-        assert!(reply["message"].as_str().unwrap().contains("not permitted"));
-    }
-
-    /// Under `cargo test` a socket never owns the real input backend (see `run`), so a
-    /// frame `input_allowed` lets through cannot reach the OS: a Local peer, which the gate
-    /// never restricts, is told injection is unavailable. The frame is a zero-delta
-    /// `mouse_move` — a no-op even if a backend ever came back — so this test stays
-    /// harmless in the very case where it is the one that fails (#1118).
-    #[tokio::test]
-    async fn a_test_socket_never_owns_the_real_input_backend() {
-        let addr = spawn_control(Trust::Local).await;
-        let (mut ws, _resp) = tokio_tungstenite::connect_async(format!("ws://{addr}/control"))
-            .await
-            .unwrap();
-        next_json(&mut ws).await; // hello
-
-        ws.send(WsMessage::Text(
-            json!({ "t": "mouse_move", "dx": 0, "dy": 0 }).to_string(),
-        ))
-        .await
-        .unwrap();
-        // With a backend the frame would be applied and, succeeding, answered with nothing.
-        let reply = tokio::time::timeout(std::time::Duration::from_secs(5), next_json(&mut ws))
-            .await
-            .expect("a permitted frame must be answered: there is no input backend under test");
-        assert_eq!(reply["t"], "error");
-        assert!(reply["message"].as_str().unwrap().contains("unavailable"));
-    }
-
-    /// A browser reaches `/control` as a `Remote` holding exactly the caps its
-    /// device was granted (`?token=`, resolved by `classify`), and every input
-    /// frame type is refused unless one of them is `remote.input`. Driven with no
-    /// `input::State`, so a refused frame never reaches the OS and a permitted one
-    /// finds "unavailable" — nothing here can move the real mouse or press a key.
-    #[test]
-    fn a_browser_device_needs_remote_input_for_every_input_frame() {
-        let mut page = HeaderMap::new();
-        page.insert(
-            axum::http::header::ORIGIN,
-            "http://192.168.1.10:18420".parse().unwrap(),
-        );
-        let input = crate::rpc::REMOTE_INPUT_CAP;
-        for (granted, permitted) in [(vec!["coder"], false), (vec!["coder", input], true)] {
-            let granted: Vec<String> = granted.into_iter().map(String::from).collect();
-            let grant = granted.clone();
-            let trust = super::super::classify(
-                "192.168.1.50".parse().unwrap(),
-                &page,
-                "/control",
-                Some("good"),
-                |_| Some(("dev-1".to_string(), grant.clone())),
-            );
-            let Ok(Trust::Remote { caps, .. }) = trust else {
-                panic!("a live token is a Remote");
-            };
-            assert_eq!(caps, granted);
-
-            for t in input::FRAME_TYPES {
-                let frame = json!({ "t": t }).to_string();
-                let reply = handle_client_frame(&frame, &mut None, &Some(caps.clone()))
-                    .expect("an input frame is always answered here");
-                let reply: Value = serde_json::from_str(&reply).unwrap();
-                let message = reply["message"].as_str().unwrap();
-                let expected = if permitted {
-                    "unavailable"
-                } else {
-                    "not permitted"
-                };
-                assert!(message.contains(expected), "{t}: {message}");
-            }
-        }
-    }
-
-    #[test]
-    fn input_allowed_is_unrestricted_for_a_local_peer_and_fail_closed_for_remote() {
-        assert!(input_allowed(&None));
-        assert!(!input_allowed(&Some(vec!["coder".to_string()])));
-        assert!(input_allowed(&Some(vec![crate::rpc::REMOTE_INPUT_CAP.to_string()])));
+        assert!(reply["message"]
+            .as_str()
+            .unwrap()
+            .contains("not implemented yet"));
     }
 }
