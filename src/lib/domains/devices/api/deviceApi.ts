@@ -46,6 +46,10 @@ export function updateDeviceCapabilities(deviceId: string, capabilities: string[
   return invokeClient.post('update_device_capabilities', { deviceId, capabilities });
 }
 
+export function extendDeviceExpiry(deviceId: string): Promise<string | null> {
+  return invokeClient.post<string | null>('extend_device_expiry', { deviceId });
+}
+
 export function generatePairingQr(capabilities: string[]): Promise<PairingQrResponse> {
   return invokeClient.post<PairingQrResponse>('generate_pairing_qr', { capabilities });
 }

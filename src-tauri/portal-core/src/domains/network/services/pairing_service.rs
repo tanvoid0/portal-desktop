@@ -108,7 +108,7 @@ pub struct DeviceSummary {
 /// One row of `remote_list_capabilities` — a capability name plus whether
 /// granting it reaches outside the app's own data (`rpc::SENSITIVE_CAPS`).
 /// The approval checklist uses `is_sensitive` to keep its "Select all" from
-/// sweeping in `terminal.exec`/`agents.exec`/`remote.input` and the like.
+/// sweeping in `terminal.exec`/`agents.exec` and the like.
 #[derive(Debug, Serialize, ts_rs::TS)]
 #[ts(export, export_to = "../../../src/lib/domains/devices/generated/")]
 pub struct CapabilityInfo {
@@ -344,6 +344,38 @@ pub async fn update_capabilities(
         .await
         .map_err(|e| format!("Failed to update device approval: {e}"))?;
     Ok(())
+}
+
+/// Push the most-recent grant's expiry out to a fresh window of its own
+/// approval_type, without re-minting the token — the paired device regains
+/// access with the credential it already holds. Only an approved, expiring
+/// grant (temporary/long_term) can be extended; a revoked/rejected/pending
+/// row must go back through approval.
+pub async fn extend_expiry(
+    conn: &DatabaseConnection,
+    device_id: &str,
+) -> Result<Option<String>, String> {
+    let Some(row) = most_recent_row(conn, device_id).await? else {
+        return Err(format!(
+            "Device approval not found for device_id: {device_id}"
+        ));
+    };
+    if !row.approved || !matches!(row.approval_type.as_str(), "temporary" | "long_term") {
+        return Err(format!(
+            "Cannot extend a {} grant; re-pair the device instead",
+            row.approval_type
+        ));
+    }
+    let new_expiry = approval_expiry(&row.approval_type);
+    let mut m: device_approval::ActiveModel = row.into();
+    m.expires_at = Set(new_expiry);
+    m.token_expires_at = Set(new_expiry);
+    m.updated_at = Set(Utc::now().into());
+    device_approval::Entity::update(m)
+        .exec(conn)
+        .await
+        .map_err(|e| format!("Failed to update device approval: {e}"))?;
+    Ok(new_expiry.map(|e| e.to_rfc3339()))
 }
 
 /// Replace the device_name on the most-recent row for `device_id` — `/control`
@@ -620,6 +652,33 @@ mod tests {
 
         // A garbage bearer is rejected.
         assert!(verify_token(&conn, "nonsense").await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn extend_expiry_keeps_token_and_rejects_revoked() {
+        let conn = fresh_db().await;
+        request_pairing(&conn, "dev-ext", "Phone").await.unwrap();
+        let outcome = approve(&conn, "dev-ext", "temporary", &[]).await.unwrap();
+        let find = || async {
+            device_approval::Entity::find()
+                .filter(device_approval::Column::DeviceId.eq("dev-ext"))
+                .one(&conn)
+                .await
+                .unwrap()
+                .unwrap()
+        };
+        let before = find().await;
+
+        let new_expiry = extend_expiry(&conn, "dev-ext").await.unwrap();
+        assert!(new_expiry.is_some());
+
+        let after = find().await;
+        assert_eq!(after.access_token, before.access_token);
+        assert!(after.expires_at > before.expires_at);
+        assert!(verify_token(&conn, &outcome.token).await.unwrap().is_some());
+
+        revoke(&conn, "dev-ext").await.unwrap();
+        assert!(extend_expiry(&conn, "dev-ext").await.is_err());
     }
 
     #[tokio::test]

@@ -180,6 +180,21 @@ pub async fn update_device_capabilities(
     Ok(())
 }
 
+/// Refresh a paired device's grant window in place — the device keeps its
+/// token and regains access without re-pairing.
+#[portal_rpc_macro::rpc]
+pub async fn extend_device_expiry(
+    device_id: String,
+    db: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Option<String>, String> {
+    log_info!(
+        "device_auth",
+        "Extending expiry for device_id: {}",
+        device_id
+    );
+    pairing_service::extend_expiry(db.get_connection(), &device_id).await
+}
+
 /// Every device the host has ever seen, most-recent row per device_id, for
 /// the Devices management page.
 #[portal_rpc_macro::rpc]
