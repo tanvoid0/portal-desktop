@@ -1,4 +1,5 @@
 import { invokeClient } from '$lib/utils/invokeClient';
+import { vaultGate } from '$lib/domains/credentials/state/vault.svelte';
 import { logger } from '$lib/domains/shared/services/logger';
 import type { Project } from '$lib/domains/projects/types';
 import { normalizeProject } from '$lib/domains/projects/utils/normalizeProject';
@@ -95,6 +96,10 @@ class GitHubService {
     scope?: string,
     callbacks?: GitHubDeviceFlowCallbacks
   ): Promise<GitHubConnectionStatus> {
+    // Unlock first: the token save waits on the vault for up to 120s, longer than the poll
+    // timeout, and an unlock cancelled after GitHub's one-time code is exchanged burns the code.
+    if (!(await vaultGate.ensureUnlocked())) throw new Error('Vault is locked');
+
     const started = await withTimeout(
       this.startDeviceFlow(scope),
       DEVICE_FLOW_TIMEOUT_MS,
