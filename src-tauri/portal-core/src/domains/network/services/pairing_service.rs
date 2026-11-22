@@ -43,6 +43,8 @@ use uuid::Uuid;
 use crate::entities::device_approval;
 
 /// Access-token lifetime for a one-off ("temporary") approval.
+/// Placeholder name of a QR grant until the device's first connect renames it.
+const UNNAMED_DEVICE: &str = "Unnamed device";
 const TEMPORARY_HOURS: i64 = 24;
 /// Access-token lifetime for a "long_term" approval.
 const LONG_TERM_DAYS: i64 = 30;
@@ -191,7 +193,7 @@ pub async fn mint_qr_pairing(
     let approval = device_approval::ActiveModel {
         id: Set(Uuid::new_v4().to_string()),
         device_id: Set(device_id.clone()),
-        device_name: Set("Unnamed device".to_string()),
+        device_name: Set(UNNAMED_DEVICE.to_string()),
         device_info: Set("{}".to_string()),
         passcode: Set(String::new()),
         passcode_expires_at: Set(now.into()),
@@ -435,6 +437,11 @@ pub async fn rename_device(
             "Device approval not found for device_id: {device_id}"
         ));
     };
+    // Only the QR grant's placeholder may be replaced: a connected device must not be able to
+    // relabel itself (e.g. as another device) on every /control connect.
+    if row.device_name != UNNAMED_DEVICE {
+        return Ok(());
+    }
     let mut m: device_approval::ActiveModel = row.into();
     m.device_name = Set(name.to_string());
     m.updated_at = Set(Utc::now().into());

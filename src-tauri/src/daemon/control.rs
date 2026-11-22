@@ -24,7 +24,9 @@ use super::{forward_one, AppState, Shared, Trust};
 /// replace a QR grant's "Unnamed device" placeholder with its real name on
 /// first connect.
 fn device_header(headers: &HeaderMap) -> Option<String> {
-    let name = headers.get("X-Portal-Device")?.to_str().ok()?.trim();
+    let raw = headers.get("X-Portal-Device")?.to_str().ok()?;
+    let name: String = raw.chars().filter(|c| !c.is_control() && !matches!(*c, '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2060}'..='\u{2069}' | '\u{FEFF}')).take(64).collect();
+    let name = name.trim();
     (!name.is_empty()).then(|| name.to_string())
 }
 
