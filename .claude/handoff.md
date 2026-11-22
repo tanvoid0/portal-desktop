@@ -1,3 +1,66 @@
+# Handoff: board loop pass, devices redesign landed, vault review next (2026-11-22)
+
+Repo `D:\projects\production\portal\portal_desktop`, branch `feat/agent-platform-sidecar` at `adccbe20`, five commits above `origin/main` (`c91c5767`), nothing pushed, working tree was clean. The older agent-platform migration handoff that lived in this file is kept below the divider, unchanged; ignore it unless you are on that workstream.
+
+## Goal
+
+Work the Portal board for this project in a loop, the `/crew:work` way: take the first open task not assigned to `owner`, claim it, route it through the crew agents (`crew:scout`, `crew:planner`, `crew:coder`, `crew:reviewer`), run the gates, close it with a note. The board is the `portal` MCP tools (`tasks`, `task`, `add`, `update`); pass the repo path as `project`. Tasks assigned to `owner` are skipped.
+
+## Done this session
+
+- `#1278` Extend button plus the devices-UI redesign it lives in: reviewed by `crew:reviewer` (8 findings: 1 high, 2 medium, 5 low), all fixed by `crew:coder`, re-checked by the reviewer against the real files: ship. Gates were green before the rebase.
+- Landed as `adccbe20`, one 35-file commit made at 19:16 by someone else (the owner or the app's commit action) that swept in the whole dirty tree: devices redesign, review fixes, the vault prompter, and the three small edits below. The branch was rebased onto `origin/main` right after.
+- `#1062` PORTAL_MOBILE.md Phase 5 status, `#1119` `scripts/dev-instance.mjs` (instance N>1 now defaults cargo dirs to `I:/build/cargo/portal-desktop-instance-N`, caller env wins), `#1101` CLAUDE.md icon line (FontAwesome `~icons/fa6-solid`, not lucide): completed.
+- `#1064` trackpad page and `#1063` remote-input decision: cancelled, superseded by `9510386c` (input injection removed, no remote control by any client).
+- Parked on `owner` with BLOCKED notes naming the exact ask: `#542` (needs `#643` real-phone alert check and `#644` Phase 3b decision), `#186` (`#194`: retire the agent-monitor import? and neither `codex` nor `cursor-agent` is installed, so those adapters never ran live), `#170` (needs a `content:read+write` token, the call on 4 private repos, the demo flow).
+- Added `#1381`: review the vault-gate work.
+
+## Left
+
+1. Close `#1278`. It is still `in-progress` on the board. Gates were started on the rebased `HEAD` but only `cargo check` was seen green. Re-run: `cd src-tauri && cargo check`; `cd src-tauri/portal-core && cargo test pairing_service` (expect 17 pass); `pnpm check` (expect 0 errors, about 120 warnings); `pnpm lint` (exit 0, 0 errors, about 3194 warnings, eslint takes about 7 minutes); `pnpm exec vitest run` (expect 56 files, 282 tests). If green, `update` `#1278` to `completed` citing `adccbe20`.
+2. `#1381` (claude): run `crew:reviewer` on the vault-gate code that went into `adccbe20` unreviewed. Check: can any command hold a lock or DB transaction across `VaultSession::require_key`; the 120 s timeout path; every caller of the removed `RETRY_AFTER_UNLOCK_COMMANDS` list in `invokeClient.ts` still handles `Vault is locked`.
+3. Next board picks, all low bugs and unclaimed: `#1090` (`mobile/src-tauri` has no `.cargo/config.toml`, so cargo builds land on D:; add `target-dir` under `I:/build/cargo/portal-desktop-mobile`, CI does not build mobile today), `#1095` (CoderPanel squeezes chat at 1280), `#1094` (`/control` `X-Portal-Device` renames any paired device on every connect).
+4. Wart: `adccbe20` includes cargo-test churn in `src-tauri/portal-core/bindings/serde_json/JsonValue.ts` (pure formatting) and `src/lib/domains/projects/generated/EnvFileView.ts` (adds a doc comment; may be legitimate). Optional cleanup commit.
+5. Known low leftovers from the devices review, deliberately not fixed: in `src/lib/domains/devices/components/PendingRequestRow.svelte` (about line 125) Allow stays disabled with no hint if the capabilities query never loads; a rustfmt nit on the `matches!` line in `set_lifetime`; svelte-check `state_referenced_locally` warnings at `DeviceDetailsDialog.svelte:32-33` (pre-existing).
+6. Push nothing unless asked. Local `main` is behind the branch; fast-forward only if the owner wants it.
+
+## Files that matter
+
+- Devices UI: `src/routes/devices/+page.svelte`; `src/lib/domains/devices/components/` (`DeviceRow`, `DeviceDetailsDialog`, `PairRequestGate`, `PendingRequestRow`, `ReconnectQrDialog`, `IconAction`, `CapabilityChecklist`); `queries/deviceQueries.ts` (5 s poll while a request is pending); `utils/capabilityChecklist.ts`; `state/devicesUi.svelte.ts`; `api/deviceApi.ts`; mounts in `src/lib/components/layout/app-shell.svelte` and `appNotifications.ts`.
+- Devices backend: `src-tauri/portal-core/src/domains/network/services/pairing_service.rs` (`extend_expiry`, `set_lifetime`, tests); `src-tauri/src/domains/network/commands.rs` (`extend_device_expiry`, `set_device_lifetime`); handler list in `src-tauri/src/lib.rs`.
+- Vault gate (`#1381`): `src-tauri/src/domains/credentials/prompter.rs`; `src-tauri/portal-core/src/domains/credentials/services/vault_session.rs` and `credential_service.rs`; `src-tauri/src/domains/credentials/commands.rs` (`vault_unlock_settled`); `src/lib/domains/credentials/components/VaultGate.svelte` and `VaultUnlockDialog.svelte`; `src/lib/utils/invokeClient.ts`; the "Vault-gated commands" paragraph in `CLAUDE.md`.
+- Docs: `docs/development/PORTAL_MOBILE.md`.
+
+## Decisions already made
+
+- The Extend button ships inside the redesign commit, not split out (owner call logged on `#1278`).
+- No remote input from any client (owner commit `9510386c`), hence `#1063` and `#1064` cancelled.
+- `extend_device_expiry` and `set_device_lifetime` carry no capability, so remote tokens are refused (`src-tauri/rpc-macro/src/lib.rs:69-71`, `src-tauri/src/daemon/mod.rs:583-595`). The reviewer confirmed.
+- No Claude attribution line in any commit or PR (user's global CLAUDE.md beats the session reminder). Check commit bodies for `Co-Authored-By` before anything is pushed.
+- A fixer never grades its own work: coder fixes, then the reviewer re-checks.
+
+## What bit me
+
+- The checkout is shared. Mid-session the dirty tree was committed and the branch rebased by someone else. I then applied a stale zero-context hunk (`git apply --cached --unidiff-zero`) onto the moved `HEAD`: it inserted a duplicate `set_device_lifetime` handler line and I committed it as `cf750b80`. Undone with `git reset HEAD~1`, working tree untouched. Before staging anything, run `git log -n 3` and `git status --short`. Saved as memory `concurrent-commits-in-shared-tree`.
+- `set -e` does not stop on a failing `diff` inside an `&&` list; use `|| exit 1`.
+- A PreToolUse hook blocks unbounded `git diff` and `git log`: always `-n N`, `| head`, or `--stat`.
+- A trailing `cd ..` in a Bash call moves the session cwd; use a subshell.
+- `pnpm lint` is `prettier --check . && eslint src && node scripts/check-shadcn-ui.mjs`; eslint (the slow part) only runs if prettier passes, and this file is prettier-checked.
+- cargo: run from inside `src-tauri/portal-core/` (it is not in `src-tauri`'s workspace) so the `I:` target-dir applies. `cargo test <filter>` does not churn the ts-rs bindings; an unfiltered run does (prettier `--write` them back, never commit them).
+- Do not read subagent output files (full transcripts, they flood context).
+
+## Phone and daemon facts (carried over from the 2026-11-20 handoff, which is no longer in this file)
+
+Needed for `#643`, the real-phone alert check.
+
+- The shared release daemon listens on `:18420`. Its LAN listener (`0.0.0.0`) is bound only at startup, and only when `remote_lan_enabled=true` in `%APPDATA%\portal_desktop\settings.json` (`app.remote_lan_enabled`). Toggling it without a full process kill does nothing, and closing the window only trays the app.
+- Loopback calls with no `Origin` header get the full Local pass, which is how you list and approve devices with curl. `approve_device` args wrap as `{"request":{...}}`. `/pair/request` takes `{"device":"<name>"}` and returns `{token,port,name}` on approve, 403 on deny, 408 after 170 s.
+- Android 16 needs the `ACCESS_LOCAL_NETWORK` runtime permission to reach a LAN daemon (fixed in the "enable LAN pairing on Android 16" commit: manifest, `MainActivity.kt`, and `mobile/android.mjs` re-patches both on every build; `gen/android` is gitignored).
+- Debug APK build: `node mobile/android.mjs build --apk --debug --target aarch64` with `JAVA_HOME=C:\Users\tanvo\.sdkman\candidates\java\21-tem` (not the default Java 25, it breaks AGP) and `NDK_HOME=D:\sdk\android\ndk\28.2.13676358`.
+- Git Bash mangles `/sdcard/...` adb paths; use PowerShell for `adb pull` and `screencap`, or `adb exec-out screencap -p`. adb to the S26 (SM-S948B) is wireless TLS.
+
+---
+
 # Handoff — agent-platform → portal_desktop migration
 
 Written for a fresh session with no memory of the prior conversation.
