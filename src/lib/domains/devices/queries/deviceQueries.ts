@@ -11,6 +11,10 @@ export function createDevicesQuery() {
   return createQuery(() => ({
     queryKey: queryKeys.devices.all,
     queryFn: fetchDevices,
+    // The daemon rejects an unanswered pair request after ~170s and emits no event
+    // for it, so poll while one is showing or the Allow prompt outlives its request.
+    refetchInterval: (q) =>
+      q.state.data?.some((d) => d.approval_type === 'pending') ? 5000 : false,
   }));
 }
 

@@ -195,6 +195,25 @@ pub async fn extend_device_expiry(
     pairing_service::extend_expiry(db.get_connection(), &device_id).await
 }
 
+/// Change a paired device's lifetime (24h / 30d / until revoked) and restart
+/// its window. The device keeps its token and its open sockets, like
+/// `extend_device_expiry`: the expiry sweep reads the new window from the
+/// database, so there is nothing to drop.
+#[portal_rpc_macro::rpc]
+pub async fn set_device_lifetime(
+    device_id: String,
+    approval_type: String,
+    db: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Option<String>, String> {
+    log_info!(
+        "device_auth",
+        "Setting lifetime {} for device_id: {}",
+        approval_type,
+        device_id
+    );
+    pairing_service::set_lifetime(db.get_connection(), &device_id, &approval_type).await
+}
+
 /// Every device the host has ever seen, most-recent row per device_id, for
 /// the Devices management page.
 #[portal_rpc_macro::rpc]

@@ -10,7 +10,9 @@
 //   CDP       9222 + (N-1)   — WebView2 reads WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
 //   data dir  <app data>/instance-N — src-tauri/src/lib.rs reads PORTAL_INSTANCE
 //   daemon    18421 + (N-1)  — daemon::configured_port reads PORTAL_DAEMON_PORT
-//   target    src-tauri/target/instance-N — Windows will not relink a running .exe
+//   target    I:/build/cargo/portal-desktop-instance-N — Windows will not relink a
+//             running .exe. Per-machine: CARGO_TARGET_DIR / CARGO_BUILD_BUILD_DIR
+//             override it, and with no I: drive it is src-tauri/target/instance-N.
 //
 // The data directory is the one that actually matters: both instances otherwise
 // open the same portal_desktop.db, and two SQLite writers on one file corrupts it.
@@ -20,7 +22,7 @@
 //
 //   node scripts/dev-instance.mjs --kill-port
 import { execFileSync, spawn } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const PORT_BASE = 1420;
@@ -147,10 +149,14 @@ if (process.argv[2] === '--kill-port') {
   if (n > 1) {
     // Instance 1's daemon holds 18421 (daemon::DEV_PORT).
     env.PORTAL_DAEMON_PORT = String(18421 + (n - 1));
-    env.CARGO_TARGET_DIR = resolve('src-tauri/target', `instance-${n}`);
+    // I: has the free space (D: runs tight; a cold build is 3+ GB). A caller-set
+    // CARGO_TARGET_DIR / CARGO_BUILD_BUILD_DIR wins; no I: drive falls back to D:.
+    env.CARGO_TARGET_DIR ||= existsSync('I:/')
+      ? `I:/build/cargo/portal-desktop-instance-${n}`
+      : resolve('src-tauri/target', `instance-${n}`);
     // The config's build-dir is per workspace path, so without this instance 2 would
     // relink into instance 1's deps/, where its running .exe is hard-linked from.
-    env.CARGO_BUILD_BUILD_DIR = env.CARGO_TARGET_DIR;
+    env.CARGO_BUILD_BUILD_DIR ||= env.CARGO_TARGET_DIR;
     // Every process sharing a WebView2 user-data folder must pass identical browser
     // arguments. Ours differ by --remote-debugging-port, so instance 2 dies on startup
     // with HRESULT 0x8007139F ("group or resource is not in the correct state") until

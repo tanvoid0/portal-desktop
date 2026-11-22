@@ -39,7 +39,7 @@ impl CredentialService {
         let now = Utc::now().naive_utc();
 
         // Encrypt the credential value
-        let master_key = self.session.key()?;
+        let master_key = self.session.require_key().await?;
         let encryption_result = self.encryption.encrypt(&request.value, &master_key)?;
 
         // Encrypt additional fields
@@ -132,14 +132,14 @@ impl CredentialService {
 
         // Update encrypted value if provided
         if let Some(value) = request.value {
-            let master_key = self.session.key()?;
+            let master_key = self.session.require_key().await?;
             let encryption_result = self.encryption.encrypt(&value, &master_key)?;
             credential.encrypted_value = serde_json::to_string(&encryption_result)?;
         }
 
         // Update encrypted fields if provided
         if let Some(fields) = request.fields {
-            let master_key = self.session.key()?;
+            let master_key = self.session.require_key().await?;
             let mut encrypted_fields = std::collections::HashMap::new();
             for (key, value) in fields {
                 let field_result = self.encryption.encrypt(&value, &master_key)?;
@@ -190,7 +190,7 @@ impl CredentialService {
             serde_json::from_str(&credential.encrypted_value)
                 .map_err(|e| CredentialError::DeserializationError(e.to_string()))?;
 
-        let master_key = self.session.key()?;
+        let master_key = self.session.require_key().await?;
         let request = DecryptionRequest {
             encrypted: encryption_data.encrypted.clone(),
             iv: encryption_data.iv.clone(),

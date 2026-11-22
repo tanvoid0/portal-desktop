@@ -2,14 +2,19 @@
   import { Card } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
-  import CapabilityChecklist from './CapabilityChecklist.svelte';
-  import { revokeDevice, updateDeviceCapabilities } from '../api/deviceApi';
+  import IconAction from './IconAction.svelte';
+  import DeviceDetailsDialog from './DeviceDetailsDialog.svelte';
+  import { extendDeviceExpiry, revokeDevice } from '../api/deviceApi';
   import { confirmAction } from '$lib/utils/confirm';
   import { toast } from '$lib/utils/toast';
   import { formatRelativeTime } from '$lib/domains/shared/utils';
+  import { devicesUi } from '../state/devicesUi.svelte';
   import type { CapabilityInfo, DeviceSummary } from '../types';
+  import ReconnectQrDialog from './ReconnectQrDialog.svelte';
   import Pencil from '~icons/fa6-solid/pen';
   import Loader2 from '~icons/fa6-solid/spinner';
+  import Ban from '~icons/fa6-solid/ban';
+  import ArrowRotateRight from '~icons/fa6-solid/arrow-rotate-right';
   import TriangleExclamation from '~icons/fa6-solid/triangle-exclamation';
 
   interface Props {
@@ -35,34 +40,61 @@
   // so this is the honest proxy: recent use.
   const ACTIVE_WINDOW_MS = 5 * 60 * 1000;
 
-  let editing = $state(false);
-  let selected = $state<string[]>([...device.capabilities]);
+  let detailsOpen = $state(false);
   let busy = $state(false);
 
+  const HOUR_MS = 60 * 60 * 1000;
+
   const isActive = $derived(device.approved && device.approval_type !== 'revoked');
+  // `list_devices` keeps an expired temporary/long_term grant in the list, and
+  // the daemon refuses it (`is_expired` in pairing_service.rs) — so the row has
+  // to say so, or it reads as a working device that silently can't connect.
+  const expiresAt = $derived(device.expires_at ? new Date(device.expires_at) : null);
+  const expired = $derived(isActive && !!expiresAt && expiresAt.getTime() <= Date.now());
+  // "Soon" scales with the grant: a 24h one is inside a one-day window from the
+  // moment it is approved, so it only counts for its last 2h.
+  const soonMs = $derived((device.approval_type === 'temporary' ? 2 : 24) * HOUR_MS);
+  const expiringSoon = $derived(
+    isActive && !!expiresAt && !expired && expiresAt.getTime() - Date.now() < soonMs
+  );
   const lastUsed = $derived(device.last_used_at ? new Date(device.last_used_at) : null);
   const isOnline = $derived(
-    isActive && !!lastUsed && Date.now() - lastUsed.getTime() < ACTIVE_WINDOW_MS
+    isActive && !expired && !!lastUsed && Date.now() - lastUsed.getTime() < ACTIVE_WINDOW_MS
   );
   const lastSeenLabel = $derived(
     isOnline ? 'Active now' : lastUsed ? formatRelativeTime(lastUsed) : 'Never used'
   );
+  const expiryLabel = $derived.by(() => {
+    if (!expiresAt) return null;
+    if (expired) return `Expired ${formatRelativeTime(expiresAt)}`;
+    if (expiringSoon) return 'Expires today';
+    return `Expires ${expiresAt.toLocaleDateString()}`;
+  });
   const dotClass = $derived(
-    isOnline ? 'bg-green-500' : isActive ? 'bg-muted-foreground/40' : 'bg-destructive/50'
+    isOnline
+      ? 'bg-green-500'
+      : expired
+        ? 'bg-destructive'
+        : isActive
+          ? 'bg-muted-foreground/40'
+          : 'bg-destructive/50'
   );
 
-  async function saveCapabilities() {
+  const canExtend = $derived(
+    device.approval_type === 'temporary' || device.approval_type === 'long_term'
+  );
+
+  async function extend() {
     busy = true;
     try {
-      await updateDeviceCapabilities(device.device_id, selected);
-      toast.success('Capabilities updated');
-      editing = false;
+      const expiry = await extendDeviceExpiry(device.device_id);
+      toast.success(
+        'Access extended',
+        expiry ? `Now expires ${new Date(expiry).toLocaleDateString()}` : undefined
+      );
       onChanged();
     } catch (err) {
-      toast.error(
-        'Failed to update capabilities',
-        err instanceof Error ? err.message : String(err)
-      );
+      toast.error('Failed to extend access', err instanceof Error ? err.message : String(err));
     } finally {
       busy = false;
     }
@@ -88,9 +120,9 @@
   }
 </script>
 
-<Card class="flex flex-col gap-2 p-3">
-  <div class="flex items-start justify-between gap-2">
-    <div class="flex min-w-0 items-center gap-2">
+<Card class="flex flex-col gap-2 px-3 py-2">
+  <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+    <div class="flex min-w-0 flex-1 items-center gap-2">
       <span
         class="h-2 w-2 shrink-0 rounded-full {dotClass}"
         title={lastSeenLabel}
@@ -99,10 +131,67 @@
       <span class="truncate text-sm font-medium" title={device.device_name}>
         {device.device_name}
       </span>
+      <span class="shrink-0 text-xs text-muted-foreground">{lastSeenLabel}</span>
+      {#if expiryLabel}
+        <span
+          class="shrink-0 text-xs {expired || expiringSoon
+            ? 'font-medium text-destructive'
+            : 'text-muted-foreground'}"
+        >
+          · {expiryLabel}
+        </span>
+      {/if}
     </div>
-    <Badge variant={isActive ? 'default' : 'outline'} class="shrink-0 font-normal">
-      {APPROVAL_LABEL[device.approval_type] ?? device.approval_type}
-    </Badge>
+
+    {#if devicesUi.advanced}
+      <Badge variant={isActive ? 'default' : 'outline'} class="shrink-0 font-normal">
+        {APPROVAL_LABEL[device.approval_type] ?? device.approval_type}
+      </Badge>
+    {/if}
+
+    {#if isActive}
+      <div class="flex shrink-0 items-center gap-0.5">
+        <!-- Extend is the quick one-click renew; the expiry itself is edited in
+             the details dialog. Simple mode only shows it once the grant has run
+             out (or runs out today), i.e. once the phone has stopped working. -->
+        {#if canExtend && (devicesUi.advanced || expired || expiringSoon)}
+          <IconAction
+            label={expired ? 'Renew access' : 'Extend access'}
+            variant={expired || expiringSoon ? 'default' : 'ghost'}
+            onclick={expired ? () => (detailsOpen = true) : extend}
+            disabled={busy}
+          >
+            {#snippet icon()}
+              <ArrowRotateRight class="h-3.5 w-3.5" />
+            {/snippet}
+          </IconAction>
+        {/if}
+        <ReconnectQrDialog {device} {onChanged} />
+        <IconAction
+          label="Edit access and capabilities"
+          onclick={() => (detailsOpen = true)}
+          disabled={busy}
+        >
+          {#snippet icon()}
+            <Pencil class="h-3.5 w-3.5" />
+          {/snippet}
+        </IconAction>
+        <IconAction
+          label="Revoke access"
+          class="text-destructive hover:text-destructive"
+          onclick={() => revoke()}
+          disabled={busy}
+        >
+          {#snippet icon()}
+            {#if busy}
+              <Loader2 class="h-3.5 w-3.5 animate-spin" />
+            {:else}
+              <Ban class="h-3.5 w-3.5" />
+            {/if}
+          {/snippet}
+        </IconAction>
+      </div>
+    {/if}
   </div>
 
   {#if duplicates.length > 0}
@@ -128,58 +217,15 @@
     </div>
   {/if}
 
-  {#if editing}
-    <CapabilityChecklist {capabilities} bind:selected disabled={busy} />
-    <div class="flex gap-2">
-      <Button size="sm" onclick={saveCapabilities} disabled={busy}>Save</Button>
-      <Button size="sm" variant="outline" onclick={() => (editing = false)} disabled={busy}>
-        Cancel
-      </Button>
-    </div>
-  {:else}
+  {#if devicesUi.advanced}
     <div class="flex flex-wrap items-center gap-1">
       {#each device.capabilities as cap}
         <Badge variant="secondary" class="text-xs font-normal">{cap}</Badge>
       {:else}
         <span class="text-xs text-muted-foreground">no capabilities</span>
       {/each}
-      {#if isActive}
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-5 w-5"
-          onclick={() => {
-            selected = [...device.capabilities];
-            editing = true;
-          }}
-          aria-label="Edit capabilities"
-        >
-          <Pencil class="h-3 w-3" />
-        </Button>
-      {/if}
     </div>
-
-    <div class="flex items-center justify-between text-xs text-muted-foreground">
-      <span>{lastSeenLabel}</span>
-      {#if device.expires_at}
-        <span>Expires {new Date(device.expires_at).toLocaleDateString()}</span>
-      {/if}
-    </div>
-
-    {#if isActive}
-      <Button
-        variant="destructive"
-        size="sm"
-        onclick={() => revoke()}
-        disabled={busy}
-        class="self-end"
-      >
-        {#if busy}
-          <Loader2 class="h-4 w-4 animate-spin" />
-        {:else}
-          Revoke
-        {/if}
-      </Button>
-    {/if}
   {/if}
 </Card>
+
+<DeviceDetailsDialog {device} {capabilities} {onChanged} bind:open={detailsOpen} />

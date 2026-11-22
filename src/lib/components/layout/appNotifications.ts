@@ -23,15 +23,15 @@ export function startAppNotifications(): () => void {
   // ~170s waiting for a human to click Allow on /devices — but that page
   // is the only place that heard this event before, so a request nobody
   // is currently looking at timed out unnoticed (QA-121). Surface it
-  // app-wide; the Devices page keeps its own listener for the refetch.
-  // Desktop-only: pairing approval happens on the PC.
+  // app-wide: `PairRequestGate` pops the Allow/Deny modal in-window, so this
+  // is only the native banner for when the window isn't focused (focusing the
+  // window then shows the modal). Desktop-only: approval happens on the PC.
   if (!isMobileShell)
     listen<{ device_id: string; device_name: string }>('device://pending', (event) => {
+      if (document.hasFocus()) return;
       notify({
         title: 'A phone wants to pair',
         body: `${event.payload.device_name} is waiting for approval.`,
-        route: '/devices',
-        actionLabel: 'Review',
         duration: 0,
       });
     }).then(keep);

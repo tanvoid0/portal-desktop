@@ -76,7 +76,7 @@ Rules:
 
 - **Do not edit files under `src/lib/components/ui/`** — those are vendored shadcn-svelte primitives (`pnpm lint` checks them). Compose on top instead.
 - Imports use `$lib/...`, never `@/...`.
-- Icons: `@lucide/svelte` (not `lucide-svelte`). Tech/brand logos: `TechIcon` / `devicon`.
+- Icons: FontAwesome via unplugin-icons, `import X from '~icons/fa6-solid/<name>'` (see `shell/nav-icon.svelte`); no lucide in app code. Tech/brand logos: `TechIcon` / `devicon`.
 - Toasts: `import { toast } from '$lib/utils/toast'`.
 - Confirm dialogs: `confirmAction()` or `AlertDialog`, never raw `confirm()`.
 - Styling: Tailwind + semantic tokens (`bg-primary`, `text-muted-foreground`, `bg-destructive`), `cn()` from `$lib/utils`, `tv()` (tailwind-variants) for variant APIs.
@@ -105,6 +105,12 @@ This is a desktop window the user resizes and puts on any monitor — not a fixe
 2. **Normalize:** Rust returns snake_case; map it in `utils/normalize*.ts` to the TS shape.
 3. **Cache:** server state goes through **TanStack Query** (`@tanstack/svelte-query`) — query keys in `src/lib/domains/shared/query/keys.ts`, client in `.../queryClient.ts`. **Do not add new `writable()` stores for server data.**
 4. **Types:** shared types live in `types/`; Rust-generated ones in `generated/` (regenerate with `pnpm gen:types`).
+
+**Vault-gated commands.** The vault read is gated in Rust: `VaultSession::require_key().await` (not `key()`) is the only way a command gets the master key. When locked it emits `vault://unlock-requested`; `VaultGate` shows the cancellable unlock dialog and answers via `vault_unlock_settled`. Unlocked → the command continues; cancelled / 120s unanswered → `CredentialError::VaultLocked` ("Vault is locked"), which the caller must handle — nothing fails silently.
+
+- Use `CredentialService` (or `require_key`) for anything touching vault data; it prompts with no extra wiring. Never call `key()` in a command path, and never hold a DB transaction or lock across the call — it can wait on the user.
+- `peek_key`/`peek_value` deliberately never prompt (background drift checks); UI that wants a prompt there calls `vaultGate.ensureUnlocked()` (see `ProjectEnv.svelte`).
+- Keep the `Vault is locked` text; the UI matches on it to show an unlock button.
 
 Never load backend data at module import time — load in `onMount`/`$effect` or via a Query. Full detail: `.cursor/rules/data-loading-conventions.md`.
 

@@ -1,6 +1,6 @@
 # Portal Mobile — the phone (and any other device) as a client of Portal Desktop
 
-**Status:** Phases 0, 1, 2 and 3a are done on `main`. Phase 0 shipped and
+**Status:** Phases 0, 1, 2, 3a and the Phase 5 resource monitor are done on `main`. Phase 0 shipped and
 verified (`7aeed3da`, `b575e599`, 2026-11-12/13) — real-phone pairing
 confirmed end to end. The browser/
 other-desktop client ("Other clients", below) is merged to `main` too, and
@@ -146,8 +146,8 @@ Each ships on its own.
    `enigo` injection, the `remote.input` cap) was built toward this but is now
    removed — we are not using Portal Desktop for full remote/media control of
    the PC, by this app or by Portal Remote. The resource-monitor half of this
-   phase (`host_stats` + `disk_usage` under the default `sysinfo` cap) is
-   unaffected and still open.
+   phase shipped: `host_stats` + `disk_usage` sit under the default `sysinfo`
+   cap and the `/system` page reads them (#1057, #1060).
 6. **~~Media-remote features~~ — cancelled (2026-11-20).** Was: screen mirror,
    files, now-playing/volume, ported from Portal Remote's C# server. Same
    reasoning as phase 5 — out of scope for this app.
@@ -255,7 +255,7 @@ task #542, pick up as wanted):
    time. Not started.
 3. UDP discovery (`mobile_discover`) not independently confirmed — the test
    phone's busybox `nc` lacks `-b`. Manual host/port pairing works regardless.
-4. Phases 1, 2 and 3a are done (see the list above); the rest ship on their
+4. Phases 1, 2, 3a and the Phase 5 resource monitor are done (see the list above); the rest ship on their
    own. Revoking a device, changing its caps, or an expired grant closes its
    open `/events` and `/control` sockets (`daemon/pairing.rs`: `drop_device`,
    plus an expiry sweep every 60 s).

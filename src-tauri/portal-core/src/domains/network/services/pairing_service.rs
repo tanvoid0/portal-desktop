@@ -276,6 +276,50 @@ pub async fn approve(
     })
 }
 
+/// Move an approved grant onto a different lifetime (24h / 30d / until
+/// revoked) and restart its window, keeping the token the device already
+/// holds. `extend_expiry` only renews the window it already has; this is how
+/// the expiry itself is edited. Pending/revoked/rejected rows must go back
+/// through approval, same rule as `extend_expiry`; so does a QR grant nobody
+/// has scanned yet, whose pickup window must lapse on its own.
+pub async fn set_lifetime(
+    conn: &DatabaseConnection,
+    device_id: &str,
+    approval_type: &str,
+) -> Result<Option<String>, String> {
+    if !matches!(approval_type, "temporary" | "long_term" | "until_revoked") {
+        return Err(format!("Unknown approval type: {approval_type}"));
+    }
+    let Some(row) = most_recent_row(conn, device_id).await? else {
+        return Err(format!(
+            "Device approval not found for device_id: {device_id}"
+        ));
+    };
+    if !row.approved || !matches!(row.approval_type.as_str(), "temporary" | "long_term" | "until_revoked")
+    {
+        return Err(format!(
+            "Cannot change the lifetime of a {} grant; re-pair the device instead",
+            row.approval_type
+        ));
+    }
+    // An unscanned QR grant (see the module doc): its pickup `expires_at` is all that
+    // keeps a leaked QR from working, and switching lifetime would clear or replace it.
+    if row.approval_type == "until_revoked" && row.expires_at.is_some() {
+        return Err("Cannot change the lifetime of a QR grant before it is scanned".to_string());
+    }
+    let new_expiry = approval_expiry(approval_type);
+    let mut m: device_approval::ActiveModel = row.into();
+    m.approval_type = Set(approval_type.to_string());
+    m.expires_at = Set(new_expiry);
+    m.token_expires_at = Set(new_expiry);
+    m.updated_at = Set(Utc::now().into());
+    device_approval::Entity::update(m)
+        .exec(conn)
+        .await
+        .map_err(|e| format!("Failed to update device approval: {e}"))?;
+    Ok(new_expiry.map(|e| e.to_rfc3339()))
+}
+
 /// Set `approved=false, approval_type="revoked"` on every row for
 /// `device_id`. The only way to end an `until_revoked` grant.
 pub async fn revoke(conn: &DatabaseConnection, device_id: &str) -> Result<(), String> {
@@ -679,6 +723,57 @@ mod tests {
 
         revoke(&conn, "dev-ext").await.unwrap();
         assert!(extend_expiry(&conn, "dev-ext").await.is_err());
+    }
+
+    #[tokio::test]
+    async fn set_lifetime_switches_window_and_keeps_token() {
+        let conn = fresh_db().await;
+        request_pairing(&conn, "dev-life", "Phone").await.unwrap();
+        let outcome = approve(&conn, "dev-life", "temporary", &[]).await.unwrap();
+        let find = || async {
+            device_approval::Entity::find()
+                .filter(device_approval::Column::DeviceId.eq("dev-life"))
+                .one(&conn)
+                .await
+                .unwrap()
+                .unwrap()
+        };
+        let before = find().await;
+
+        // 24h -> 30d: further out, same token.
+        assert!(set_lifetime(&conn, "dev-life", "long_term")
+            .await
+            .unwrap()
+            .is_some());
+        let after = find().await;
+        assert_eq!(after.approval_type, "long_term");
+        assert!(after.expires_at > before.expires_at);
+        assert_eq!(after.access_token, before.access_token);
+        assert!(verify_token(&conn, &outcome.token).await.unwrap().is_some());
+
+        // 30d -> until revoked: no expiry at all.
+        assert!(set_lifetime(&conn, "dev-life", "until_revoked")
+            .await
+            .unwrap()
+            .is_none());
+        let after = find().await;
+        assert!(after.expires_at.is_none() && after.token_expires_at.is_none());
+        assert!(verify_token(&conn, &outcome.token).await.unwrap().is_some());
+
+        // Back from "until revoked" to an expiring window is fine; only an
+        // unscanned QR grant is refused (checked below).
+        assert!(set_lifetime(&conn, "dev-life", "long_term")
+            .await
+            .unwrap()
+            .is_some());
+
+        assert!(set_lifetime(&conn, "dev-life", "forever").await.is_err());
+        revoke(&conn, "dev-life").await.unwrap();
+        assert!(set_lifetime(&conn, "dev-life", "temporary").await.is_err());
+
+        // An unscanned QR grant keeps its pickup window: until_revoked would clear it.
+        let (qr_id, _token) = mint_qr_pairing(&conn, &[]).await.unwrap();
+        assert!(set_lifetime(&conn, &qr_id, "until_revoked").await.is_err());
     }
 
     #[tokio::test]

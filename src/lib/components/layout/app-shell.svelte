@@ -17,6 +17,7 @@
   import ToastContainer from '$lib/components/ui/toast-container.svelte';
   import ConfirmDialog from '$lib/components/ui/confirm-dialog.svelte';
   import UpdatePrompt from '$lib/domains/updates/components/UpdatePrompt.svelte';
+  import PairRequestGate from '$lib/domains/devices/components/PairRequestGate.svelte';
   import VaultGate from '$lib/domains/credentials/components/VaultGate.svelte';
   import { vaultGate } from '$lib/domains/credentials/state/vault.svelte';
   import { runStartupUpdateCheck } from '$lib/domains/updates/services/startupUpdate';
@@ -267,5 +268,8 @@
 
     <!-- Vault setup/unlock gate -->
     <VaultGate />
+
+    <!-- Phone pairing request: Allow / Deny right here -->
+    <PairRequestGate />
   {/if}
 </DeviceAuthGuard>

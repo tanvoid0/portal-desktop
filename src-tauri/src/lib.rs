@@ -207,6 +207,12 @@ pub fn run() {
             // locked every launch — nothing here persists across restarts.
             let vault_session = std::sync::Arc::new(VaultSession::default());
             app.manage(vault_session.clone());
+            // Locked vault + a command that needs the key → ask the UI to unlock, then continue.
+            let vault_prompter = std::sync::Arc::new(
+                domains::credentials::prompter::TauriVaultPrompter::new(app.handle().clone()),
+            );
+            vault_session.set_prompter(vault_prompter.clone());
+            app.manage(vault_prompter);
 
             // Database explorer state, seeded with Portal's own DB as a source.
             app.manage(std::sync::Arc::new(
@@ -604,6 +610,7 @@ pub fn run() {
             domains::credentials::commands::vault_unlock_with_password,
             domains::credentials::commands::vault_unlock_with_hello,
             domains::credentials::commands::vault_lock,
+            domains::credentials::commands::vault_unlock_settled,
             domains::credentials::commands::vault_reset_password,
             // Database explorer commands
             domains::database_explorer::commands::db_list_sources,
@@ -911,6 +918,7 @@ pub fn run() {
             domains::network::commands::revoke_device,
             domains::network::commands::update_device_capabilities,
             domains::network::commands::extend_device_expiry,
+            domains::network::commands::set_device_lifetime,
             domains::network::commands::list_devices,
             domains::network::commands::generate_pairing_qr,
             domains::network::commands::remote_list_capabilities,

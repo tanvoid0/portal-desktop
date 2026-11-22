@@ -245,6 +245,18 @@ pub async fn vault_lock(session: State<'_, Arc<VaultSession>>) -> Result<(), Str
     Ok(())
 }
 
+/// Frontend's answer to `vault://unlock-requested`: `true` once unlocked,
+/// `false` if the user dismissed the prompt. Releases every command waiting
+/// in `VaultSession::require_key`.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn vault_unlock_settled(
+    ok: bool,
+    prompter: State<'_, Arc<crate::domains::credentials::prompter::TauriVaultPrompter>>,
+) -> Result<(), String> {
+    prompter.settle(ok);
+    Ok(())
+}
+
 /// Reset the master password using the recovery key. The master key itself
 /// is unchanged, so existing credentials stay decryptable.
 #[portal_rpc_macro::rpc(local_only)]

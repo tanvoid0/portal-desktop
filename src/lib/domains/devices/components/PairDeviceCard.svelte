@@ -1,12 +1,16 @@
 <script lang="ts">
   import QRCode from 'qrcode';
   import { Button } from '$lib/components/ui/button';
-  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Card, CardContent } from '$lib/components/ui/card';
   import CapabilityChecklist from './CapabilityChecklist.svelte';
   import { generatePairingQr, revokeDevice } from '../api/deviceApi';
+  import { bulkToggleable } from '../utils/capabilityChecklist';
+  import { devicesUi } from '../state/devicesUi.svelte';
   import { toast } from '$lib/utils/toast';
   import Loader2 from '~icons/fa6-solid/spinner';
   import QrCodeIcon from '~icons/fa6-solid/qrcode';
+  import ArrowRotateRight from '~icons/fa6-solid/arrow-rotate-right';
+  import Xmark from '~icons/fa6-solid/xmark';
   import type { CapabilityInfo } from '../types';
 
   interface Props {
@@ -57,10 +61,26 @@
     };
   });
 
+  // Simple mode doesn't show the checklist, so it grants every non-sensitive
+  // capability — enough for the phone to be useful, while terminal.exec and
+  // friends stay behind the advanced checklist.
+  const standardCaps = $derived(bulkToggleable(capabilities));
+  const grantCaps = $derived(devicesUi.advanced ? selected : standardCaps);
+
+  // Seed the advanced checklist with the same standard set simple mode grants,
+  // so switching to advanced starts from "what you'd have got" rather than an
+  // all-off list that generates a useless grant.
+  let seeded = false;
+  $effect(() => {
+    if (seeded || capabilities.length === 0) return;
+    seeded = true;
+    selected = bulkToggleable(capabilities);
+  });
+
   async function generate() {
     generating = true;
     try {
-      const { qr_url, device_id } = await generatePairingQr(selected);
+      const { qr_url, device_id } = await generatePairingQr(grantCaps);
       deviceId = device_id;
       qrUrl = qr_url;
       qrDataUrl = await QRCode.toDataURL(qr_url, { width: 240, margin: 2 });
@@ -90,43 +110,72 @@
 </script>
 
 <Card>
-  <CardHeader>
-    <CardTitle>Pair a phone</CardTitle>
-  </CardHeader>
-  <CardContent class="space-y-4">
-    <div>
-      <p class="mb-2 text-sm font-medium">Capabilities to grant</p>
-      <CapabilityChecklist {capabilities} bind:selected disabled={generating} />
-    </div>
-
+  <CardContent class="space-y-3 p-4">
     {#if qrDataUrl}
-      <div class="flex flex-col items-center gap-3 rounded-lg border bg-white p-4">
-        <img src={qrDataUrl} alt="Pairing QR code" class="h-56 w-56" />
-        <code class="text-center text-xs break-all text-muted-foreground">{qrUrl}</code>
+      <div class="flex flex-wrap items-center gap-4">
+        <img
+          src={qrDataUrl}
+          alt="Pairing QR code"
+          class="h-36 w-36 shrink-0 rounded-md border bg-white p-1"
+        />
+        <div class="min-w-0 flex-1 space-y-2">
+          <p class="text-sm font-medium">Scan this with the Portal app</p>
+          <p class="text-xs text-muted-foreground">
+            It connects straight away — no approval step on the phone. Expires in 5 minutes if
+            nobody scans it.
+          </p>
+          <code class="block text-xs break-all text-muted-foreground">{qrUrl}</code>
+        </div>
       </div>
-      <p class="text-xs text-muted-foreground">
-        Scanning connects immediately with the capabilities above — there's no approval step on the
-        phone. The grant appears below once scanned; an unscanned code expires in 5 minutes.
-      </p>
+    {:else}
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="min-w-0">
+          <p class="text-sm font-medium">Pair a phone</p>
+          <p class="text-xs text-muted-foreground">
+            {#if devicesUi.advanced}
+              Pick what the phone may do, then show it the code.
+            {:else}
+              Show the code to the phone — it gets the {standardCaps.length} standard capabilities.
+            {/if}
+          </p>
+        </div>
+        <Button onclick={generate} disabled={generating || canceling}>
+          {#if generating}
+            <Loader2 class="mr-2 h-4 w-4 animate-spin" />
+          {:else}
+            <QrCodeIcon class="mr-2 h-4 w-4" />
+          {/if}
+          Generate QR code
+        </Button>
+      </div>
     {/if}
 
-    <div class="flex gap-2">
-      <Button onclick={generate} disabled={generating || canceling}>
-        {#if generating}
-          <Loader2 class="mr-2 h-4 w-4 animate-spin" />
-        {:else}
-          <QrCodeIcon class="mr-2 h-4 w-4" />
-        {/if}
-        {qrDataUrl ? 'Regenerate QR code' : 'Generate QR code'}
-      </Button>
-      {#if qrDataUrl}
-        <Button variant="outline" onclick={cancel} disabled={canceling || generating}>
+    {#if devicesUi.advanced}
+      <div class="border-t pt-3">
+        <p class="mb-2 text-xs font-medium text-muted-foreground">Capabilities to grant</p>
+        <CapabilityChecklist {capabilities} bind:selected disabled={generating} />
+      </div>
+    {/if}
+
+    {#if qrDataUrl}
+      <div class="flex gap-2 border-t pt-3">
+        <Button variant="outline" size="sm" onclick={generate} disabled={generating || canceling}>
+          {#if generating}
+            <Loader2 class="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          {:else}
+            <ArrowRotateRight class="mr-1.5 h-3.5 w-3.5" />
+          {/if}
+          Regenerate
+        </Button>
+        <Button variant="outline" size="sm" onclick={cancel} disabled={canceling || generating}>
           {#if canceling}
-            <Loader2 class="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 class="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          {:else}
+            <Xmark class="mr-1.5 h-3.5 w-3.5" />
           {/if}
           Cancel
         </Button>
-      {/if}
-    </div>
+      </div>
+    {/if}
   </CardContent>
 </Card>

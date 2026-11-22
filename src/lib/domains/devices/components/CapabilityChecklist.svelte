@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Switch } from '$lib/components/ui/switch';
   import { Label } from '$lib/components/ui/label';
-  import { Button } from '$lib/components/ui/button';
+  import { confirmAction } from '$lib/utils/confirm';
   import { Badge } from '$lib/components/ui/badge';
   import { bulkToggleable } from '../utils/capabilityChecklist';
   import type { CapabilityInfo } from '../types';
@@ -14,22 +14,33 @@
 
   let { capabilities, selected = $bindable([]), disabled = false }: Props = $props();
 
-  // "Select all" only ever bulk-toggles the non-sensitive caps — terminal.exec,
-  // agents.exec, remote.input and the rest of SENSITIVE_CAPS stay opt-in per
-  // row even when every other box gets checked at once.
   const bulkCaps = $derived(bulkToggleable(capabilities));
+  const sensitiveCaps = $derived(capabilities.filter((c) => c.is_sensitive).map((c) => c.name));
   const allSelected = $derived(
-    bulkCaps.length > 0 && bulkCaps.every((name) => selected.includes(name))
+    capabilities.length > 0 && capabilities.every((c) => selected.includes(c.name))
   );
 
   function toggle(cap: string, checked: boolean) {
     selected = checked ? [...selected, cap] : selected.filter((c) => c !== cap);
   }
 
-  function toggleAll() {
-    selected = allSelected
-      ? selected.filter((c) => !bulkCaps.includes(c))
-      : [...new Set([...selected, ...bulkCaps])];
+  // Turning "all" on asks about sensitive caps (terminal.exec, agents.exec, ...) —
+  // yes grants them too, no grants only the non-sensitive ones. Turning it off clears everything.
+  async function toggleAll(on: boolean) {
+    if (!on) {
+      selected = [];
+      return;
+    }
+    const withSensitive =
+      sensitiveCaps.length > 0 &&
+      (await confirmAction(
+        'Also enable the sensitive permissions (' +
+          sensitiveCaps.join(', ') +
+          ')? These allow running commands on this computer.',
+        'Enable sensitive permissions?',
+        { confirmLabel: 'Yes', cancelLabel: 'No', destructive: false }
+      ));
+    selected = [...new Set([...bulkCaps, ...(withSensitive ? sensitiveCaps : [])])];
   }
 </script>
 
@@ -37,9 +48,10 @@
   <p class="text-sm text-muted-foreground">No capabilities are registered.</p>
 {:else}
   <div class="space-y-2">
-    <Button type="button" variant="ghost" size="sm" onclick={toggleAll} {disabled}>
-      {allSelected ? 'Deselect all' : 'Select all'}
-    </Button>
+    <Label class="flex items-center gap-2 text-sm font-medium">
+      <Switch checked={allSelected} onCheckedChange={(v) => toggleAll(v === true)} {disabled} />
+      Select all
+    </Label>
     <!-- Columns follow this element's width, not the viewport's: it also sits in half-width cards.
          13rem holds the longest cell (switch + "agents.history" + Sensitive); flex-wrap covers longer. -->
     <div class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,13rem),1fr))] gap-2">

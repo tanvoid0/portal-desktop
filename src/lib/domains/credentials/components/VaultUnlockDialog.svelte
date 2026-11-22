@@ -109,7 +109,10 @@
     {#if mode === 'unlock'}
       <Dialog.Header>
         <Dialog.Title>Vault locked</Dialog.Title>
-        <Dialog.Description>Enter your master password to unlock it.</Dialog.Description>
+        <Dialog.Description>
+          Enter your master password to unlock it, or skip — you'll be asked again when something
+          needs it.
+        </Dialog.Description>
       </Dialog.Header>
 
       <form
@@ -142,14 +145,12 @@
         </Button>
       {/if}
 
-      <Button
-        variant="link"
-        size="sm"
-        onclick={() => (mode = 'recovery')}
-        class="h-auto self-start px-0"
-      >
-        Forgot password?
-      </Button>
+      <div class="flex items-center justify-between">
+        <Button variant="link" size="sm" onclick={() => (mode = 'recovery')} class="h-auto px-0">
+          Forgot password?
+        </Button>
+        <Button variant="ghost" size="sm" onclick={() => vaultGate.settle(false)}>Not now</Button>
+      </div>
     {:else}
       <Dialog.Header>
         <Dialog.Title>Reset your password</Dialog.Title>

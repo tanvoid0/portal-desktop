@@ -7,8 +7,11 @@
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { useQueryClient } from '@tanstack/svelte-query';
   import { Button } from '$lib/components/ui/button';
-  import { PageEmpty, PageError, PageHeader, PageLoading, PageStats } from '$lib/components/shell';
-  import type { PageStat } from '$lib/components/shell';
+  import { Switch } from '$lib/components/ui/switch';
+  import { Label } from '$lib/components/ui/label';
+  import { PageEmpty, PageError, PageHeader, PageLoading } from '$lib/components/shell';
+  import { formatRelativeTime } from '$lib/domains/shared/utils';
+  import { devicesUi } from '$lib/domains/devices/state/devicesUi.svelte';
   import LanToggleCard from '$lib/domains/devices/components/LanToggleCard.svelte';
   import PairDeviceCard from '$lib/domains/devices/components/PairDeviceCard.svelte';
   import PendingRequestRow from '$lib/domains/devices/components/PendingRequestRow.svelte';
@@ -71,11 +74,6 @@
     return map;
   });
 
-  const stats = $derived<PageStat[]>([
-    { label: 'Pending', value: pending.length, icon: ClockIcon },
-    { label: 'Paired', value: paired.length, icon: MobileIcon },
-  ]);
-
   function refetchDevices() {
     return queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
   }
@@ -109,12 +107,24 @@
   <title>Devices - Portal Desktop</title>
 </svelte:head>
 
-<div class="space-y-6">
-  <PageHeader title="Devices" description="Pair and manage phones connecting to Portal Desktop">
+<div class="space-y-4">
+  <PageHeader title="Devices" description="Phones connecting to Portal Desktop">
     {#snippet actions()}
-      <Button variant="outline" size="sm" onclick={handleRefreshClick} disabled={refreshing}>
-        <RefreshCw class="mr-2 h-4 w-4 {refreshing ? 'animate-spin' : ''}" />
-        Refresh
+      <Label class="flex items-center gap-2 text-xs font-normal text-muted-foreground">
+        <Switch
+          checked={devicesUi.advanced}
+          onCheckedChange={(v) => devicesUi.setAdvanced(v === true)}
+        />
+        Advanced
+      </Label>
+      <Button
+        variant="outline"
+        size="sm"
+        onclick={handleRefreshClick}
+        disabled={refreshing}
+        aria-label="Refresh devices"
+      >
+        <RefreshCw class="h-4 w-4 {refreshing ? 'animate-spin' : ''}" />
       </Button>
     {/snippet}
   </PageHeader>
@@ -127,20 +137,19 @@
       onRetry={refetchDevices}
     />
   {:else}
-    <PageStats {stats} />
-
-    <LanToggleCard />
+    <LanToggleCard compact={!devicesUi.advanced} />
 
     {#if showConnectivityWarning}
       <FirewallWarningBanner {firewallRuleMissing} {vpnAdapter} />
     {/if}
 
-    <PairDeviceCard {capabilities} {pairedDeviceIds} onPaired={refetchDevices} />
-
     {#if pending.length > 0}
-      <div class="space-y-3">
-        <h3 class="text-sm font-semibold">Pending requests</h3>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div class="space-y-2">
+        <h3 class="flex items-center gap-2 text-sm font-semibold">
+          <ClockIcon class="h-3.5 w-3.5 text-muted-foreground" />
+          Waiting for you ({pending.length})
+        </h3>
+        <div class="space-y-2">
           {#each pending as device (device.device_id)}
             <PendingRequestRow
               {device}
@@ -153,16 +162,18 @@
       </div>
     {/if}
 
-    <div class="space-y-3">
-      <h3 class="text-sm font-semibold">Paired devices</h3>
+    <PairDeviceCard {capabilities} {pairedDeviceIds} onPaired={refetchDevices} />
+
+    <div class="space-y-2">
+      <h3 class="text-sm font-semibold">Paired devices ({paired.length})</h3>
       {#if paired.length === 0}
         <PageEmpty
           title="No paired devices"
-          description="Generate a QR code above to pair a phone."
+          description="Generate a QR code above and scan it with the phone."
           icon={MobileIcon}
         />
       {:else}
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div class="space-y-2">
           {#each paired as device (device.device_id)}
             <DeviceRow
               {device}
@@ -176,16 +187,31 @@
     </div>
 
     {#if history.length > 0}
-      <div class="space-y-3">
-        <Button variant="ghost" size="sm" onclick={() => (historyOpen = !historyOpen)}>
-          {historyOpen ? 'Hide' : 'Show'} history ({history.length})
+      <div class="space-y-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-7 px-2 text-xs text-muted-foreground"
+          onclick={() => (historyOpen = !historyOpen)}
+        >
+          {historyOpen ? 'Hide' : 'Show'} past devices ({history.length})
         </Button>
         {#if historyOpen}
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <!-- Nothing is actionable on a revoked or rejected grant, so these are
+               plain text lines rather than the full device card. -->
+          <ul class="divide-y rounded-md border text-xs">
             {#each history as device (device.device_id)}
-              <DeviceRow {device} {capabilities} onChanged={refetchDevices} />
+              <li class="flex items-center justify-between gap-3 px-3 py-1.5">
+                <span class="truncate font-medium" title={device.device_name}>
+                  {device.device_name}
+                </span>
+                <span class="shrink-0 text-muted-foreground">
+                  {device.approval_type === 'rejected' ? 'Denied' : 'Revoked'} ·
+                  {formatRelativeTime(new Date(device.last_used_at ?? device.created_at))}
+                </span>
+              </li>
             {/each}
-          </div>
+          </ul>
         {/if}
       </div>
     {/if}

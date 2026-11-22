@@ -7,35 +7,7 @@
 
 import { isTauriEnvironment, tauriInvoke } from './tauri';
 import DeviceAuthService from '$lib/services/deviceAuthService';
-import { vaultGate } from '$lib/domains/credentials/state/vault.svelte';
 import { getErrorMessage } from './errorMessage';
-
-/** Locked-vault errors from any credential/GitHub command carry this phrase (case-insensitive).
- *  Tauri 2 commands returning `Result<_, String>` reject with a plain string, not an `Error`. */
-function isVaultLockedError(error: unknown): boolean {
-  return /vault is locked/i.test(getErrorMessage(error));
-}
-
-/** Commands known to check the vault lock before any mutation, so retrying once after an
- *  unlock prompt is safe. NOT a blanket "retry anything that errors with vault-is-locked":
- *  `github_poll_device_flow` trades its one-time device code with GitHub *before* the
- *  local `create_credential` call that can fail locked — retrying it would replay an
- *  already-consumed code. New commands need an explicit add here, not a default yes. */
-const RETRY_AFTER_UNLOCK_COMMANDS = new Set([
-  'create_credential',
-  'update_credential',
-  'decrypt_credential',
-  // GitHub reads: the token decrypt is the first step and has no side effects.
-  'github_get_connection_status',
-  'github_list_repositories',
-  'github_get_repository',
-  'github_list_issues',
-  'github_get_issue',
-  'github_list_workflow_runs',
-  'github_list_workflows',
-  'github_get_workflow_run',
-  'github_get_workflow_job_logs',
-]);
 
 /**
  * Get the base URL for HTTP API calls
@@ -362,20 +334,8 @@ export class InvokeClient {
     if (isTauriEnvironment()) {
       // Tauri app - direct invoke (fastest)
       const args = config.data || config.params || {};
-      try {
-        return await tauriInvoke<T>(command, args);
-      } catch (error) {
-        // Only commands known to check the vault lock before touching anything —
-        // see `RETRY_AFTER_UNLOCK_COMMANDS` above for why this isn't everyone.
-        if (
-          RETRY_AFTER_UNLOCK_COMMANDS.has(command) &&
-          isVaultLockedError(error) &&
-          (await vaultGate.ensureUnlocked())
-        ) {
-          return await tauriInvoke<T>(command, args);
-        }
-        throw error;
-      }
+      // A locked vault is handled in Rust (`VaultSession::require_key` asks the UI to unlock).
+      return await tauriInvoke<T>(command, args);
     } else if (InvokeClient.isLocalhost()) {
       // Localhost browser - handle based on strategy
       return this.handleLocalhostStrategy<T>(command, config);

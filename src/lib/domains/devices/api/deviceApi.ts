@@ -46,6 +46,18 @@ export function updateDeviceCapabilities(deviceId: string, capabilities: string[
   return invokeClient.post('update_device_capabilities', { deviceId, capabilities });
 }
 
+/** Move an approved grant onto a different lifetime and restart its window.
+ * Returns the new expiry, or null for `until_revoked`. */
+export function setDeviceLifetime(
+  deviceId: string,
+  approvalType: ApprovalType
+): Promise<string | null> {
+  return invokeClient.post<string | null>('set_device_lifetime', {
+    deviceId,
+    approvalType,
+  });
+}
+
 export function extendDeviceExpiry(deviceId: string): Promise<string | null> {
   return invokeClient.post<string | null>('extend_device_expiry', { deviceId });
 }

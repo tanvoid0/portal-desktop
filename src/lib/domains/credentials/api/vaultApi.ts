@@ -38,3 +38,8 @@ export async function resetVaultPassword(recoveryKey: string, newPassword: strin
     newPassword,
   });
 }
+
+/** Answer to the backend's `vault://unlock-requested`: releases commands waiting on the vault. */
+export async function settleVaultUnlock(ok: boolean): Promise<void> {
+  await invokeClient.post<void>('vault_unlock_settled', { ok });
+}
