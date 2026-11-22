@@ -19,6 +19,13 @@ pub trait VaultPrompter: Send + Sync {
     fn prompt(&self) -> Pin<Box<dyn Future<Output = bool> + Send>>;
 }
 
+tokio::task_local! {
+    /// Set by the daemon's /rpc handler around remote-trust dispatches; makes `require_key`
+    /// skip the prompt. Lost across `tokio::spawn`: re-enter the scope inside any spawned task that can reach a
+    /// vault-gated call (see `CoderService::spawn_run`).
+    pub static REMOTE_CALLER: ();
+}
+
 #[derive(Default)]
 pub struct VaultSession {
     inner: Mutex<Option<[u8; 32]>>,
@@ -64,10 +71,16 @@ impl VaultSession {
         if let Ok(key) = self.key() {
             return Ok(key);
         }
+        // A remote (LAN) caller must not pop an unlock dialog on a desk nobody may be at:
+        // fail fast like `key()`.
+        if REMOTE_CALLER.try_with(|_| ()).is_ok() {
+            return Err(CredentialError::VaultLocked);
+        }
         if let Some(p) = self.prompter.get() {
-            if p.prompt().await {
-                return self.key();
-            }
+            // Whatever the prompt said (even a timeout after a lost event), the
+            // key is the truth: unlocked meanwhile → continue.
+            p.prompt().await;
+            return self.key();
         }
         Err(CredentialError::VaultLocked)
     }
@@ -115,5 +128,24 @@ mod tests {
         let s = Arc::new(VaultSession::default());
         s.set_prompter(Arc::new(Stub(Some(s.clone()))));
         assert_eq!(s.require_key().await.unwrap(), [7; 32]); // unlocked → continues
+
+        // Prompt times out (false) but the vault got unlocked meanwhile → still continues.
+        struct UnlockThenTimeout(Arc<VaultSession>);
+        impl VaultPrompter for UnlockThenTimeout {
+            fn prompt(&self) -> Pin<Box<dyn Future<Output = bool> + Send>> {
+                self.0.unlock([9; 32]);
+                Box::pin(async { false })
+            }
+        }
+        let t = Arc::new(VaultSession::default());
+        t.set_prompter(Arc::new(UnlockThenTimeout(t.clone())));
+        assert_eq!(t.require_key().await.unwrap(), [9; 32]);
+
+        // Remote caller: no prompt, fails fast while locked.
+        let r = Arc::new(VaultSession::default());
+        r.set_prompter(Arc::new(Stub(Some(r.clone()))));
+        let res = REMOTE_CALLER.scope((), r.require_key()).await;
+        assert!(matches!(res, Err(CredentialError::VaultLocked)));
+        assert!(r.key().is_err()); // Stub would have unlocked had it been asked
     }
 }

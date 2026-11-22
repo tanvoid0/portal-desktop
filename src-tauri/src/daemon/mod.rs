@@ -607,7 +607,14 @@ async fn rpc(
     let args = if args.is_null() { json!({}) } else { args };
 
     let caller = caller_for(&trust);
-    match crate::rpc::dispatch(app, &caller, &command, args).await {
+    let dispatched = crate::rpc::dispatch(app, &caller, &command, args);
+    // Remote callers must not trigger the desktop's vault unlock prompt (see `require_key`).
+    let result = if matches!(trust, Trust::Local) {
+        dispatched.await
+    } else {
+        crate::domains::credentials::services::REMOTE_CALLER.scope((), dispatched).await
+    };
+    match result {
         Ok(value) => axum::Json(value).into_response(),
         Err(crate::rpc::DispatchError::Unknown) => (
             StatusCode::NOT_FOUND,

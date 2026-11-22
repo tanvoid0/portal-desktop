@@ -197,12 +197,15 @@ pub async fn vault_unlock_with_password(
     password: String,
     db: State<'_, Arc<DatabaseManager>>,
     session: State<'_, Arc<VaultSession>>,
+    prompter: State<'_, Arc<crate::domains::credentials::prompter::TauriVaultPrompter>>,
 ) -> Result<(), String> {
     let service = VaultService::new(db.get_connection_clone(), session.inner().clone());
     service
         .unlock_with_password(&password)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    prompter.settle(true); // release waiters even if the unlock event was lost
+    Ok(())
 }
 
 /// Unlock via the OS keychain, gated by a Windows Hello consent prompt
@@ -213,6 +216,7 @@ pub async fn vault_unlock_with_hello(
     app: tauri::AppHandle,
     db: State<'_, Arc<DatabaseManager>>,
     session: State<'_, Arc<VaultSession>>,
+    prompter: State<'_, Arc<crate::domains::credentials::prompter::TauriVaultPrompter>>,
 ) -> Result<(), String> {
     let window = app
         .get_webview_window("main")
@@ -235,7 +239,9 @@ pub async fn vault_unlock_with_hello(
     service
         .unlock_with_keychain()
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    prompter.settle(true);
+    Ok(())
 }
 
 /// Lock the vault immediately. It otherwise stays unlocked until the app exits.
@@ -265,12 +271,15 @@ pub async fn vault_reset_password(
     new_password: String,
     db: State<'_, Arc<DatabaseManager>>,
     session: State<'_, Arc<VaultSession>>,
+    prompter: State<'_, Arc<crate::domains::credentials::prompter::TauriVaultPrompter>>,
 ) -> Result<(), String> {
     let service = VaultService::new(db.get_connection_clone(), session.inner().clone());
     service
         .reset_password(&recovery_key, &new_password)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    prompter.settle(true);
+    Ok(())
 }
 
 /// Search credentials

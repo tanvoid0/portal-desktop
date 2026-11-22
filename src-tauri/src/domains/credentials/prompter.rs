@@ -38,15 +38,14 @@ impl TauriVaultPrompter {
 impl VaultPrompter for TauriVaultPrompter {
     fn prompt(&self) -> Pin<Box<dyn Future<Output = bool> + Send>> {
         let (tx, rx) = oneshot::channel();
-        let first = {
+        {
             let mut waiters = self.waiters.lock().unwrap();
             waiters.retain(|w| !w.is_closed()); // drop callers that timed out
             waiters.push(tx);
-            waiters.len() == 1
-        };
-        if first {
-            let _ = self.app.emit("vault://unlock-requested", ());
         }
+        // Every call, not just the first: a single lost event would stall all callers.
+        // The frontend merges repeats into one dialog (`ensureUnlocked`).
+        let _ = self.app.emit("vault://unlock-requested", ());
         Box::pin(async move {
             matches!(tokio::time::timeout(PROMPT_TIMEOUT, rx).await, Ok(Ok(true)))
         })

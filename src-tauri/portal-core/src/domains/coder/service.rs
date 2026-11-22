@@ -1661,8 +1661,11 @@ impl CoderService {
         };
         let svc = Arc::clone(&self);
         let tid = thread_id.clone();
+        // tokio::spawn drops task-locals: carry the remote-caller mark into the run so a
+        // remote-started agent cannot pop the desktop vault prompt.
+        let remote = crate::domains::credentials::services::REMOTE_CALLER.try_with(|_| ()).is_ok();
 
-        tokio::spawn(async move {
+        let run = async move {
             {
                 let mut runs = svc.active_runs.lock().await;
                 if let Some(old) = runs.insert(tid.clone(), handle) {
@@ -1706,7 +1709,12 @@ impl CoderService {
                         .await;
                 }
             }
-        });
+        };
+        if remote {
+            tokio::spawn(crate::domains::credentials::services::REMOTE_CALLER.scope((), run));
+        } else {
+            tokio::spawn(run);
+        }
     }
 
     /// Cancel an in-flight run for a thread, if any.
