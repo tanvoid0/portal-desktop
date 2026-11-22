@@ -1648,6 +1648,40 @@ struct LogReader {
     raw: bool,
 }
 
+/// Reads up to and including the next LF or CR, so a progress bar redrawn
+/// with a bare CR (pnpm, flutter, curl) streams live. A CRLF pair counts as
+/// one terminator (`after_cr` remembers a trailing CR across chunks).
+/// Returns the segment's length in `buf`; 0 means EOF. Cancel-safe.
+async fn read_segment<R: AsyncRead + Unpin>(
+    r: &mut BufReader<R>,
+    buf: &mut Vec<u8>,
+    after_cr: &mut bool,
+) -> std::io::Result<usize> {
+    loop {
+        let chunk = r.fill_buf().await?;
+        if chunk.is_empty() {
+            return Ok(buf.len());
+        }
+        if std::mem::take(after_cr) && chunk[0] == b'\n' {
+            r.consume(1);
+            continue;
+        }
+        match chunk.iter().position(|&b| b == b'\r' || b == b'\n') {
+            Some(i) => {
+                *after_cr = chunk[i] == b'\r';
+                buf.extend_from_slice(&chunk[..=i]);
+                r.consume(i + 1);
+                return Ok(buf.len());
+            }
+            None => {
+                let l = chunk.len();
+                buf.extend_from_slice(chunk);
+                r.consume(l);
+            }
+        }
+    }
+}
+
 impl LogReader {
     fn spawn<R: AsyncRead + Unpin + Send + 'static>(self, pipe: R) -> JoinHandle<()> {
         tokio::spawn(async move {
@@ -1656,12 +1690,13 @@ impl LogReader {
             // the pipe the child blocks on its next write once the pipe fills.
             let mut pipe = BufReader::new(pipe);
             let mut buf = Vec::new();
+            let mut after_cr = false;
             let mut pending: Vec<String> = Vec::new();
             let mut flush_at: Option<tokio::time::Instant> = None;
             loop {
-                // read_until is cancel-safe: a partial line stays in `buf`.
+                // read_segment is cancel-safe: a partial line stays in `buf`.
                 let n = tokio::select! {
-                    r = pipe.read_until(b'\n', &mut buf) => r.unwrap_or(0),
+                    r = read_segment(&mut pipe, &mut buf, &mut after_cr) => r.unwrap_or(0),
                     _ = async move {
                         match flush_at {
                             Some(t) => tokio::time::sleep_until(t).await,
@@ -2678,5 +2713,16 @@ mod tests {
             eta(&svc, meta(Some("t"), "npm test", Some("/w"))).await,
             Some(6000)
         );
+    }
+
+    #[tokio::test]
+    async fn read_segment_splits_on_cr_lf_and_crlf() {
+        let mut pipe = BufReader::new(&b"10%\r50%\rdone\r\nnext\n\nlast"[..]);
+        let (mut buf, mut after_cr) = (Vec::new(), false);
+        let mut got = Vec::new();
+        while read_segment(&mut pipe, &mut buf, &mut after_cr).await.unwrap() > 0 {
+            got.push(String::from_utf8(std::mem::take(&mut buf)).unwrap());
+        }
+        assert_eq!(got, ["10%\r", "50%\r", "done\r", "next\n", "\n", "last"]);
     }
 }
