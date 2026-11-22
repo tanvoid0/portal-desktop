@@ -1,6 +1,6 @@
 # Handoff: board loop pass, devices redesign landed, vault review next (2026-11-22)
 
-Repo `D:\projects\production\portal\portal_desktop`, branch `feat/agent-platform-sidecar` at `adccbe20`, five commits above `origin/main` (`c91c5767`), nothing pushed, working tree was clean. The older agent-platform migration handoff that lived in this file is kept below the divider, unchanged; ignore it unless you are on that workstream.
+Repo `D:\projects\production\portal\portal_desktop`, branch `feat/agent-platform-sidecar` at `d9cdf955`, six commits above `origin/main` (`c91c5767`). Local `main` was fast-forwarded to the same commit after a rebase on a freshly fetched `origin/main` (no-op) and green gates. Nothing pushed, working tree clean. The older agent-platform migration handoff that lived in this file is kept below the divider, unchanged; ignore it unless you are on that workstream.
 
 ## Goal
 
@@ -8,7 +8,7 @@ Work the Portal board for this project in a loop, the `/crew:work` way: take the
 
 ## Done this session
 
-- `#1278` Extend button plus the devices-UI redesign it lives in: reviewed by `crew:reviewer` (8 findings: 1 high, 2 medium, 5 low), all fixed by `crew:coder`, re-checked by the reviewer against the real files: ship. Gates were green before the rebase.
+- `#1278` Extend button plus the devices-UI redesign it lives in: reviewed by `crew:reviewer` (8 findings: 1 high, 2 medium, 5 low), all fixed by `crew:coder`, re-checked by the reviewer against the real files: ship. Gates green on the rebased tree (`cargo check`, 17 pairing tests, `pnpm check` 0 errors, `pnpm lint` exit 0, vitest 282 tests); `#1278` is closed on the board.
 - Landed as `adccbe20`, one 35-file commit made at 19:16 by someone else (the owner or the app's commit action) that swept in the whole dirty tree: devices redesign, review fixes, the vault prompter, and the three small edits below. The branch was rebased onto `origin/main` right after.
 - `#1062` PORTAL_MOBILE.md Phase 5 status, `#1119` `scripts/dev-instance.mjs` (instance N>1 now defaults cargo dirs to `I:/build/cargo/portal-desktop-instance-N`, caller env wins), `#1101` CLAUDE.md icon line (FontAwesome `~icons/fa6-solid`, not lucide): completed.
 - `#1064` trackpad page and `#1063` remote-input decision: cancelled, superseded by `9510386c` (input injection removed, no remote control by any client).
@@ -17,12 +17,12 @@ Work the Portal board for this project in a loop, the `/crew:work` way: take the
 
 ## Left
 
-1. Close `#1278`. It is still `in-progress` on the board. Gates were started on the rebased `HEAD` but only `cargo check` was seen green. Re-run: `cd src-tauri && cargo check`; `cd src-tauri/portal-core && cargo test pairing_service` (expect 17 pass); `pnpm check` (expect 0 errors, about 120 warnings); `pnpm lint` (exit 0, 0 errors, about 3194 warnings, eslint takes about 7 minutes); `pnpm exec vitest run` (expect 56 files, 282 tests). If green, `update` `#1278` to `completed` citing `adccbe20`.
+1. Nothing to redo for `#1278` or the merge: gates are green on the rebased tree and `main` equals the branch. To re-verify after any new commit: `cd src-tauri && cargo check`; `cd src-tauri/portal-core && cargo test pairing_service` (17 pass); `pnpm check` (0 errors, about 120 warnings); `pnpm lint` (exit 0, 0 errors, about 3194 warnings, eslint takes about 7 minutes); `pnpm exec vitest run` (56 files, 282 tests).
 2. `#1381` (claude): run `crew:reviewer` on the vault-gate code that went into `adccbe20` unreviewed. Check: can any command hold a lock or DB transaction across `VaultSession::require_key`; the 120 s timeout path; every caller of the removed `RETRY_AFTER_UNLOCK_COMMANDS` list in `invokeClient.ts` still handles `Vault is locked`.
 3. Next board picks, all low bugs and unclaimed: `#1090` (`mobile/src-tauri` has no `.cargo/config.toml`, so cargo builds land on D:; add `target-dir` under `I:/build/cargo/portal-desktop-mobile`, CI does not build mobile today), `#1095` (CoderPanel squeezes chat at 1280), `#1094` (`/control` `X-Portal-Device` renames any paired device on every connect).
 4. Wart: `adccbe20` includes cargo-test churn in `src-tauri/portal-core/bindings/serde_json/JsonValue.ts` (pure formatting) and `src/lib/domains/projects/generated/EnvFileView.ts` (adds a doc comment; may be legitimate). Optional cleanup commit.
 5. Known low leftovers from the devices review, deliberately not fixed: in `src/lib/domains/devices/components/PendingRequestRow.svelte` (about line 125) Allow stays disabled with no hint if the capabilities query never loads; a rustfmt nit on the `matches!` line in `set_lifetime`; svelte-check `state_referenced_locally` warnings at `DeviceDetailsDialog.svelte:32-33` (pre-existing).
-6. Push nothing unless asked. Local `main` is behind the branch; fast-forward only if the owner wants it.
+6. Push nothing unless asked.
 
 ## Files that matter
 
