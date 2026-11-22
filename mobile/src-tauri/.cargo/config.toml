@@ -1,0 +1,6 @@
+# Keep mobile cargo output off D: (3.4 GB per worktree otherwise). Same scheme as
+# the root .cargo/config.toml. Per-machine path: CARGO_TARGET_DIR /
+# CARGO_BUILD_BUILD_DIR env vars override this file elsewhere (CI does not build mobile).
+[build]
+target-dir = "I:/build/cargo/portal-desktop-mobile"
+build-dir = "I:/build/cargo/portal-desktop-mobile/build/{workspace-path-hash}"
