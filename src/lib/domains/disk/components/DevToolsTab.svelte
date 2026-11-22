@@ -30,6 +30,7 @@
   import PermanentDeleteToggle from './shared/PermanentDeleteToggle.svelte';
   import DevToolsScopeCard from './DevToolsScopeCard.svelte';
   import DevToolsGroupCard from './DevToolsGroupCard.svelte';
+  import RelocationCard from './RelocationCard.svelte';
 
   let { pending }: { pending: { tab: string; path?: string; seq: number } | null } = $props();
 
@@ -285,3 +286,7 @@
     </CardContent>
   </Card>
 {/if}
+
+<div class="mt-4">
+  <RelocationCard />
+</div>

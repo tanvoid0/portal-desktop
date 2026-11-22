@@ -434,3 +434,45 @@ pub fn open_recycle_bin() -> Result<(), String> {
         Err("Open your system Trash to restore items.".to_string())
     }
 }
+
+/// Tools whose big data dir can be moved to another drive and repointed via a
+/// user env var (Ollama, Gradle, Android AVDs, caches …).
+#[portal_rpc_macro::rpc]
+pub fn list_relocatable_tools(
+) -> Result<Vec<crate::domains::disk::relocate::RelocatableTool>, String> {
+    crate::domains::disk::relocate::list()
+}
+
+/// Read-only: exactly what moving `toolId` under `targetRoot` would do, plus
+/// anything that would block it (tool running, destination not empty, …).
+#[portal_rpc_macro::rpc]
+pub async fn plan_relocation(
+    request: crate::domains::disk::relocate::RelocationRequest,
+) -> Result<crate::domains::disk::relocate::RelocationPlan, String> {
+    tauri::async_runtime::spawn_blocking(move || crate::domains::disk::relocate::plan(&request))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// MOVES data and sets a user env var. Refuses while the tool is running. Call
+/// `plan_relocation` first and confirm with the user.
+#[portal_rpc_macro::rpc]
+pub async fn apply_relocation(
+    request: crate::domains::disk::relocate::RelocationRequest,
+    db: State<'_, Arc<Db>>,
+) -> Result<crate::domains::disk::relocate::RelocationResult, String> {
+    let id = request.tool_id.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        crate::domains::disk::relocate::apply(&request)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    let _ = db.log_action(
+        "relocate",
+        &id,
+        0,
+        "relocate",
+        if result.is_ok() { "moved" } else { "failed" },
+    );
+    result
+}

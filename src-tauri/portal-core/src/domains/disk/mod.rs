@@ -13,6 +13,7 @@ pub mod disk;
 pub mod locations;
 pub mod projects;
 pub mod quarantine;
+pub mod relocate;
 pub mod scan;
 // Agent-Platform verification path — retained as a fallback but no longer the
 // default (the command uses `verify_ai`). Dead-code allowed until it is either

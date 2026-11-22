@@ -3,6 +3,7 @@
 //! cleaners in `registry()` below.
 
 pub mod container_runtime;
+pub mod known_caches;
 pub mod projects;
 
 use std::sync::atomic::AtomicBool;
@@ -146,6 +147,7 @@ pub trait DevCleaner: Send + Sync {
 
 fn registry() -> Vec<Box<dyn DevCleaner>> {
     vec![
+        Box::new(known_caches::KnownCachesCleaner),
         Box::new(projects::ProjectDevCleaner),
         Box::new(container_runtime::ContainerRuntimeCleaner::docker()),
         Box::new(container_runtime::ContainerRuntimeCleaner::podman()),
