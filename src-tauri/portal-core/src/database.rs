@@ -69,7 +69,8 @@ impl DatabaseManager {
 
     fn migrate_legacy_database(data_dir: &Path) {
         let new_db = data_dir.join("portal_desktop.db");
-        if new_db.exists() {
+        // Unit tests build throwaway DBs; never seed them from the real data dir.
+        if cfg!(test) || new_db.exists() {
             return;
         }
 
