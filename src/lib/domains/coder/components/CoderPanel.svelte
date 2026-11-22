@@ -79,7 +79,6 @@
     queuedCount={p.queuedMessages.length}
     bind:workspaceRoot={coderSession.workspaceRoot}
     workspaceName={p.workspaceName}
-    onOpenSessions={() => (p.sessionsPanelOpen = true)}
     onBackToCoordinator={() => void p.backToCoordinator()}
     onProjectSelect={p.handleProjectSelect}
     projectLocked={!!p.thread}
@@ -240,6 +239,7 @@
   bind:sessionsOpen={p.sessionsPanelOpen}
   bind:commitOpen={p.showCommitDialog}
   workspaceRoot={p.workspaceRoot}
+  adaptiveDock
   onCommitted={() => void p.refreshGitStats()}
   {sessions}
   {header}

@@ -4,7 +4,6 @@
   import type { Snippet } from 'svelte';
   import { Button } from '$lib/components/ui/button';
   import FolderOpen from '~icons/fa6-solid/folder-open';
-  import PanelLeftOpen from '~icons/fa6-solid/table-columns';
   import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import CoderProjectSelector from './CoderProjectSelector.svelte';
 
@@ -24,7 +23,6 @@
     workspaceName?: string;
     /** Extra clickable chips (project / task links). */
     chips?: Snippet;
-    onOpenSessions?: () => void;
     onBackToCoordinator?: () => void;
     /** Present = the project is pickable here (locked via `projectLocked`). */
     onProjectSelect?: (path: string, projectId?: string) => void;
@@ -42,7 +40,6 @@
     workspaceRoot = $bindable(''),
     workspaceName = '',
     chips,
-    onOpenSessions,
     onBackToCoordinator,
     onProjectSelect,
     projectLocked = false,
@@ -55,17 +52,6 @@
   class="divider-edge-b divider-edge-full flex h-10 shrink-0 items-center gap-2 bg-background px-3"
 >
   <div class="flex min-w-0 flex-1 items-center gap-2">
-    {#if onOpenSessions}
-      <Button
-        size="icon"
-        variant="ghost"
-        class="h-7 w-7 shrink-0 md:hidden"
-        title="Sessions"
-        onclick={onOpenSessions}
-      >
-        <PanelLeftOpen class="h-4 w-4" />
-      </Button>
-    {/if}
     <h2 class="min-w-0 truncate text-[13px] font-medium">
       {#if subAgent}
         <span class="text-muted-foreground">Sub-agent</span>
