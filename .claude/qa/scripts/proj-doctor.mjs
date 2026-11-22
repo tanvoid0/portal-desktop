@@ -1,0 +1,12 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('projects/233?tab=actions');
+const p = app.page;
+await dismissVault(p);
+await p.getByRole('tab', { name: /^History/ }).click().catch(()=>p.getByRole('button',{name:/^History/}).first().click());
+await p.waitForTimeout(2000);
+await p.getByText('failed', { exact: true }).first().click();
+await p.waitForTimeout(2000);
+console.log(await app.shot('sweep-projects-233-failed-run-doctor'));
+console.log(await p.evaluate(()=>[...document.querySelectorAll('main button')].map(b=>(b.getAttribute('aria-label')||b.textContent).trim().slice(0,30)).filter(Boolean)));
+await app.done();

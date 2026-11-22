@@ -1,0 +1,15 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('projects');
+const p = app.page;
+await dismissVault(p);
+const t0 = Date.now();
+await p.getByText('Loading projects...').waitFor({ state: 'detached', timeout: 20000 }).catch(()=>console.log('still loading after 20s'));
+console.log('load wait ms', Date.now() - t0);
+await p.getByPlaceholder('Search projects...').fill('QA project');
+await p.waitForTimeout(1000);
+console.log('listed', await p.getByText(/QA project/).count());
+console.log(await app.shot('sweep-projects-qa-found'));
+const r = await p.evaluate(async () => (await window.__TAURI_INTERNALS__.invoke('get_all_projects')).filter(x=>/^QA/.test(x.name)).map(x=>({id:x.id,name:x.name})));
+console.log(JSON.stringify(r));
+await app.done();

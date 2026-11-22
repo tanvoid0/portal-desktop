@@ -1,0 +1,12 @@
+import { open } from './app.mjs';
+const app = await open('ai');
+const p = app.page;
+await p.getByRole('button',{name:'Not now'}).click({timeout:1500}).catch(()=>{});
+await p.waitForTimeout(1500);
+const b = await p.locator('main button').evaluateAll(bs=>bs.slice(0,12).map(b=>[b.getAttribute('aria-label'),b.title,b.innerText.trim()].join('|')));
+console.log(b.join('\n'));
+console.log((await p.locator('a[href*=github]').evaluateAll(a=>a.map(x=>x.getAttribute('href')))).join(' '));
+await p.goto(new URL('/github',p.url()).href); await p.waitForTimeout(1500);
+await p.getByRole('button',{name:'Not now'}).click({timeout:800}).catch(()=>{});
+console.log('cards links', await p.locator('main a').evaluateAll(a=>a.map(x=>x.getAttribute('href'))));
+await app.done();

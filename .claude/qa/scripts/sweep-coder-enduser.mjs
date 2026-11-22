@@ -1,0 +1,16 @@
+import { open } from './app.mjs';
+const app = await open('coder');
+const p = app.page;
+await p.waitForTimeout(2500);
+await p.getByRole('button',{name:'Not now'}).click({timeout:800}).catch(()=>{});
+await p.waitForTimeout(800);
+console.log(p.url());
+await app.shot('sweep-coder-light-1280');
+console.log((await p.locator('main').innerText()).replace(/\n+/g,' | ').slice(0,1500));
+await p.setViewportSize({width:1024,height:600});
+await p.waitForTimeout(800);
+await app.shot('sweep-coder-light-1024x600');
+const gh = p.getByText('Repositories').first();
+console.log('gh clickable', await p.evaluate(()=>0));
+await p.setViewportSize({width:1280,height:800});
+await app.done();

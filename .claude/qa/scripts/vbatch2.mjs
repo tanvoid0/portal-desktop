@@ -1,0 +1,23 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('documents/create');
+const p = app.page;
+await dismissVault(p);
+await p.getByPlaceholder('Enter document title...').fill('QA doc verify');
+await p.getByRole('button', { name: 'Create Document' }).click();
+await p.waitForTimeout(1800);
+console.log('detail url', p.url(), 'archived checkbox on detail:', await p.getByText('Archived (soft delete)').count());
+console.log(await app.shot('QA-179-after-document-detail-archive'));
+await p.goto(new URL('/documents', p.url()).href); await dismissVault(p,1500);
+const card = p.locator('[data-slot=card]', { hasText: 'QA doc verify' }).first();
+await card.getByRole('button').last().click(); await p.waitForTimeout(500);
+await p.locator('[role=alertdialog],[role=dialog]').getByRole('button', { name: 'Delete' }).click(); await p.waitForTimeout(900);
+console.log('left', await p.getByText('QA doc verify').count());
+// logs 176
+await p.goto(new URL('/logs', p.url()).href); await dismissVault(p,1500); await p.waitForTimeout(800);
+await p.getByRole('button', { name: 'Clear logs' }).click(); await p.waitForTimeout(500);
+console.log('176 dialog:', (await p.locator('[role=alertdialog],[role=dialog]').innerText()).replace(/\n/g,' | '));
+console.log(await app.shot('QA-176-after-logs-confirm'));
+await p.getByRole('button', { name: 'Cancel' }).click(); await p.waitForTimeout(400);
+console.log('after cancel', await p.evaluate(()=>document.body.innerText.match(/Showing \d+ of \d+/)?.[0]));
+await app.done();

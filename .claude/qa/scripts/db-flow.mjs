@@ -1,0 +1,10 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('database');
+const p = app.page;
+await dismissVault(p);
+await p.waitForTimeout(4000);
+console.log(await app.shot('sweep-database-sources-settled'));
+console.log(await p.evaluate(()=>[...document.querySelectorAll('[data-slot=switch]')].map(s=>[s.getAttribute('aria-label'), s.getAttribute('aria-checked'), s.closest('div')?.innerText?.replace(/\s+/g,' ').slice(0,60)])));
+console.log(await p.evaluate(()=>document.body.innerText.match(/(Loading|Error|failed|refused|unreachable)[^\n]{0,80}/gi)));
+await app.done();

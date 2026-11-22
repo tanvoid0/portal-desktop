@@ -1,0 +1,14 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('projects/edit/234');
+const p = app.page;
+await dismissVault(p);
+await p.waitForTimeout(1200);
+await p.getByPlaceholder('My Awesome Project').fill('QA project edited');
+await p.getByRole('button', { name: 'Update Project' }).click();
+await p.waitForTimeout(2000);
+console.log('url', p.url());
+console.log(await app.shot('sweep-projects-after-edit'));
+await p.goto(new URL('/projects/234', p.url()).href); await dismissVault(p,1500); await p.waitForTimeout(1000);
+console.log('title', await p.locator('h1').first().innerText());
+await app.done();

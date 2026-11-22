@@ -1,0 +1,13 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('automation/blocks');
+const p = app.page;
+await dismissVault(p);
+await p.getByPlaceholder('Search blocks...').fill('QA block');
+await p.waitForTimeout(500);
+await p.locator('[data-slot=card]', { hasText: 'QA block single' }).first().getByRole('button').last().click();
+await p.waitForTimeout(500);
+console.log(await p.evaluate(()=>[...document.querySelectorAll('[role=dialog],[role=alertdialog]')].map(e=>e.getAttribute('role')+':'+e.innerText.slice(0,40)))); await p.locator('[role=dialog],[role=alertdialog]').getByRole('button', { name: 'Delete' }).click();
+await p.waitForTimeout(1000);
+console.log('left', await p.locator('[data-slot=card]', { hasText: 'QA block' }).count());
+await app.done();

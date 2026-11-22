@@ -1,0 +1,10 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('automation/blocks');
+const p = app.page;
+await dismissVault(p);
+await p.locator('[data-slot=card]').first().getByRole('button').last().click(); await p.waitForTimeout(500);
+console.log((await p.locator('[role=alertdialog],[role=dialog]').innerText()).replace(/\n/g,' | '));
+console.log(await app.shot('QA-178-after-block-delete-dialog'));
+await p.getByRole('button', { name: 'Cancel' }).click();
+await app.done();

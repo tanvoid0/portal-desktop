@@ -1,0 +1,17 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('projects');
+const p = app.page;
+await dismissVault(p);
+await p.getByText('Loading projects...').waitFor({ state: 'detached', timeout: 20000 }).catch(()=>{});
+await p.getByPlaceholder('Search projects...').fill('QA project');
+await p.waitForTimeout(1000);
+const row = p.getByText('QA project edited').first();
+await row.hover(); await p.waitForTimeout(400);
+const box = row.locator('xpath=ancestor::*[self::div][3]');
+console.log(await p.locator('main button, main [role=menuitem]').evaluateAll(els=>els.map(e=>(e.getAttribute('aria-label')||e.title||e.textContent).trim()).filter(Boolean).slice(0,30)));
+console.log(await app.shot('sweep-projects-qa-row-hover'));
+await row.click({ button: 'right' }); await p.waitForTimeout(500);
+console.log('context menu', await p.locator('[role=menuitem]').allInnerTexts());
+console.log(await app.shot('sweep-projects-qa-row-contextmenu'));
+await app.done();

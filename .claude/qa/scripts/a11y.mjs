@@ -1,0 +1,12 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('logs');
+const p = app.page;
+await dismissVault(p);
+console.log('logs autoscroll checkbox by name:', await p.getByRole('checkbox', { name: /auto-scroll/i }).count(), 'trash/download named:', await p.getByRole('button').evaluateAll(els=>els.filter(e=>!e.closest('aside,nav,header')).map(e=>(e.getAttribute('aria-label')||e.title||e.textContent).trim()||'<<NONAME>>')));
+await p.goto(new URL('/projects', p.url()).href); await dismissVault(p,1500);
+console.log('projects switches by name:', await p.getByRole('switch').evaluateAll(els=>els.map(e=>e.getAttribute('aria-label')||e.labels?.[0]?.textContent||'<<NONAME>>')));
+await p.goto(new URL('/database', p.url()).href); await dismissVault(p,1500);
+await p.waitForTimeout(1500);
+console.log('database switches:', await p.getByRole('switch').evaluateAll(els=>els.map(e=>e.getAttribute('aria-label')||e.title||e.labels?.[0]?.textContent||'<<NONAME>>')));
+await app.done();

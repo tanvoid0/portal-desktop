@@ -1,0 +1,12 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const route = process.argv[2], btn = process.argv[3], name = process.argv[4];
+const app = await open(route);
+const p = app.page;
+await dismissVault(p);
+await p.getByRole('button', { name: new RegExp(btn) }).first().click();
+await p.waitForTimeout(1000);
+console.log(p.url());
+console.log((await p.evaluate(() => [...document.querySelectorAll('[role=dialog] input,[role=dialog] textarea,[role=dialog] button,[role=dialog] [role=combobox],main input,main textarea')].map(e=>e.tagName+':'+(e.getAttribute('aria-label')||e.placeholder||e.textContent||e.id||'').trim().slice(0,30)))).join(' | '));
+console.log(await app.shot(name));
+await app.done();

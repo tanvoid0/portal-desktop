@@ -1,0 +1,15 @@
+import { open } from './app.mjs';
+const app = await open('github');
+const p = app.page;
+await p.getByRole('button',{name:'Not now'}).click({timeout:1500}).catch(()=>{});
+await p.waitForTimeout(800);
+await p.getByText('Browse, clone, and link').click();
+await p.waitForTimeout(1200);
+console.log('after card click:', p.url());
+await p.goto(new URL('/',p.url()).href); await p.waitForTimeout(2500);
+await p.getByRole('button',{name:'Not now'}).click({timeout:800}).catch(()=>{});
+await app.shot('sweep-home-light-1280');
+console.log((await p.locator('main').innerText()).replace(/\n+/g,' | ').slice(0,900));
+await p.setViewportSize({width:1024,height:600}); await p.waitForTimeout(600);
+await app.shot('sweep-home-light-1024x600');
+await app.done();

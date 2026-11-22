@@ -1,0 +1,17 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('tasks?view=list');
+const p = app.page;
+await dismissVault(p);
+await p.getByPlaceholder('Search tasks...').fill('QA task');
+await p.waitForTimeout(800);
+await p.getByText(/^QA task/).first().click();
+await p.waitForTimeout(1000);
+await p.getByRole('button', { name: 'Delete', exact: true }).click();
+await p.waitForTimeout(600);
+console.log('dialog', await p.locator('[role=alertdialog],[role=dialog]').allInnerTexts());
+console.log(await app.shot('sweep-tasks-delete-confirm'));
+await p.locator('[role=alertdialog],[role=dialog]').getByRole('button', { name: /Delete|Continue/ }).click();
+await p.waitForTimeout(1500);
+console.log('url', p.url(), 'remaining', await p.getByText(/^QA task/).count());
+await app.done();

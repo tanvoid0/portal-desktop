@@ -1,6 +1,10 @@
-import { open } from './i2.mjs';
-const route = process.argv[2] ?? 'logs';
-const app = await open(route);
-const links = await app.page.evaluate(() => [...document.querySelectorAll('a[href]')].map(a => a.getAttribute('href') + ' | ' + a.textContent.trim().slice(0,40)));
-console.log(links.join('\n'));
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('tasks');
+const p = app.page;
+console.log('vault dialog', await dismissVault(p));
+await p.getByText('Project #1', {exact:true}).first().click();
+await p.waitForTimeout(1200);
+console.log(p.url());
+await app.shot('sweep-tasks-project-1-placeholder');
 await app.done();

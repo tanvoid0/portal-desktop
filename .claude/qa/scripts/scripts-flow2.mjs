@@ -1,0 +1,21 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('automation/scripts');
+const p = app.page;
+await dismissVault(p);
+await p.getByPlaceholder('Search scripts...').fill('QA script');
+await p.waitForTimeout(500);
+await p.getByRole('button', { name: 'View' }).first().click();
+await p.waitForTimeout(1000);
+console.log('view url', p.url());
+await app.shot('sweep-scripts-view-qa-long');
+await p.goBack(); await p.waitForTimeout(800);
+console.log('back url', p.url(), 'search kept?', await p.getByPlaceholder('Search scripts...').inputValue().catch(()=>'n/a'));
+await dismissVault(p,500);
+await p.getByPlaceholder('Search scripts...').fill('QA script');
+await p.waitForTimeout(500);
+// delete
+const del = p.getByRole('button').filter({ has: p.locator('svg') }).last();
+const btns = await p.locator('main button, [data-slot=card] button').evaluateAll(els=>els.map(e=>(e.getAttribute('aria-label')||e.title||e.textContent).trim()));
+console.log(btns);
+await app.done();

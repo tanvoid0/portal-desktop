@@ -1,0 +1,18 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('database');
+const p = app.page;
+await dismissVault(p);
+await p.waitForTimeout(1500);
+await p.getByText('Portal (this app)').click().catch(async()=>p.locator('text=Portal').first().click());
+await p.waitForTimeout(1200);
+await p.getByPlaceholder('Filter 53 tables...').fill('task');
+await p.waitForTimeout(500);
+console.log(await p.evaluate(()=>[...document.querySelectorAll('aside *, [data-slot=card] *')].filter(e=>e.children.length===0 && /task/i.test(e.textContent)).map(e=>e.textContent.trim()).slice(0,8)));
+await p.getByText(/^tasks$/).first().click();
+await p.waitForTimeout(2000);
+console.log(await app.shot('sweep-database-sqlite-tasks-table'));
+await p.getByRole('tab', { name: 'Query' }).click().catch(()=>p.getByText('Query', {exact:true}).click());
+await p.waitForTimeout(800);
+console.log(await app.shot('sweep-database-query-tab'));
+await app.done();

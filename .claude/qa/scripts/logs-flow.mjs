@@ -1,0 +1,13 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('logs');
+const p = app.page;
+await dismissVault(p);
+await p.waitForTimeout(1000);
+const before = await p.evaluate(()=>document.body.innerText.match(/Showing \d+ of \d+/)?.[0]);
+await p.getByRole('button', { name: 'Clear logs' }).click();
+await p.waitForTimeout(700);
+console.log('before', before, 'dialog after Clear:', await p.locator('[role=alertdialog],[role=dialog]').allInnerTexts(), 'after', await p.evaluate(()=>document.body.innerText.match(/Showing \d+ of \d+/)?.[0]));
+console.log(await app.shot('sweep-logs-clear-click'));
+await p.keyboard.press('Escape');
+await app.done();

@@ -1,0 +1,18 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('tasks?view=list');
+const p = app.page;
+await dismissVault(p);
+await p.getByPlaceholder('Search tasks...').fill('QA task');
+await p.waitForTimeout(800);
+console.log(await app.shot('sweep-tasks-list-view-search'));
+await p.getByText(/^QA task/).first().click();
+await p.waitForTimeout(1200);
+console.log('url after open', p.url());
+console.log(await app.shot('sweep-tasks-open-rail'));
+console.log('buttons', await p.locator('[role=dialog] button, aside button').evaluateAll(els=>els.map(e=>(e.getAttribute('aria-label')||e.title||e.textContent).trim()).filter(Boolean).slice(0,30)));
+await p.keyboard.press('Escape'); await p.waitForTimeout(600);
+console.log('url after esc', p.url());
+await p.goBack(); await p.waitForTimeout(600);
+console.log('url after back', p.url());
+await app.done();

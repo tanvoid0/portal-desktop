@@ -1,0 +1,13 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('documents');
+const p = app.page;
+await dismissVault(p);
+const card = p.locator('[data-slot=card]', { hasText: 'QA doc' }).first();
+await card.getByRole('button').last().click();
+await p.waitForTimeout(500);
+await p.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click().catch(async()=>p.getByRole('dialog').getByRole('button',{name:'Delete'}).click());
+await p.waitForTimeout(1000);
+console.log('remaining QA docs', await p.getByText(/^QA doc/).count());
+await app.shot('sweep-documents-after-delete');
+await app.done();

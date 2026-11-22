@@ -1,0 +1,28 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('documents/create');
+const p = app.page;
+await dismissVault(p);
+// empty submit
+await p.getByRole('button', { name: 'Create Document' }).click();
+await p.waitForTimeout(600);
+console.log('after empty submit url', p.url(), 'toast/err:', await p.evaluate(()=>[...document.querySelectorAll('[data-sonner-toast],[role=alert],[aria-invalid=true]')].map(e=>e.textContent.trim().slice(0,80))));
+await app.shot('sweep-documents-create-empty-submit');
+const long = 'QA doc 🚀 ' + 'very-long-title-'.repeat(12);
+await p.getByPlaceholder('Enter document title...').fill(long);
+await p.getByPlaceholder(/Enter document content/).fill('# QA\n\nline <b>html</b> & "quotes" ünï');
+const tag = p.getByPlaceholder('Add a tag...');
+await tag.fill('qa'); await tag.press('Enter');
+await tag.fill('qa'); await tag.press('Enter');
+await tag.fill('  '); await tag.press('Enter');
+console.log('tags rendered', await p.evaluate(()=>document.body.innerText.match(/qa\s*×?/g)));
+await app.shot('sweep-documents-create-filled');
+const btn = p.getByRole('button', { name: 'Create Document' });
+await btn.dblclick();
+await p.waitForTimeout(1500);
+console.log('after create url', p.url());
+await app.shot('sweep-documents-after-create');
+await p.goto(new URL('/documents', p.url()).href); await dismissVault(p,1500);
+console.log('QA docs in list:', await p.getByText(/^QA doc/).count());
+await app.shot('sweep-documents-list-with-qa');
+await app.done();

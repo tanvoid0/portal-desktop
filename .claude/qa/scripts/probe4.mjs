@@ -1,0 +1,11 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('documents');
+const p = app.page;
+await dismissVault(p);
+await p.getByRole('button', { name: /New Document/ }).click();
+await p.waitForTimeout(1200);
+console.log(p.url());
+console.log((await p.evaluate(() => [...document.querySelectorAll('input,textarea,[contenteditable],button')].map(e=>e.tagName+':'+(e.getAttribute('aria-label')||e.placeholder||e.textContent||'').trim().slice(0,30)).slice(0,40))).join(' | '));
+await app.shot('sweep-documents-new');
+await app.done();

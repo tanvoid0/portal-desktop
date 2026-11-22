@@ -1,0 +1,15 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('pipeline-runs');
+const p = app.page;
+await dismissVault(p);
+await p.getByText('failed', { exact: true }).first().click({ button: 'right' });
+await p.waitForTimeout(500);
+console.log('menu', await p.locator('[role=menuitem]').allInnerTexts());
+console.log(await app.shot('sweep-pipeline-runs-contextmenu'));
+await p.keyboard.press('Escape');
+await p.getByPlaceholder(/Search by project/).fill('zzzz-nothing');
+await p.waitForTimeout(600);
+console.log(await app.shot('sweep-pipeline-runs-search-empty'));
+console.log(await p.evaluate(()=>document.querySelector('main')?.innerText.replace(/\s+/g,' ').slice(0,200)));
+await app.done();

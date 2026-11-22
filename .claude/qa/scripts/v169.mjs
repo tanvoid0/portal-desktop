@@ -1,0 +1,24 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('scripts/new');
+const p = app.page;
+await dismissVault(p);
+await p.getByPlaceholder('e.g., VPN Connect').fill('QA script long ' + 'x'.repeat(90));
+await p.getByPlaceholder('Describe what this script does').fill('QA fixture');
+await p.getByPlaceholder(/e.g., \.\/scripts/).fill('echo qa');
+await p.getByRole('button', { name: 'Save Script' }).click();
+await p.waitForTimeout(1500);
+await p.goto(new URL('/automation/scripts', p.url()).href); await dismissVault(p, 1500);
+await p.getByPlaceholder('Search scripts...').fill('QA script long');
+await p.waitForTimeout(600);
+const wide = () => p.evaluate(() => [...document.querySelectorAll('*')].filter(e => e.scrollWidth > e.clientWidth + 1 && ['auto','scroll','visible'].includes(getComputedStyle(e).overflowX) && e.clientWidth>0 && (e.tagName==='DIV'||e.tagName==='MAIN')).map(e=>e.tagName+'.'+String(e.className).slice(0,50)+' '+e.scrollWidth+'>'+e.clientWidth).slice(0,6));
+console.log('list', await wide());
+console.log(await app.shot('QA-169-after-list-long-name'));
+await p.getByRole('button', { name: 'View' }).first().click();
+await p.waitForTimeout(1200);
+console.log('detail', await wide());
+console.log(await app.shot('QA-169-after-detail-long-name'));
+await p.goBack(); await dismissVault(p,800);
+await p.getByPlaceholder('Search scripts...').fill('QA script long'); await p.waitForTimeout(500);
+for (let i = 0; i < 5; i++) { const d = p.getByRole('button', { name: /^Delete script QA script long/ }); if (!(await d.count())) break; await d.first().click(); await p.waitForTimeout(500); console.log('dlg:', (await p.locator('[role=alertdialog],[role=dialog]').innerText()).replace(/\n/g,' | ').slice(0,160)); await p.locator('[role=alertdialog],[role=dialog]').getByRole('button', { name: 'Delete' }).click(); await p.waitForTimeout(800); }
+await app.done();

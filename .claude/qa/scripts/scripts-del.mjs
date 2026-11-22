@@ -1,0 +1,15 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('automation/scripts');
+const p = app.page;
+await dismissVault(p);
+await p.getByPlaceholder('Search scripts...').fill('QA script');
+await p.waitForTimeout(500);
+await p.getByRole('button', { name: /^Delete script QA script/ }).click();
+await p.waitForTimeout(600);
+console.log('dialog:', await p.evaluate(()=>document.querySelector('[role=alertdialog],[role=dialog]')?.innerText.slice(0,200)));
+await app.shot('sweep-scripts-delete-confirm-long');
+await p.getByRole('alertdialog').getByRole('button', { name: /Delete|Continue/ }).click();
+await p.waitForTimeout(1000);
+console.log('left', await p.getByRole('button', { name: /^Delete script QA script/ }).count());
+await app.done();

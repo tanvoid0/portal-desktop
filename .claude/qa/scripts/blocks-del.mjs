@@ -1,0 +1,16 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('automation/blocks');
+const p = app.page;
+await dismissVault(p);
+await p.getByPlaceholder('Search blocks...').fill('QA block');
+await p.waitForTimeout(500);
+const cards = p.locator('[data-slot=card]', { hasText: 'QA block' });
+console.log('before', await cards.count());
+const names = await cards.first().getByRole('button').evaluateAll(els=>els.map(e=>e.getAttribute('aria-label')||e.title||e.textContent.trim()));
+console.log(names);
+await cards.first().getByRole('button').last().click();
+await p.waitForTimeout(800);
+console.log('dialogs', await p.locator('[role=dialog],[role=alertdialog]').count(), 'after', await cards.count());
+console.log(await app.shot('sweep-blocks-delete-click'));
+await app.done();

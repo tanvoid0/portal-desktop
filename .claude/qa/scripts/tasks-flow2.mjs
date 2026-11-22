@@ -1,0 +1,17 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('tasks/create');
+const p = app.page;
+await dismissVault(p);
+await p.getByPlaceholder('Enter task title...').fill('QA task 🚀 日本語 <b>x</b>');
+await p.getByPlaceholder('Enter task description...').fill('QA fixture\nline2');
+const submit = p.getByRole('button', { name: 'Create Task' });
+await submit.dblclick();
+await p.waitForTimeout(2000);
+console.log('url', p.url());
+await p.goto(new URL('/tasks', p.url()).href); await dismissVault(p, 1500);
+await p.getByPlaceholder('Search tasks...').fill('QA task');
+await p.waitForTimeout(800);
+console.log('QA task cards', await p.getByText(/^QA task/).count());
+console.log(await app.shot('sweep-tasks-qa-created-search'));
+await app.done();
