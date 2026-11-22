@@ -65,8 +65,16 @@ print what went wrong.
    minimum window (`open(route, { width: 1024, height: 600 })`).
 5. **Console:** every error in tauri mode is worth a look.
 
-Lean on the **make-interfaces-feel-better** skill for UX judgement. **break-ui** has a good
-worst-case data list — use the list, not its demo-toggle step (that edits app code).
+Load these skills (Skill tool) before judging UI, and cite the principle in the issue:
+
+- **make-interfaces-feel-better** — polish details: radii, shadows, hover/active states, type.
+- **emil-design-eng** — interaction feel, animation decisions, invisible details.
+- **apple-design** — feedback, spatial consistency, restraint, reduced motion.
+- **impeccable** — audit/critique mode for hierarchy, spacing, consistency.
+- **mobile-native** — only for narrow-window / touch layouts.
+- **break-ui** — worst-case data list; use the list, not its demo-toggle step (that edits app code).
+  Skills are lenses, not scope: file only what you saw in the running app. Skip a skill whose
+  parked/unavailable status blocks loading (`/governor:skill <name>` reads it) — do not stall.
 
 ## Filing
 

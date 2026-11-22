@@ -16,12 +16,18 @@
   import { toast } from '$lib/utils/toast';
   import FolderGit2 from '~icons/fa6-solid/folder-tree';
   import Bug from '~icons/fa6-solid/bug';
+  import ArrowRight from '~icons/fa6-solid/arrow-right';
   import Unplug from '~icons/fa6-solid/plug-circle-xmark';
 
   const statusQuery = createGitHubStatusQuery();
   const status = $derived(statusQuery.data);
   const tokenCheck = createGitHubTokenCheckQuery(() => status?.connected ?? false);
   const tokenUnreadable = $derived(isTokenUnreadableError(tokenCheck.error));
+
+  const SCOPE_LABELS: Record<string, string> = {
+    'read:user': 'Read profile',
+    repo: 'Repository access',
+  };
 
   let connecting = $state(false);
   let disconnecting = $state(false);
@@ -93,7 +99,12 @@
   <PageHeader title="GitHub" description="Connect GitHub, browse repositories, and manage issues">
     {#snippet actions()}
       {#if status?.connected}
-        <Button variant="outline" onclick={handleDisconnect} disabled={disconnecting}>
+        <Button
+          variant="outline"
+          onclick={handleDisconnect}
+          disabled={disconnecting}
+          title="Removes the stored GitHub token from Portal Desktop. Your GitHub account is not changed."
+        >
           <Unplug class="mr-2 h-4 w-4" />
           Disconnect
         </Button>
@@ -138,7 +149,7 @@
                 <Badge variant="secondary">Connected</Badge>
               {/if}
               {#each status.account.scopes as scope}
-                <Badge variant="outline">{scope}</Badge>
+                <Badge variant="outline" title={scope}>{SCOPE_LABELS[scope] ?? scope}</Badge>
               {/each}
             </div>
             {#if tokenUnreadable}
@@ -157,7 +168,10 @@
         </CardContent>
       </Card>
 
-      <Card class="cursor-pointer" onclick={() => goto('/github/repos')}>
+      <Card
+        class="cursor-pointer transition-colors hover:bg-muted/50"
+        onclick={() => goto('/github/repos')}
+      >
         <CardHeader>
           <CardTitle class="flex items-center gap-2">
             <FolderGit2 class="h-4 w-4" />
@@ -168,10 +182,16 @@
           <p class="text-sm text-muted-foreground">
             Browse, clone, and link GitHub repositories into Projects.
           </p>
+          <p class="mt-2 flex items-center gap-1 text-sm font-medium">
+            Open repositories <ArrowRight class="h-3 w-3" />
+          </p>
         </CardContent>
       </Card>
 
-      <Card class="cursor-pointer" onclick={() => goto('/github/issues')}>
+      <Card
+        class="cursor-pointer transition-colors hover:bg-muted/50"
+        onclick={() => goto('/github/issues')}
+      >
         <CardHeader>
           <CardTitle class="flex items-center gap-2">
             <Bug class="h-4 w-4" />
@@ -181,6 +201,9 @@
         <CardContent>
           <p class="text-sm text-muted-foreground">
             View your assigned issues and create or update repository issues.
+          </p>
+          <p class="mt-2 flex items-center gap-1 text-sm font-medium">
+            Open issues <ArrowRight class="h-3 w-3" />
           </p>
         </CardContent>
       </Card>

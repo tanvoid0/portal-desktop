@@ -7,6 +7,7 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
   import { Switch } from '$lib/components/ui/switch';
   import TechIcon from '$lib/components/ui/tech-icon.svelte';
   import { toast } from '$lib/utils/toast';
@@ -105,15 +106,21 @@
     {:else}
       <Database class="h-4 w-4 shrink-0 text-muted-foreground" />
     {/if}
-    <span class="flex-1 truncate">{source.label}</span>
+    <span class="min-w-0 flex-1 break-words">{source.label}</span>
+    <Badge variant="outline" class="shrink-0 text-[10px] font-normal">{engine.label}</Badge>
+  </div>
+  <div class="flex items-center gap-2 px-2 text-xs text-muted-foreground">
     <Switch
+      id="{uid}-edit"
       checked={source.editable}
       onCheckedChange={(v) => toggleEdit.mutate(v)}
       disabled={toggleEdit.isPending}
-      title={source.editable ? 'Editing enabled' : 'Enable editing'}
+      aria-label="Enable editing for {source.label}"
       class="shrink-0"
     />
-    <Badge variant="outline" class="shrink-0 text-[10px] font-normal">{engine.label}</Badge>
+    <Label for="{uid}-edit" class="text-xs font-normal">
+      {source.editable ? 'Editing enabled' : 'Enable editing'}
+    </Label>
   </div>
   {#if isRedis}
     {#if redisDbs.isPending}

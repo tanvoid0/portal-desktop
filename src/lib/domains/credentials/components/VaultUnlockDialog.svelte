@@ -110,8 +110,8 @@
       <Dialog.Header>
         <Dialog.Title>Vault locked</Dialog.Title>
         <Dialog.Description>
-          Enter your master password to unlock it, or skip — you'll be asked again when something
-          needs it.
+          {vaultGate.reason || 'Something needs your saved credentials.'}
+          Enter your master password, or skip — you'll be asked again only when something needs it.
         </Dialog.Description>
       </Dialog.Header>
 

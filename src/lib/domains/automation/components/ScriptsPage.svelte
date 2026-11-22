@@ -93,7 +93,7 @@
 
   async function handleDeleteScript(scriptId: string) {
     const confirmed = await confirmAction(
-      'Are you sure you want to delete this script?',
+      `Delete "${scripts.find((s) => s.id === scriptId)?.name ?? 'this script'}"?`,
       'Delete script',
       { confirmLabel: 'Delete', destructive: true }
     );
@@ -252,14 +252,16 @@
           {#snippet trigger(menuProps)}
             <Card
               {...menuProps}
-              class="cursor-pointer transition-colors hover:border-primary/50"
+              class="min-w-0 cursor-pointer transition-colors hover:border-primary/50"
               onclick={() => handleViewScript(script)}
             >
-              <CardHeader class="pb-3">
+              <CardHeader class="grid-cols-[minmax(0,1fr)] pb-3">
                 <div class="flex items-start justify-between">
                   <div class="min-w-0 flex-1">
-                    <CardTitle class="truncate text-lg">{script.name}</CardTitle>
-                    <CardDescription class="mt-1 line-clamp-2">{script.description}</CardDescription
+                    <CardTitle class="truncate text-lg" title={script.name}>{script.name}</CardTitle
+                    >
+                    <CardDescription class="mt-1 line-clamp-2 break-words"
+                      >{script.description}</CardDescription
                     >
                   </div>
                   <Badge variant="outline" class="ml-2 shrink-0">{script.category}</Badge>

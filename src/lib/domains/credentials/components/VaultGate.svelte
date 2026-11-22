@@ -21,7 +21,9 @@
   onMount(() => {
     if (!isTauriEnvironment()) return;
     const unlisten = listen('vault://unlock-requested', async () => {
-      const ok = await vaultGate.ensureUnlocked().catch(() => false);
+      const ok = await vaultGate
+        .ensureUnlocked('An action needs your saved credentials.')
+        .catch(() => false);
       await settleVaultUnlock(ok).catch(() => {});
     });
     return () => void unlisten.then((fn) => fn());

@@ -222,7 +222,7 @@
       {#each device.capabilities as cap}
         <Badge variant="secondary" class="text-xs font-normal">{cap}</Badge>
       {:else}
-        <span class="text-xs text-muted-foreground">no capabilities</span>
+        <span class="text-xs text-muted-foreground">No permissions granted</span>
       {/each}
     </div>
   {/if}

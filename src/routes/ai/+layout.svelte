@@ -36,14 +36,14 @@
   <h1 class="sr-only">{srHeading}</h1>
   <!-- Pages park their action controls here so their own header stays readable. -->
   <div
-    class="divider-edge-b divider-edge-full flex shrink-0 items-center gap-3 bg-background px-3 py-2 md:px-4"
+    class="divider-edge-b divider-edge-full flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 bg-background px-3 py-2 md:px-4"
   >
     <AITabBar class="w-[200px] shrink-0" />
     {#if isAiCoderRoute(page.url.pathname)}
       <CoderEngineTabs class="min-w-0 shrink" />
     {/if}
     {#if aiTopbar.actions}
-      <div class="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5">
+      <div class="flex min-w-[20rem] flex-1 flex-wrap items-center justify-end gap-1.5">
         {@render aiTopbar.actions()}
       </div>
     {/if}

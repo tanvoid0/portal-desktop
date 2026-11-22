@@ -4,6 +4,7 @@
 	data loading, and the dialogs.
 -->
 <script lang="ts">
+  import { PageHeader } from '$lib/components/shell';
   import { onMount } from 'svelte';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
@@ -80,7 +81,11 @@
     showBlockDialog = true;
   }
 
+  let saving = false;
+
   async function handleSaveBlock(formData: CreateBlockRequest) {
+    if (saving) return; // double-click guard: dialog stays open until the request settles
+    saving = true;
     try {
       if (editingBlock) {
         await blockLibraryService.updateBlock(editingBlock.id, formData);
@@ -94,12 +99,14 @@
     } catch (error) {
       console.error('Failed to save block', error);
       toast.error('Failed to save block');
+    } finally {
+      saving = false;
     }
   }
 
   async function handleDeleteBlock(blockId: string) {
     const confirmed = await confirmAction(
-      'Are you sure you want to delete this block?',
+      `Delete "${blocks.find((b) => b.id === blockId)?.name ?? 'this block'}"?`,
       'Delete block',
       { confirmLabel: 'Delete', destructive: true }
     );
@@ -147,7 +154,8 @@
   }
 </script>
 
-<div class="flex flex-col gap-4 pt-4">
+<div class="flex flex-col gap-4">
+  <PageHeader title="Blocks" description="Reusable building blocks for your scripts" />
   <div class="flex flex-wrap items-center gap-2">
     <Input
       bind:value={searchQuery}

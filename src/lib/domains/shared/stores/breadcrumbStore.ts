@@ -126,7 +126,7 @@ function generateBreadcrumbsFromPath(
     // `tab` is page-local view state (tabs show their own label), not a location.
     // `project`/`view` are the tasks board's own selection, shown by its sidebar.
     const paramEntries = Array.from(queryParams.entries()).filter(
-      ([key]) => !['tab', 'from', 'q', 'status', 'project', 'view'].includes(key)
+      ([key]) => !['tab', 'from', 'q', 'status', 'project', 'view', 'task'].includes(key)
     );
 
     if (paramEntries.length > 0) {

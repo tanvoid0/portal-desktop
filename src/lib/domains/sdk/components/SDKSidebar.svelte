@@ -245,9 +245,7 @@
   <div class="divider-edge-t divider-edge-full p-3 group-data-[collapsible=icon]:hidden">
     <div class="space-y-1 text-center text-xs text-muted-foreground">
       <div>
-        {#if sidebarLoading}
-          Loading SDKs...
-        {:else}
+        {#if !sidebarLoading}
           {allSDKs.filter((sdk) => sdk.installed).length} of {allSDKs.length} SDKs
         {/if}
       </div>

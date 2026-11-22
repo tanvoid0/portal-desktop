@@ -60,7 +60,7 @@
 <nav class={cn('flex items-center space-x-1 text-sm', className)} aria-label="Breadcrumb">
   <ol class="flex min-w-0 items-center space-x-1 overflow-hidden">
     {#each visibleItems as item, index (index)}
-      <li class="flex items-center">
+      <li class="flex min-w-0 items-center">
         {#if index > 0}
           <ChevronRight class="mx-1 h-4 w-4 text-muted-foreground" />
         {/if}
@@ -79,13 +79,15 @@
           </Button>
         {:else}
           <span
-            class="flex items-center px-1 py-0.5 font-medium text-foreground"
+            class="flex min-w-0 items-center px-1 py-0.5 font-medium text-foreground"
             class:opacity-50={item.disabled}
           >
             {#if item.icon === 'home' && homeIcon}
               <Home class="mr-1 h-3 w-3" />
             {/if}
-            <span class={item.label.startsWith('?') ? 'text-xs' : ''}>{item.label}</span>
+            <span class={['truncate', item.label.startsWith('?') && 'text-xs']} title={item.label}
+              >{item.label}</span
+            >
           </span>
         {/if}
       </li>

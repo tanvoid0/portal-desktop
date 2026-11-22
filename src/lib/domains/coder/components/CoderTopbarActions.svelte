@@ -1,9 +1,6 @@
 <!-- Coder action row (model picker, retry, panel toggles, copy, commit) shown in the AI tab bar. -->
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
-  import Bot from '~icons/fa6-solid/robot';
-  import GitBranch from '~icons/fa6-solid/code-branch';
-  import GitCommitHorizontal from '~icons/fa6-solid/code-commit';
   import RotateCcw from '~icons/fa6-solid/rotate-left';
   import Copy from '~icons/fa6-solid/copy';
   import Check from '~icons/fa6-solid/check';
@@ -16,7 +13,7 @@
   import { coderSession } from '../state/coderSession.svelte.js';
   import { coderTerminalStore } from '../state/coderTerminalStore.svelte.js';
   import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
-  import type { CoderThread, GitDiffStats } from '../types.js';
+  import type { CoderThread } from '../types.js';
 
   interface Props {
     thread: CoderThread | null | undefined;
@@ -25,11 +22,8 @@
     running: boolean;
     showRetry: boolean;
     platformBlocked: boolean;
-    pendingChangeCount: number;
-    gitStats: GitDiffStats | null;
     canCopyConversation: boolean;
     getConversationText: () => string;
-    onCommit: () => void;
   }
 
   let {
@@ -39,19 +33,14 @@
     running,
     showRetry,
     platformBlocked,
-    pendingChangeCount,
-    gitStats,
     canCopyConversation,
     getConversationText,
-    onCommit,
   }: Props = $props();
 
   let catalogError = $state<string | null>(null);
   let copied = $state(false);
 
   const tokenRejected = $derived(isAuthError(catalogError));
-  const showChanges = $derived(coderWorkspaceStore.activePanel === 'changes');
-  const showGitChanges = $derived(coderWorkspaceStore.activePanel === 'git-changes');
   const terminalOpen = $derived.by(() => {
     coderSession.runtimeRevision;
     return coderSession.terminalOpen;
@@ -80,8 +69,10 @@
   bind:selectedModel={coderSession.selectedModel}
   onModelChange={(m) => coderSession.handleModelChange(m)}
   onBackendProviderChange={(p) => coderSession.handleBackendProviderChange(p)}
-  modelSelectClass="w-[180px]"
+  backendSelectClass="w-[110px]"
+  modelSelectClass="w-[130px]"
   showInlineError={false}
+  showPlatformLabel={false}
   onStatusChange={(s) => (catalogError = s.error)}
 />
 {#if catalogError && !platformBlocked}
@@ -131,7 +122,7 @@
   }}
 >
   <TerminalIcon class="h-3.5 w-3.5" />
-  <span class="hidden xl:inline">Terminal</span>
+  <span class="hidden 2xl:inline">Terminal</span>
 </Button>
 <Button
   size="icon"
@@ -146,47 +137,4 @@
   {:else}
     <Copy class="h-3.5 w-3.5" />
   {/if}
-</Button>
-<Button
-  size="sm"
-  variant={showChanges ? 'secondary' : 'ghost'}
-  class="h-8 gap-1"
-  title="Review agent file changes"
-  onclick={() => {
-    coderWorkspaceStore.openChanges();
-    coderSession.refreshChanges(thread?.id);
-  }}
->
-  <Bot class="h-3.5 w-3.5" />
-  {#if pendingChangeCount > 0}
-    <span class="rounded-full bg-amber-500 px-1.5 text-xs text-white">
-      {pendingChangeCount}
-    </span>
-  {/if}
-</Button>
-<Button
-  size="sm"
-  variant={showGitChanges ? 'secondary' : 'ghost'}
-  class="h-8 gap-1"
-  title="View git working tree changes"
-  onclick={() => coderWorkspaceStore.openGitChanges()}
->
-  <GitBranch class="h-3.5 w-3.5" />
-  {#if gitStats?.hasChanges}
-    <span class="font-mono text-xs text-diff-add-foreground">
-      {#if gitStats.additions > 0}+{gitStats.additions}{/if}
-      {#if gitStats.deletions > 0}-{gitStats.deletions}{/if}
-    </span>
-  {/if}
-</Button>
-<Button
-  size="sm"
-  variant="outline"
-  class="h-8 gap-1"
-  title="Review and commit git changes"
-  disabled={!gitStats?.hasChanges}
-  onclick={onCommit}
->
-  <GitCommitHorizontal class="h-3.5 w-3.5" />
-  <span class="hidden xl:inline">Commit</span>
 </Button>

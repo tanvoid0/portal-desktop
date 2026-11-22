@@ -76,7 +76,7 @@
 
   async function handleDelete() {
     const confirmed = await confirmAction(
-      'Are you sure you want to delete this script?',
+      `Delete "${script?.name ?? 'this script'}"?`,
       'Delete script',
       { confirmLabel: 'Delete', destructive: true }
     );
@@ -137,10 +137,10 @@
       >
         <ArrowLeft class="h-5 w-5" />
       </Button>
-      <div class="flex-1">
+      <div class="min-w-0 flex-1">
         <h1 class="flex items-center gap-2 text-2xl font-bold">
-          <FileCode class="h-6 w-6" />
-          {script.name}
+          <FileCode class="h-6 w-6 shrink-0" />
+          <span class="min-w-0 break-all">{script.name}</span>
         </h1>
         <p class="text-muted-foreground">{script.description}</p>
       </div>

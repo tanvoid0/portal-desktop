@@ -123,11 +123,13 @@
       <Input id="title" bind:value={title} placeholder="Enter document title..." />
     </div>
 
-    <!-- Archived Toggle -->
-    <div class="flex items-center space-x-2">
-      <Checkbox id="isArchived" bind:checked={isArchived} />
-      <Label for="isArchived" class="cursor-pointer">Archived (soft delete)</Label>
-    </div>
+    <!-- Archived Toggle (edit only; a new document is never born archived) -->
+    {#if !isCreateMode}
+      <div class="flex items-center space-x-2">
+        <Checkbox id="isArchived" bind:checked={isArchived} />
+        <Label for="isArchived" class="cursor-pointer">Archived (soft delete)</Label>
+      </div>
+    {/if}
 
     <!-- Content -->
     <div class="space-y-2">

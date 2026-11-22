@@ -64,7 +64,10 @@
           />
           {cap.name}
           {#if cap.is_sensitive}
-            <Badge variant="destructive" class="px-1.5 py-0 text-[10px] font-normal"
+            <Badge
+              variant="destructive"
+              class="px-1.5 py-0 text-[10px] font-normal"
+              title="Can run commands or change things on this computer. Grant only to devices you trust."
               >Sensitive</Badge
             >
           {/if}

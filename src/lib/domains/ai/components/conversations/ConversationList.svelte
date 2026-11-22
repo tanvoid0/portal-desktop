@@ -119,8 +119,9 @@
         onclick={onDeleteAll}
         size="icon"
         variant="ghost"
-        class="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-        title="Delete all conversations"
+        class="ml-2 h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+        title="Delete all conversations (asks to confirm)"
+        aria-label="Delete all conversations"
       >
         <Trash2 class="h-4 w-4" />
       </Button>

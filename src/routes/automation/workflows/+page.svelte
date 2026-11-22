@@ -54,7 +54,7 @@
 <div class="space-y-6">
   <PageHeader
     title="n8n Workflows"
-    description="Trigger n8n workflows for a project and watch their execution. Requires a running n8n server on localhost:5678 (pnpm n8n:start)."
+    description="Trigger n8n workflows for a project and watch their runs"
   >
     {#snippet actions()}
       <Badge variant={$automationStore.isN8nHealthy ? 'default' : 'secondary'}>

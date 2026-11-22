@@ -66,6 +66,8 @@ export class TaskManagerState {
   );
   sidebarProjects = $derived(
     [...taskUi.projectCounts.known]
+      // Hide rows until names load, so ids never flash as "Project #N".
+      .filter(() => !this.projectsQuery.isPending)
       .map((id) => ({ id, name: this.nameOf(id), open: taskUi.projectCounts.open[id] ?? 0 }))
       .sort((a, b) => b.open - a.open || a.name.localeCompare(b.name))
   );
@@ -133,7 +135,7 @@ export class TaskManagerState {
     $effect(() => () => taskUi.clearFilters());
   }
 
-  nameOf = (id: string) => this.projectNames.get(id) ?? `Project #${id}`;
+  nameOf = (id: string) => this.projectNames.get(id) ?? 'Unknown project';
 
   /**
    * One writer for the query string, so changing the project keeps the open
@@ -350,6 +352,8 @@ export class TaskManagerState {
         this.showKeyboardShortcuts = false;
       } else if (taskUi.isMultiSelectMode) {
         this.handleMultiSelectToggle();
+      } else if (this.selectedTaskId && !this.isTypingTarget(event)) {
+        this.closeTask();
       }
     }
   };

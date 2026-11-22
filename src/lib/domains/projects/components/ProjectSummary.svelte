@@ -18,9 +18,10 @@
 
   // Keep the drive and the last folders visible; the full path stays in the tooltip.
   const shown = $derived.by(() => {
-    const parts = project.path.split(/[\/]/);
+    const parts = project.path.split(/[\\/]/);
+    const sep = project.path.includes('\\') ? '\\' : '/';
     return project.path.length > 56 && parts.length > 4
-      ? `${parts[0]}\…\${parts.slice(-3).join('\')}`
+      ? `${parts[0]}${sep}…${sep}${parts.slice(-3).join(sep)}`
       : project.path;
   });
 

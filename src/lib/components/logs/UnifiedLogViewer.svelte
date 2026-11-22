@@ -10,6 +10,8 @@
     LogLevel,
     type LogSource,
   } from '$lib/domains/shared/services/logger';
+  import { confirmAction } from '$lib/utils/confirm';
+  import { toast } from '$lib/utils/toast';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
@@ -138,9 +140,11 @@
     return date.toISOString().replace('T', ' ').substring(0, 23);
   }
 
-  function clearLogs() {
+  async function clearLogs() {
+    if (!(await confirmAction('Clear all log lines? This cannot be undone.', 'Clear logs'))) return;
     logger.clear();
     updateLogs();
+    toast.success('Logs cleared');
   }
 
   function exportLogs() {

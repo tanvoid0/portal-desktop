@@ -37,11 +37,8 @@
     running={p.running}
     showRetry={p.showRetry}
     platformBlocked={p.platformBlocked}
-    pendingChangeCount={p.pendingChangeCount}
-    gitStats={p.gitStats}
     canCopyConversation={p.canCopyConversation}
     getConversationText={p.copyText}
-    onCommit={() => (p.showCommitDialog = true)}
   />
 {/snippet}
 

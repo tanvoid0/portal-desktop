@@ -309,11 +309,11 @@
           <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {#each RESOURCE_DESCRIPTORS as descriptor}
               <Button
                 variant="outline"
-                class="w-full justify-start"
+                class="w-full justify-start px-4"
                 onclick={() => goto(`/cloud/${descriptor.slug}`)}
               >
                 <span class="mr-2 text-lg">{descriptor.icon}</span>

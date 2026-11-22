@@ -63,7 +63,7 @@
   $effect(() => {
     if (!setupPromptShown && vaultStatus?.state === 'needs_setup') {
       setupPromptShown = true;
-      void vaultGate.ensureUnlocked();
+      void vaultGate.ensureUnlocked('Your credentials need to be moved into the vault.');
     }
   });
 
@@ -178,7 +178,12 @@
             Vault is locked — unlock it to reveal, copy, or decrypt credential values.
           </span>
         </div>
-        <Button size="sm" onclick={() => vaultGate.ensureUnlocked()}>Unlock</Button>
+        <Button
+          size="sm"
+          onclick={() =>
+            vaultGate.ensureUnlocked('Unlock to reveal, copy or edit credential values.')}
+          >Unlock</Button
+        >
       </CardContent>
     </Card>
   {/if}

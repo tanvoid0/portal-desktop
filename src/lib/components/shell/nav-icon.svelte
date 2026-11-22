@@ -26,6 +26,7 @@
   import Trash from '~icons/fa6-solid/trash';
   import Workflow from '~icons/fa6-solid/diagram-project';
   import Wrench from '~icons/fa6-solid/wrench';
+  import Devicon from '$lib/components/ui/devicon.svelte';
 
   interface Props {
     icon?: string;
@@ -87,6 +88,8 @@
   <Trash class={className} />
 {:else if icon === 'variable'}
   <Variable class={className} />
+{:else if icon?.startsWith('devicon-')}
+  <Devicon {icon} size="sm" />
 {:else}
   <Home class={className} />
 {/if}

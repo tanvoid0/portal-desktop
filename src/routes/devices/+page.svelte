@@ -110,7 +110,10 @@
 <div class="space-y-4">
   <PageHeader title="Devices" description="Phones connecting to Portal Desktop">
     {#snippet actions()}
-      <Label class="flex items-center gap-2 text-xs font-normal text-muted-foreground">
+      <Label
+        class="flex items-center gap-2 text-xs font-normal text-muted-foreground"
+        title="Show each device's individual permissions and the full permission checklist"
+      >
         <Switch
           checked={devicesUi.advanced}
           onCheckedChange={(v) => devicesUi.setAdvanced(v === true)}

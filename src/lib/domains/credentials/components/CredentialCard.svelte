@@ -143,11 +143,11 @@
 
 <Card class="transition-shadow hover:shadow-md">
   <CardHeader>
-    <div class="flex items-start justify-between">
-      <div class="flex items-center gap-2">
+    <div class="flex items-start justify-between gap-2">
+      <div class="flex min-w-0 items-center gap-2">
         <span class="text-2xl">{getTypeIcon(credential.type)}</span>
-        <div>
-          <CardTitle class="text-lg">{credential.name}</CardTitle>
+        <div class="min-w-0">
+          <CardTitle class="truncate text-lg" title={credential.name}>{credential.name}</CardTitle>
           <CardDescription class="flex items-center gap-2">
             <Badge variant="outline" class={getTypeColor(credential.type)}>
               {credential.type.replace('_', ' ')}
@@ -161,7 +161,7 @@
           </CardDescription>
         </div>
       </div>
-      <div class="flex items-center gap-1">
+      <div class="flex shrink-0 items-center gap-1">
         <Button
           variant="ghost"
           size="sm"
@@ -220,11 +220,11 @@
             </Button>
           {/if}
         </div>
-        <div class="rounded-md bg-muted p-2 font-mono text-sm">
+        <div class="rounded-md bg-muted p-2 font-mono text-sm break-all">
           {#if showValue && decryptedValue}
             {decryptedValue}
           {:else}
-            {credentialService.maskValue('encrypted_value', credential.type)}
+            <span class="text-muted-foreground italic">Hidden — use the eye icon to reveal</span>
           {/if}
         </div>
       </div>
@@ -243,6 +243,10 @@
 
       <!-- Metadata -->
       <div class="space-y-1 text-xs text-muted-foreground">
+        <div class="flex items-center gap-1">
+          <Calendar class="h-3 w-3" />
+          Added: {formatDate(credential.createdAt)}
+        </div>
         {#if credential.lastUsed}
           <div class="flex items-center gap-1">
             <Calendar class="h-3 w-3" />
