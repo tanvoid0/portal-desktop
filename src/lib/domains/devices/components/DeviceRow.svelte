@@ -8,6 +8,7 @@
   import { confirmAction } from '$lib/utils/confirm';
   import { toast } from '$lib/utils/toast';
   import { formatRelativeTime } from '$lib/domains/shared/utils';
+  import { relativeExpiry } from '../utils/expiry';
   import { devicesUi } from '../state/devicesUi.svelte';
   import type { CapabilityInfo, DeviceSummary } from '../types';
   import ReconnectQrDialog from './ReconnectQrDialog.svelte';
@@ -66,9 +67,9 @@
   );
   const expiryLabel = $derived.by(() => {
     if (!expiresAt) return null;
-    if (expired) return `Expired ${formatRelativeTime(expiresAt)}`;
+    if (expired) return `Expired ${relativeExpiry(expiresAt)}`;
     if (expiringSoon) return 'Expires today';
-    return `Expires ${expiresAt.toLocaleDateString()}`;
+    return `Expires ${relativeExpiry(expiresAt)}`;
   });
   const dotClass = $derived(
     isOnline
@@ -90,7 +91,7 @@
       const expiry = await extendDeviceExpiry(device.device_id);
       toast.success(
         'Access extended',
-        expiry ? `Now expires ${new Date(expiry).toLocaleDateString()}` : undefined
+        expiry ? `Now expires ${relativeExpiry(new Date(expiry))}` : undefined
       );
       onChanged();
     } catch (err) {
@@ -134,6 +135,7 @@
       <span class="shrink-0 text-xs text-muted-foreground">{lastSeenLabel}</span>
       {#if expiryLabel}
         <span
+          title={expiresAt?.toLocaleString()}
           class="shrink-0 text-xs {expired || expiringSoon
             ? 'font-medium text-destructive'
             : 'text-muted-foreground'}"

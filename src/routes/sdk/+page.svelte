@@ -196,7 +196,7 @@
 {/snippet}
 
 <div class="space-y-6">
-  <PageHeader title="SDK Management" description="Development environment and SDK versions">
+  <PageHeader title="SDK Manager" description="Development environment and SDK versions">
     {#snippet actions()}
       <Button variant="outline" size="sm" onclick={reload} disabled={isBusy}>
         <RefreshCw class="mr-2 h-4 w-4 {isBusy ? 'animate-spin' : ''}" />

@@ -1,7 +1,6 @@
 export { default as QuickRunPage } from './components/QuickRunPage.svelte';
 export { default as BlocksPage } from './components/BlocksPage.svelte';
 export { default as ScriptsPage } from './components/ScriptsPage.svelte';
-export { default as UtilitiesPage } from './components/UtilitiesPage.svelte';
 export { default as WorkflowTrigger } from './components/WorkflowTrigger.svelte';
 export { default as WorkflowResults } from './components/WorkflowResults.svelte';
 

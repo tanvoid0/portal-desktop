@@ -98,6 +98,8 @@
     bind:value={selectedModel}
     onSelect={handleModelChange}
     placeholder={isLoading ? 'Loading...' : 'Select model'}
+    loading={isLoading}
+    aria-label={isLoading ? 'Model (loading)' : 'Model'}
     disabled={disabled || isLoading || !selectedProvider}
     class={selectClass}
   />

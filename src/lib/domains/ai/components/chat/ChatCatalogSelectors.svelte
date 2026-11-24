@@ -217,6 +217,7 @@
     value={selectedBackendProvider || undefined}
     onSelect={handleBackendProviderChange}
     placeholder={isLoading ? 'Loading...' : 'Provider'}
+    aria-label={isLoading ? 'Provider (loading)' : 'Provider'}
     disabled={disabled || isLoading || backendOptions.length === 0}
     class={backendSelectClass}
   />
@@ -226,6 +227,8 @@
     bind:value={selectedModel}
     onSelect={handleModelChange}
     placeholder={isLoading ? 'Loading...' : 'Select model'}
+    loading={isLoading}
+    aria-label={isLoading ? 'Model (loading)' : 'Model'}
     disabled={disabled || isLoading || !selectedBackendProvider}
     class={modelSelectClass}
   />
@@ -235,7 +238,11 @@
   {/if}
 
   {#if isLoading}
-    <Loader class="h-4 w-4 animate-spin text-muted-foreground" />
+    <Loader
+      role="status"
+      aria-label="Loading models"
+      class="h-4 w-4 animate-spin text-muted-foreground"
+    />
   {/if}
 
   {#if loadError && !isLoading && showInlineError}

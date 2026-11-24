@@ -4,7 +4,7 @@
 </script>
 
 <svelte:head>
-  <title>Utilities - Automation - Portal Desktop</title>
+  <title>Utility scripts - Automation - Portal Desktop</title>
 </svelte:head>
 
 <ScriptsPage />

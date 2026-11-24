@@ -29,6 +29,10 @@ manual - steps above
 
 Cards were plain Cards with onclick. Added hover background and an 'Open repositories/issues' arrow line; scopes show friendly label (raw scope in title); Disconnect has a title saying it removes the stored token only. File: routes/github/+page.svelte. Cards still not keyboard-focusable (pre-existing). Checks: pnpm check (0 errors), eslint+prettier on touched files.
 
+Second pass: Repositories/Issues cards are now wrapped in a real <a href=/github/repos|issues> with focus-visible ring (keyboard reachable, Enter activates, correct link semantics) instead of a Card onclick. File: routes/github/+page.svelte. Checks: pnpm check 0 errors, eslint+prettier.
+
 ## Verification
 
 <!-- qa-tester -->
+
+2026-11-22 (round 2), tauri. Round 2: GitHub cards are <a href=/github/repos|/github/issues>; Tab reaches the Repositories card with a visible focus ring, Enter navigates to /github/repos (QA-165-after2-github-focus-ring.png).

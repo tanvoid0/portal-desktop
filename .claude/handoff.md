@@ -1,6 +1,6 @@
 # Handoff: board loop pass, devices redesign landed, vault review next (2026-11-22)
 
-Repo `D:\projects\production\portal\portal_desktop`, branch `feat/agent-platform-sidecar` at `d9cdf955`, six commits above `origin/main` (`c91c5767`). Local `main` was fast-forwarded to the same commit after a rebase on a freshly fetched `origin/main` (no-op) and green gates. Nothing pushed, working tree clean. The older agent-platform migration handoff that lived in this file is kept below the divider, unchanged; ignore it unless you are on that workstream.
+Repo `D:\projects\production\portal\portal_desktop`, branch `feat/agent-platform-sidecar`, equal to local `main` and `origin/main` at `cbd785fa` after the 2026-11-22 push (rebased on a freshly fetched `origin/main` first, a no-op; gates green; the pre-push hook passed). Run `git status -sb` for the current state. The older agent-platform migration handoff that lived in this file is kept below the divider, unchanged; ignore it unless you are on that workstream.
 
 ## Goal
 
@@ -18,7 +18,7 @@ Work the Portal board for this project in a loop, the `/crew:work` way: take the
 ## Left
 
 1. Nothing to redo for `#1278` or the merge: gates are green on the rebased tree and `main` equals the branch. To re-verify after any new commit: `cd src-tauri && cargo check`; `cd src-tauri/portal-core && cargo test pairing_service` (17 pass); `pnpm check` (0 errors, about 120 warnings); `pnpm lint` (exit 0, 0 errors, about 3194 warnings, eslint takes about 7 minutes); `pnpm exec vitest run` (56 files, 282 tests).
-2. `#1381` (claude): run `crew:reviewer` on the vault-gate code that went into `adccbe20` unreviewed. Check: can any command hold a lock or DB transaction across `VaultSession::require_key`; the 120 s timeout path; every caller of the removed `RETRY_AFTER_UNLOCK_COMMANDS` list in `invokeClient.ts` still handles `Vault is locked`.
+2. `#1381` (claude): run `crew:reviewer` on the vault-gate code that went into `adccbe20` unreviewed (it is already on `origin/main`, pushed in `cbd785fa`). Check: can any command hold a lock or DB transaction across `VaultSession::require_key`; the 120 s timeout path; every caller of the removed `RETRY_AFTER_UNLOCK_COMMANDS` list in `invokeClient.ts` still handles `Vault is locked`.
 3. Next board picks, all low bugs and unclaimed: `#1090` (`mobile/src-tauri` has no `.cargo/config.toml`, so cargo builds land on D:; add `target-dir` under `I:/build/cargo/portal-desktop-mobile`, CI does not build mobile today), `#1095` (CoderPanel squeezes chat at 1280), `#1094` (`/control` `X-Portal-Device` renames any paired device on every connect).
 4. Wart: `adccbe20` includes cargo-test churn in `src-tauri/portal-core/bindings/serde_json/JsonValue.ts` (pure formatting) and `src/lib/domains/projects/generated/EnvFileView.ts` (adds a doc comment; may be legitimate). Optional cleanup commit.
 5. Known low leftovers from the devices review, deliberately not fixed: in `src/lib/domains/devices/components/PendingRequestRow.svelte` (about line 125) Allow stays disabled with no hint if the capabilities query never loads; a rustfmt nit on the `matches!` line in `set_lifetime`; svelte-check `state_referenced_locally` warnings at `DeviceDetailsDialog.svelte:32-33` (pre-existing).

@@ -35,6 +35,7 @@ Either the same utility scripts, or an empty state that explains what this tab h
 manual - steps above
 
 ## Fix
+Follow-up (2026-11-22): Automation tab renamed 'Utility scripts' (layout + page title; route unchanged, least invasive); deleted dead UtilitiesPage.svelte + index export (no other importers). routes/automation/+layout.svelte, utilities/+page.svelte, domains/automation/index.ts.
 
 Utilities tab (/automation/utilities) now renders ScriptsPage, the same list as the Scripts tab. Root cause: tab rendered UtilitiesPage, which reads the separate custom_scripts store (empty) while Scripts reads blocks. Files: src/routes/automation/utilities/+page.svelte. Checks: pnpm check (0 errors). UtilitiesPage.svelte left in place, now unrouted.
 
@@ -45,3 +46,5 @@ Utilities tab (/automation/utilities) now renders ScriptsPage, the same list as 
 ## Owner decision (2026-11-22)
 
 Show the scripts: Utilities tab must list the same scripts the Scripts tab does (or merge into one list).
+
+2026-11-22 (round 2), tauri. Round 2: tab is labelled 'Utility scripts'; /automation/utilities still lists the scripts.

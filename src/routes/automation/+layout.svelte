@@ -12,7 +12,7 @@
     { id: 'scripts', label: 'Scripts', url: '/automation/scripts' },
     {
       id: 'utilities',
-      label: 'Utilities',
+      label: 'Utility scripts',
       url: '/automation/utilities',
     },
     { id: 'workflows', label: 'Workflows', url: '/automation/workflows' },

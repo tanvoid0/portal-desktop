@@ -34,9 +34,12 @@ Read how full each drive is.
 manual - steps above
 
 ## Fix
+Follow-up (2026-11-22): disk tile: used/free line and drive label wrap instead of truncate (flex-wrap, no truncate). DashboardTab.svelte.
 
 Root cause: DashboardTab printed mountPoint twice when the drive has no name, truncated the mount, and the 'N% of X' span could wrap. File: src/lib/domains/disk/components/DashboardTab.svelte (hide name when equal to mount, mount shrink-0, nowrap on percentage, used/free truncates instead). Header differing from PageHeader (DiskUtilityPage) left as is: design call. Checks: pnpm check, prettier, eslint. Not visually rerun.
 
 ## Verification
 
 2026-11-22, tauri. C:\ shown once, '45% of 2.6 TB' on one line (QA-180-after-utilities-disk.png). Trade-off: 'N used - M free' now truncates ('1.2 TB used - 1.4 ...') and 'I:\ Samsung SSD 990 ...' still truncates.
+
+2026-11-22 (round 2), tauri. Round 2: disk tiles show 'used - free' and '45% of 2.6 TB' on wrapped lines with no truncation at 1280 and 1024 (QA-180-after2-disk-1024.png).

@@ -16,6 +16,9 @@
     placeholder?: string;
     searchPlaceholder?: string;
     disabled?: boolean;
+    /** Marks the trigger aria-busy while the catalog loads. */
+    loading?: boolean;
+    'aria-label'?: string;
     class?: string;
   }
 
@@ -26,6 +29,8 @@
     placeholder = 'Select model',
     searchPlaceholder = 'Type to filter models…',
     disabled = false,
+    loading = false,
+    'aria-label': ariaLabel,
     class: className = '',
   }: Props = $props();
 
@@ -55,6 +60,8 @@
         variant="outline"
         role="combobox"
         aria-expanded={open}
+        aria-label={ariaLabel}
+        aria-busy={loading}
         {disabled}
         class={cn(
           'w-full justify-between px-3 font-normal',

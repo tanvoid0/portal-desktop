@@ -38,6 +38,7 @@ Name wraps or truncates with a tooltip inside the card, the header and the bread
 `node .claude/qa/scripts/QA-169.mjs` (creates and deletes its own `QA script long` fixtures)
 
 ## Fix
+Follow-up (2026-11-22): card action row flex-wrap so it cannot spill at 1024. ScriptsPage.svelte. pnpm check + eslint/prettier.
 
 Root cause: grid-item Card lacked `min-w-0`, description/h1 lacked wrapping, breadcrumb leaf had no truncation. Fix: `min-w-0` on card, `break-words` on description, `min-w-0`+`break-all` span on detail h1, breadcrumb items `min-w-0` + `truncate` + title tooltip. Files: automation/components/ScriptsPage.svelte, src/routes/scripts/[id]/+page.svelte, src/lib/components/ui/breadcrumb.svelte (app wrapper, not vendored dir). Reopen fix: CardHeader is a grid with an auto column, so the long title's min-content widened it; added `grid-cols-[minmax(0,1fr)]` on the header in ScriptsPage.svelte (also backs /automation/utilities) plus a title tooltip. QA-169.mjs now prints ok (no overflow); pnpm check 0 errors.
 
@@ -46,3 +47,5 @@ Root cause: grid-item Card lacked `min-w-0`, description/h1 lacked wrapping, bre
 2026-11-22, tauri. Detail page fixed: no overflow, breadcrumb truncates (QA-169-after-detail-long-name.png). The list CARD still overflows: with a 90-char unbroken name the card header grid is 1077px inside a 320px card, the title runs past the card edge and the pane scrolls sideways (QA-169-after-list-long-name.png; node QA-169.mjs still prints BUG, scrollWidth 1101>1040). The title/header element in ScriptsPage needs min-w-0 + break-all/truncate (min-w-0 was added on the Card but not on the header/title).
 
 2026-11-22 re-verify, tauri: 90-char unbroken name on /automation/scripts and /automation/utilities at 1280x800 and 1024x600: title truncates with ellipsis inside the card, no sideways scroll at 1280 (QA-169-after-automation-scripts-1280.png, QA-169-after-automation-utilities-1280.png). Detail page: no overflow. Note at 1024 a single-card grid is 229px wide and the action-button row spills ~5px past the card edge (QA-169-after-automation-scripts-1024.png); that is card width, not name length, so not reopened. Fixture deleted.
+
+2026-11-22 (round 2), tauri. Round 2: 90-char unbroken name on /automation/scripts and /automation/utilities at 1280 and 1024: no overflow anywhere, action row no longer spills (QA-169-after-automation-scripts-1024-2.png); detail page clean. Fixture deleted.

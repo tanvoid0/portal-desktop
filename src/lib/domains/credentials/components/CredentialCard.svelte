@@ -224,7 +224,9 @@
           {#if showValue && decryptedValue}
             {decryptedValue}
           {:else}
-            <span class="text-muted-foreground italic">Hidden — use the eye icon to reveal</span>
+            <span class="break-normal text-muted-foreground italic"
+              >Hidden — use the eye icon to reveal</span
+            >
           {/if}
         </div>
       </div>

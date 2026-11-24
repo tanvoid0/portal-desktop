@@ -86,7 +86,7 @@
     showCloseButton={step === 'password'}
     interactOutsideBehavior={step === 'password' ? 'close' : 'ignore'}
     escapeKeydownBehavior={step === 'password' ? 'close' : 'ignore'}
-    class="sm:max-w-md"
+    class="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-md"
   >
     {#if step === 'password'}
       <Dialog.Header>

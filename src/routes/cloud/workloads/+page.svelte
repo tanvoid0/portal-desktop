@@ -2,10 +2,8 @@
 <script lang="ts">
   import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
   import { ResourceType } from '$lib/domains/cloud/core/types';
-  import { RESOURCE_DESCRIPTORS } from '$lib/domains/cloud/core/resourceDescriptors';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
-  import { goto } from '$app/navigation';
   import { Badge } from '$lib/components/ui/badge';
   import { PageError, PageLoading, PageStats } from '$lib/components/shell';
   import MetricsDisplay from '$lib/domains/cloud/components/MetricsDisplay.svelte';
@@ -17,6 +15,7 @@
   let hasLoadedOnce = $state(false);
   let clusterMetrics = $state<Record<string, any> | null>(null);
   let metricsLoading = $state(false);
+  let metricsError = $state<string | null>(null);
   let wasConnected = $state(false);
 
   // Load once when cluster connection becomes available (not on every store refresh)
@@ -68,11 +67,13 @@
 
     try {
       metricsLoading = true;
+      metricsError = null;
       const namespace = $cloudStore.selectedNamespace || undefined;
       const metrics = await k8sResourceService.getAllPodsMetrics(namespace || null);
       clusterMetrics = metrics;
     } catch (error) {
       console.error('Failed to load metrics:', error);
+      metricsError = error instanceof Error ? error.message : String(error);
     } finally {
       metricsLoading = false;
     }
@@ -253,7 +254,11 @@
       </Card>
 
       <!-- Metrics -->
-      {#if aggregateMetrics}
+      {#if metricsError}
+        <p class="text-sm text-muted-foreground" role="status">
+          Resource usage unavailable: {metricsError}
+        </p>
+      {:else if aggregateMetrics}
         <MetricsDisplay
           metrics={aggregateMetrics}
           title="Cluster Resource Usage"
@@ -302,27 +307,6 @@
           ]}
         />
       </div>
-
-      <!-- Quick Actions -->
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-            {#each RESOURCE_DESCRIPTORS as descriptor}
-              <Button
-                variant="outline"
-                class="w-full justify-start px-4"
-                onclick={() => goto(`/cloud/${descriptor.slug}`)}
-              >
-                <span class="mr-2 text-lg">{descriptor.icon}</span>
-                View {descriptor.label}
-              </Button>
-            {/each}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   {/if}
 </div>

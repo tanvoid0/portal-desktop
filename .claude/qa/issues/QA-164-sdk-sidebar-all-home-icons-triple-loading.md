@@ -29,6 +29,10 @@ manual - steps above
 
 Sidebar submenu icons in main-nav.ts ('node-js','python','coffee','rust','go') matched no case in nav-icon.svelte so fell through to the Home icon. Now devicon-* names, and nav-icon renders Devicon for them. SDKSidebar footer no longer repeats 'Loading SDKs...' (rail body + page body keep one each). Files: config/main-nav.ts, components/shell/nav-icon.svelte, sdk/components/SDKSidebar.svelte. Not changed: doubled title SDK Manager / SDK Management (copy call). Checks: pnpm check (0 errors), eslint+prettier on touched files.
 
+Second pass: doubled title was src/routes/sdk/+page.svelte PageHeader 'SDK Management' vs nav/sidebar 'SDK Manager'; now 'SDK Manager' (matches nav). Checks: pnpm check 0 errors, eslint+prettier on touched file.
+
 ## Verification
 
 <!-- qa-tester -->
+
+2026-11-22 (round 2), tauri. Round 2: page title reads 'SDK Manager' (QA-164-after2-sdk.png).

@@ -1,0 +1,18 @@
+import { open } from './app.mjs';
+const app = await open('tasks');
+const p = app.page;
+const dlg = p.locator('[role=dialog]');
+await dlg.waitFor({ timeout: 6000 }).catch(()=>console.log('no vault dialog'));
+const m = async (tag) => console.log(tag, await p.evaluate(() => { const d=document.querySelector('[role=dialog]'); if(!d) return null; const r=d.getBoundingClientRect(); return {top:Math.round(r.top), bottom:Math.round(r.bottom), h:Math.round(r.height), vh:innerHeight, cx:Math.round(r.left+r.width/2), cy:Math.round(r.top+r.height/2), scrollable:d.scrollHeight>d.clientHeight, ov:getComputedStyle(d).overflowY}; }));
+await m('normal 1280x800');
+console.log(await app.shot('QA-191-after-vault-dialog-normal'));
+await p.setViewportSize({ width: 800, height: 500 }); await p.waitForTimeout(500);
+await m('800x500');
+console.log(await app.shot('QA-191-after-vault-dialog-800x500'));
+await p.evaluate(()=>document.documentElement.style.zoom='2'); await p.waitForTimeout(500);
+await m('zoom2');
+console.log(await app.shot('QA-191-after-vault-dialog-zoom2'));
+await p.evaluate(()=>document.documentElement.style.zoom=''); await p.setViewportSize({ width: 1280, height: 800 }); await p.waitForTimeout(400);
+await m('restored');
+await p.getByRole('button', { name: 'Not now' }).click().catch(()=>{});
+await app.done();

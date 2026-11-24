@@ -7,6 +7,7 @@
   import { createLanEnabledQuery } from '../queries/deviceQueries';
   import { setLanEnabled } from '../api/deviceApi';
   import { queryKeys } from '$lib/domains/shared/query/keys';
+  import { relaunch } from '@tauri-apps/plugin-process';
   import { toast } from '$lib/utils/toast';
 
   interface Props {
@@ -19,11 +20,13 @@
   const queryClient = useQueryClient();
   const lanQ = createLanEnabledQuery();
   let saving = $state(false);
+  let changed = $state(false);
 
   async function onToggle(checked: boolean) {
     saving = true;
     try {
       await setLanEnabled(checked);
+      changed = true;
       await queryClient.invalidateQueries({ queryKey: queryKeys.devices.lanEnabled });
     } catch (err) {
       toast.error('Failed to update LAN setting', err instanceof Error ? err.message : String(err));
@@ -54,6 +57,9 @@
           restarting Portal Desktop.
         </p>
       </div>
+      {#if changed}
+        <Button size="sm" variant="outline" onclick={() => relaunch()}>Restart now</Button>
+      {/if}
       <Switch
         id="lan-toggle"
         checked={lanQ.data ?? false}

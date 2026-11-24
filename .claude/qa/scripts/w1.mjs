@@ -1,0 +1,30 @@
+import { open } from './app.mjs';
+import { dismissVault } from './util.mjs';
+const app = await open('tasks');
+const p = app.page;
+await dismissVault(p, 4000);
+const go = async (r, t=2500) => { await p.goto(new URL('/'+r, p.url()).href); await dismissVault(p,1500); await p.waitForTimeout(t); };
+await go('credentials');
+console.log('162 placeholder:', await p.evaluate(()=>[...document.querySelectorAll('*')].filter(e=>e.children.length===0&&/^Hidden/.test(e.textContent)).map(e=>{const r=e.getBoundingClientRect();return e.textContent.trim()+' h='+Math.round(r.height)})));
+console.log(await app.shot('QA-162-after2-credentials'));
+await go('devices');
+console.log(await app.shot('QA-163-after2-devices'));
+console.log('163 text:', await p.evaluate(()=>document.body.innerText.replace(/\s+/g,' ').slice(0,700)));
+console.log('163 order paired vs pair:', await p.evaluate(()=>{const t=document.body.innerText;return [t.indexOf('Paired devices'),t.indexOf('Pair a phone')]}));
+await go('sdk');
+console.log('164 title:', await p.evaluate(()=>[...document.querySelectorAll('h1,h2')].map(e=>e.textContent.trim()).slice(0,3)));
+console.log(await app.shot('QA-164-after2-sdk'));
+await go('github');
+const cards = p.locator('main a[href]');
+console.log('165 links:', await cards.evaluateAll(els=>els.map(e=>e.getAttribute('href')+' '+e.textContent.trim().slice(0,20))));
+await p.evaluate(()=>document.activeElement?.blur());
+let hit=null; for (let i=0;i<40;i++){ await p.keyboard.press('Tab'); const t=await p.evaluate(()=>{const e=document.activeElement; const cs=getComputedStyle(e); return {txt:e.textContent.trim().slice(0,25), href:e.getAttribute('href'), ring: (cs.outlineStyle!=='none'&&parseFloat(cs.outlineWidth)>0)||cs.boxShadow!=='none'}}); if(t.href && /repos|issues/i.test(t.txt+t.href) && /Open/.test(t.txt)){hit=t;break;} }
+console.log('165 tab focus:', hit);
+console.log(await app.shot('QA-165-after2-github-focus'));
+if (hit) { await p.keyboard.press('Enter'); await p.waitForTimeout(1500); console.log('165 enter ->', p.url()); }
+await go('ai/chat');
+console.log('166 selects aria:', await p.evaluate(()=>[...document.querySelectorAll('button[role=combobox],[aria-busy]')].slice(0,4).map(e=>e.getAttribute('aria-label')+'|busy='+e.getAttribute('aria-busy')+'|'+e.textContent.trim().slice(0,12))));
+await go('cloud/workloads', 3500);
+console.log('167 quick actions present:', await p.getByText('Quick Actions').count(), 'unavailable msg:', await p.getByText(/Resource usage unavailable/).count());
+console.log(await app.shot('QA-167-after2-cloud-workloads'));
+await app.done();

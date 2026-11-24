@@ -168,45 +168,49 @@
         </CardContent>
       </Card>
 
-      <Card
-        class="cursor-pointer transition-colors hover:bg-muted/50"
-        onclick={() => goto('/github/repos')}
+      <a
+        href="/github/repos"
+        class="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
-        <CardHeader>
-          <CardTitle class="flex items-center gap-2">
-            <FolderGit2 class="h-4 w-4" />
-            Repositories
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p class="text-sm text-muted-foreground">
-            Browse, clone, and link GitHub repositories into Projects.
-          </p>
-          <p class="mt-2 flex items-center gap-1 text-sm font-medium">
-            Open repositories <ArrowRight class="h-3 w-3" />
-          </p>
-        </CardContent>
-      </Card>
+        <Card class="h-full transition-colors hover:bg-muted/50">
+          <CardHeader>
+            <CardTitle class="flex items-center gap-2">
+              <FolderGit2 class="h-4 w-4" />
+              Repositories
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p class="text-sm text-muted-foreground">
+              Browse, clone, and link GitHub repositories into Projects.
+            </p>
+            <p class="mt-2 flex items-center gap-1 text-sm font-medium">
+              Open repositories <ArrowRight class="h-3 w-3" />
+            </p>
+          </CardContent>
+        </Card>
+      </a>
 
-      <Card
-        class="cursor-pointer transition-colors hover:bg-muted/50"
-        onclick={() => goto('/github/issues')}
+      <a
+        href="/github/issues"
+        class="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
-        <CardHeader>
-          <CardTitle class="flex items-center gap-2">
-            <Bug class="h-4 w-4" />
-            Issues
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p class="text-sm text-muted-foreground">
-            View your assigned issues and create or update repository issues.
-          </p>
-          <p class="mt-2 flex items-center gap-1 text-sm font-medium">
-            Open issues <ArrowRight class="h-3 w-3" />
-          </p>
-        </CardContent>
-      </Card>
+        <Card class="h-full transition-colors hover:bg-muted/50">
+          <CardHeader>
+            <CardTitle class="flex items-center gap-2">
+              <Bug class="h-4 w-4" />
+              Issues
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p class="text-sm text-muted-foreground">
+              View your assigned issues and create or update repository issues.
+            </p>
+            <p class="mt-2 flex items-center gap-1 text-sm font-medium">
+              Open issues <ArrowRight class="h-3 w-3" />
+            </p>
+          </CardContent>
+        </Card>
+      </a>
     </div>
   {/if}
 </div>

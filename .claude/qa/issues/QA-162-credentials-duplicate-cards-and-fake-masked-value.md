@@ -34,9 +34,12 @@ Two cards share name, type and description; only "Last used" differs (on one onl
 manual - steps above
 
 ## Fix
+Follow-up (2026-11-22): placeholder span gets break-normal (parent break-all split 'reveal'). CredentialCard.svelte. pnpm check + eslint/prettier on file.
 
 Root cause: card printed maskValue('encrypted_value') = 'encr****' as a fake value; header actions could shrink and clip; no field to tell duplicates apart. Fix: italic 'Hidden — use the eye icon to reveal' placeholder, actions shrink-0 with title truncate, added an 'Added: <date>' line. File: src/lib/domains/credentials/components/CredentialCard.svelte. pnpm check 0 errors. Underlying duplicate GitHub rows (data) not touched.
 
 ## Verification
 
 <!-- qa-tester -->
+
+2026-11-22 (round 2), tauri. Round 2: placeholder 'Hidden - use the eye icon to / reveal' now wraps at a word boundary (QA-162-after2-credentials.png).

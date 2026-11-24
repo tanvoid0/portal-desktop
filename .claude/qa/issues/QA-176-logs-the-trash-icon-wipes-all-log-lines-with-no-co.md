@@ -35,9 +35,12 @@ Instantly `Showing 0 of 0` / `No logs found`: no dialog, no toast. The page also
 `node .claude/qa/scripts/QA-176.mjs`
 
 ## Fix
+Follow-up (2026-11-22): /logs now has a shell PageHeader ('Logs'); viewer wrapped in flex column, confirmed clear + toast untouched. routes/logs/+page.svelte.
 
 Root cause: clearLogs wiped immediately. Fix: confirmAction (destructive wording) then toast.success('Logs cleared'). File: src/lib/components/logs/UnifiedLogViewer.svelte. Checks: pnpm check, eslint. Page-title-row note not addressed.
 
 ## Verification
 
 2026-11-22, tauri. Trash opens 'Clear all log lines? This cannot be undone.'; Cancel keeps 11 lines (QA-176-after-logs-confirm.png). Toast after confirm not exercised, to keep the log buffer.
+
+2026-11-22 (round 2), tauri. Round 2: /logs has a 'Logs' header; confirmed clear empties the list and shows the 'Logs cleared' toast (QA-176-after2-logs-cleared.png).

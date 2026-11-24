@@ -165,14 +165,12 @@
       </div>
     {/if}
 
-    <PairDeviceCard {capabilities} {pairedDeviceIds} onPaired={refetchDevices} />
-
     <div class="space-y-2">
       <h3 class="text-sm font-semibold">Paired devices ({paired.length})</h3>
       {#if paired.length === 0}
         <PageEmpty
           title="No paired devices"
-          description="Generate a QR code above and scan it with the phone."
+          description="Generate a QR code below and scan it with the phone."
           icon={MobileIcon}
         />
       {:else}
@@ -188,6 +186,8 @@
         </div>
       {/if}
     </div>
+
+    <PairDeviceCard {capabilities} {pairedDeviceIds} onPaired={refetchDevices} />
 
     {#if history.length > 0}
       <div class="space-y-2">

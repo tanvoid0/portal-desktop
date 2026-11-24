@@ -4,6 +4,7 @@
   import { confirmAction } from '$lib/utils/confirm';
   import { Badge } from '$lib/components/ui/badge';
   import { bulkToggleable } from '../utils/capabilityChecklist';
+  import { capabilityLabel } from '../utils/capabilityLabels';
   import type { CapabilityInfo } from '../types';
 
   interface Props {
@@ -53,24 +54,31 @@
       Select all
     </Label>
     <!-- Columns follow this element's width, not the viewport's: it also sits in half-width cards.
-         13rem holds the longest cell (switch + "agents.history" + Sensitive); flex-wrap covers longer. -->
-    <div class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,13rem),1fr))] gap-2">
+         16rem holds the longest cell (switch + label + Sensitive); flex-wrap covers longer. -->
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,16rem),1fr))] gap-2">
       {#each capabilities as cap (cap.name)}
-        <Label class="flex flex-wrap items-center gap-2 text-sm font-normal">
+        <Label class="flex items-start gap-2 text-sm font-normal" title={cap.name}>
           <Switch
+            class="mt-0.5"
             checked={selected.includes(cap.name)}
             onCheckedChange={(v) => toggle(cap.name, v === true)}
             {disabled}
           />
-          {cap.name}
-          {#if cap.is_sensitive}
-            <Badge
-              variant="destructive"
-              class="px-1.5 py-0 text-[10px] font-normal"
-              title="Can run commands or change things on this computer. Grant only to devices you trust."
-              >Sensitive</Badge
+          <span class="min-w-0">
+            <span class="flex flex-wrap items-center gap-2">
+              {capabilityLabel(cap.name).label}
+              {#if cap.is_sensitive}
+                <Badge
+                  variant="destructive"
+                  class="px-1.5 py-0 text-[10px] font-normal"
+                  title="Can run commands or change things on this computer. Grant only to devices you trust."
+                  >Sensitive</Badge
+                >
+              {/if}
+            </span>
+            <span class="block text-xs text-muted-foreground">{capabilityLabel(cap.name).hint}</span
             >
-          {/if}
+          </span>
         </Label>
       {/each}
     </div>

@@ -316,7 +316,7 @@
 
                 <!-- Actions -->
                 <div
-                  class="divider-edge-t divider-edge-full flex gap-2 pt-2"
+                  class="divider-edge-t divider-edge-full flex flex-wrap gap-2 pt-2"
                   onclick={(e) => e.stopPropagation()}
                 >
                   <Button

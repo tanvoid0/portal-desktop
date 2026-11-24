@@ -1,0 +1,13 @@
+import { open } from './app.mjs';
+const app = await open('tasks');
+const p = app.page;
+await p.locator('[role=dialog]').waitFor({ timeout: 6000 }).catch(()=>{});
+await p.setViewportSize({ width: 640, height: 250 }); await p.waitForTimeout(600);
+const r = await p.evaluate(() => { const d=document.querySelector('[role=dialog]'); const b=d.getBoundingClientRect(); return {top:Math.round(b.top), bottom:Math.round(b.bottom), vh:innerHeight, scrollable:d.scrollHeight>d.clientHeight, sh:d.scrollHeight, ch:d.clientHeight}; });
+console.log('equiv zoom 2 @1280x500 -> 640x250', JSON.stringify(r));
+console.log(await app.shot('QA-191-after-vault-dialog-equiv-zoom2'));
+await p.evaluate(()=>{const d=document.querySelector('[role=dialog]'); d.scrollTop=d.scrollHeight;}); await p.waitForTimeout(300);
+console.log('can reach Not now:', await p.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Not now'); const r=b.getBoundingClientRect(); return r.bottom<=innerHeight+1 && r.top>=0;}));
+await p.setViewportSize({ width: 1280, height: 800 }); await p.waitForTimeout(400);
+await p.getByRole('button', { name: 'Not now' }).click().catch(()=>{});
+await app.done();

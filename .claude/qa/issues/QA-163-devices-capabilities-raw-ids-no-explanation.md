@@ -35,8 +35,10 @@ manual - steps above
 
 ## Fix
 
-Capability ids are the backend registry names with no descriptions (no label/hint field in CapabilityInfo). Added title hints: Sensitive badge explains the risk, Advanced switch explains itself; expired/empty rows read 'No permissions granted' instead of 'no capabilities'. Files: devices/components/CapabilityChecklist.svelte, DeviceRow.svelte, routes/devices/+page.svelte. Left as product calls: human labels per capability (needs registry descriptions in Rust), moving the checklist below the device list, unifying absolute/relative dates, a restart action for 'Takes effect after restarting' (LanToggleCard). Checks: pnpm check (0 errors), eslint+prettier on touched files.
+Root cause: registry ids had no human copy, and several presentation details were left as product calls. Now: (1) `devices/utils/capabilityLabels.ts` maps ids to label + one-line hint (fallback = raw id); CapabilityChecklist shows label, hint, Sensitive badge, raw id in title. (2) `devices/utils/expiry.ts` `relativeExpiry` ("in 3d" / "3d ago"); DeviceRow expiry label and extend toast use it, absolute date in title. (3) PairDeviceCard (pairing + checklist) moved below Paired devices in routes/devices/+page.svelte; empty-state copy says "below". (4) LanToggleCard shows "Restart now" after toggling, via existing `relaunch()` from @tauri-apps/plugin-process (already used by updateService); no new Rust. Earlier hints (Sensitive tooltip, Advanced title, 'No permissions granted') kept. Checks: pnpm check 0 errors, prettier + eslint on devices (0 errors). Visual CDP check not completed (script hung); not verified in the running app. Earlier status was already verified for the first round; re-verify.
 
 ## Verification
 
 <!-- qa-tester -->
+
+2026-11-22 (round 2), tauri. Round 2: Paired devices list is above the Pair a phone card; pairing card shows labels with hints ('Quick actions - Run your saved actions', 'Run agents' Sensitive); 1d expiry reads relative ('Expired 1d ago') while older ones show the date (QA-163-after2-devices.png). Notes: paired-device chips still show raw ids (agents.exec, remote.input). The 'Restart now' button after the LAN toggle NOT verified (needs toggling the real LAN setting).

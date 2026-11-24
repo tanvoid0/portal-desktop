@@ -105,7 +105,7 @@
     if (!isOpen) vaultGate.settle(false);
   }}
 >
-  <Dialog.Content class="sm:max-w-md">
+  <Dialog.Content class="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-md">
     {#if mode === 'unlock'}
       <Dialog.Header>
         <Dialog.Title>Vault locked</Dialog.Title>

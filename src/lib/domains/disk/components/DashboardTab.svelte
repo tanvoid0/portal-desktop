@@ -135,7 +135,7 @@
     {@const used = Math.max(0, d.totalBytes - d.availableBytes)}
     <Card class="gap-0 py-4">
       <CardContent class="px-4">
-        <div class="mb-2 flex items-center gap-2">
+        <div class="mb-2 flex flex-wrap items-center gap-x-2">
           {#if d.isRemovable}
             <Usb class="size-4 text-muted-foreground" />
           {:else}
@@ -145,7 +145,7 @@
             >{d.mountPoint}</span
           >
           {#if d.name?.trim() && d.name.trim() !== d.mountPoint}
-            <span class="truncate text-xs text-muted-foreground" title={d.name.trim()}
+            <span class="min-w-0 text-xs break-words text-muted-foreground" title={d.name.trim()}
               >{d.name.trim()}</span
             >
           {/if}
@@ -159,8 +159,8 @@
               ? '[&>[data-slot=progress-indicator]]:bg-status-warning'
               : ''}"
         />
-        <div class="flex items-center justify-between gap-2 text-xs">
-          <span class="min-w-0 truncate text-muted-foreground tabular-nums"
+        <div class="flex flex-wrap items-center justify-between gap-x-2 text-xs">
+          <span class="min-w-0 text-muted-foreground tabular-nums"
             >{fmtBytes(used)} used · {fmtBytes(d.availableBytes)} free</span
           >
           <span class="whitespace-nowrap text-muted-foreground/70 tabular-nums"
