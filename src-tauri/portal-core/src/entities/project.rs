@@ -62,6 +62,8 @@ pub struct Model {
     /// which the disk-scan import also writes (`status = "archived"` means
     /// "missing on disk", a different thing).
     pub archived: bool,
+    /// Written only by `set_project_push_ok`; discovery never touches it.
+    pub push_ok: bool,
     pub created_at: Option<DateTimeWithTimeZone>,
     pub updated_at: Option<DateTimeWithTimeZone>,
 }

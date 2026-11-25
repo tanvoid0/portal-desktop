@@ -204,6 +204,14 @@ impl ProjectService {
         self.repository.set_archived(id, archived).await
     }
 
+    pub async fn set_project_push_ok(
+        &self,
+        id: i32,
+        push_ok: bool,
+    ) -> Result<Option<ProjectResponse>, String> {
+        self.repository.set_push_ok(id, push_ok).await
+    }
+
     pub async fn toggle_project_star(&self, id: i32) -> Result<Option<ProjectResponse>, String> {
         // Get current project to check if it exists and get current starred status
         let current_project = self.repository.get_by_id(id).await?;

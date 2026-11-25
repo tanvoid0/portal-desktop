@@ -7,3 +7,4 @@ pub mod pipelines;
 pub mod relocation;
 pub mod repositories;
 pub mod services;
+pub mod sync_all;

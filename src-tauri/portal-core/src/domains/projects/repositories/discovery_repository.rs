@@ -17,7 +17,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::database::DatabaseManager;
-use crate::domains::projects::discovery::{DiscoveredProject, DiscoveryReport};
+use crate::domains::projects::discovery::{DiscoveredProject, DiscoveryReport, GitProbe};
 use crate::domains::projects::move_lock;
 use crate::entities::project::{self, Entity as Project};
 
@@ -252,30 +252,45 @@ fn apply_machine_fields(am: &mut project::ActiveModel, p: &DiscoveredProject, no
     am.activity_status = Set(Some(p.status.as_str().to_string()));
     am.last_activity = Set(to_dt(p.activity).map(|d| d.into()));
     am.risk_level = Set(Some(p.risk_level.as_str().to_string()));
-    am.unpushed_commits = Set(p.git.ahead.max(0) as i32);
-    am.stash_count = Set(p.git.stash.max(0) as i32);
-    am.has_remote = Set(p
-        .git
-        .remote
-        .as_deref()
-        .map(|r| !r.is_empty())
-        .unwrap_or(false));
     am.module_count = Set(p.module_count as i32);
     am.duplicate_group = Set(join(&p.duplicate_of));
     am.regenerable_dirs = Set(join(&p.regenerable));
     am.discovered_at = Set(Some(now.into()));
 
-    am.git_repository = Set(p.git.remote.clone());
-    am.git_branch = Set(p.git.branch.clone());
+    let g = &p.git;
+    let probe = GitProbe {
+        branch: g.branch.clone(),
+        remote: g.remote.clone(),
+        last_commit: g.last_commit.clone(),
+        ahead: g.ahead,
+        stash: g.stash,
+        dirty: g.dirty,
+        ..Default::default()
+    };
+    apply_git_fields(am, &probe);
+    am.updated_at = Set(Some(now.into()));
+}
+
+/// The git half of the machine-owned fields; shared with "Sync all", which
+/// re-probes a repo after pulling/pushing.
+pub(crate) fn apply_git_fields(am: &mut project::ActiveModel, g: &GitProbe) {
+    am.unpushed_commits = Set(g.ahead.max(0) as i32);
+    am.stash_count = Set(g.stash.max(0) as i32);
+    am.has_remote = Set(g
+        .remote
+        .as_deref()
+        .map(|r| !r.is_empty())
+        .unwrap_or(false));
+
+    am.git_repository = Set(g.remote.clone());
+    am.git_branch = Set(g.branch.clone());
     // `dirty` is -1 when unmeasured; only a positive count means dirty.
-    am.has_uncommitted_changes = Set(p.git.dirty > 0);
-    am.last_commit = Set(p
-        .git
+    am.has_uncommitted_changes = Set(g.dirty > 0);
+    am.last_commit = Set(g
         .last_commit
         .as_deref()
         .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
         .map(|d| d.with_timezone(&Utc).into()));
-    am.updated_at = Set(Some(now.into()));
 }
 
 #[cfg(test)]

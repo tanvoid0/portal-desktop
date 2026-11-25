@@ -287,6 +287,17 @@ mod tests {
         );
     }
 
+    /// "Sync all" pushes to remotes and uploads a snapshot, and `push_ok` is
+    /// the push allowlist: none of it may be reachable by a LAN device.
+    #[test]
+    fn sync_all_is_local_only() {
+        for name in ["sync_all_projects", "cancel_sync_all", "set_project_push_ok"] {
+            // local_only commands are not in the registry at all.
+            assert!(!is_registered(name), "{name}");
+            assert_eq!(capability(name), None, "{name}");
+        }
+    }
+
     /// Running commands on the host is opt-in per device, so `terminal.exec` is
     /// sensitive and never in the untouched-dialog default grant.
     #[test]

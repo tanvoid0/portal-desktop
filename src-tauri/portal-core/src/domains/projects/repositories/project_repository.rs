@@ -362,6 +362,31 @@ impl ProjectRepository {
         Ok(Some(self.to_response(result).await?))
     }
 
+    /// Sets the "Sync all" push allowlist flag.
+    pub async fn set_push_ok(
+        &self,
+        id: i32,
+        push_ok: bool,
+    ) -> Result<Option<ProjectResponse>, String> {
+        let connection = self.db_manager.get_connection();
+
+        let mut project: ProjectActiveModel = ProjectEntity::find_by_id(id)
+            .one(connection)
+            .await
+            .map_err(|e| format!("Failed to find project: {}", e))?
+            .ok_or_else(|| "Project not found".to_string())?
+            .into();
+
+        project.push_ok = Set(push_ok);
+
+        let result = project
+            .update(connection)
+            .await
+            .map_err(|e| format!("Failed to update project push_ok flag: {}", e))?;
+
+        Ok(Some(self.to_response(result).await?))
+    }
+
     /// Ids for `names` in a lookup table (`frameworks`, `languages` or
     /// `package_managers`), matched case-insensitively. A name the table has never
     /// seen (a stack detected on disk, e.g. `Android`) gets a row of its own.

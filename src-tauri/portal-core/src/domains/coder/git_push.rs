@@ -32,7 +32,7 @@ pub fn git_push(workspace: &str) -> Result<String, String> {
 
 /// The exact argv for `git push`, isolated so it's testable without a real
 /// repo or remote.
-fn push_args(branch: &str, has_upstream: bool) -> Vec<String> {
+pub(crate) fn push_args(branch: &str, has_upstream: bool) -> Vec<String> {
     if has_upstream {
         vec!["push".to_string()]
     } else {

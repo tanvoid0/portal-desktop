@@ -206,6 +206,18 @@ pub async fn set_project_archived(
     service.set_project_archived(id, archived).await
 }
 
+/// Allowlists a project for "Sync all" pushes. local_only: a LAN device must
+/// not be able to grant outbound push.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn set_project_push_ok(
+    id: i32,
+    push_ok: bool,
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Option<crate::domains::projects::entities::ProjectResponse>, String> {
+    let service = ProjectService::new(&db_manager);
+    service.set_project_push_ok(id, push_ok).await
+}
+
 #[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn open_project(
     id: i32,

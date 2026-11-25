@@ -986,6 +986,7 @@ mod tests {
         assert_eq!(event_cap("terminal-output"), Some("terminal.exec"));
         assert_eq!(event_cap("shell-integration-event"), Some("terminal.exec"));
         assert_eq!(event_cap("k8s://pods"), None);
+        assert_eq!(event_cap("sync-all://progress"), None);
 
         // General `<domain>://...` rule, for a domain that isn't terminal's
         // special case.

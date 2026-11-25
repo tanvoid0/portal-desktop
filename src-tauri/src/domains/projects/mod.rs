@@ -12,6 +12,7 @@ pub mod commands;
 pub mod discovery_commands;
 pub mod env_commands;
 pub mod move_commands;
+pub mod sync_all_commands;
 pub mod pipelines;
 pub use commands::*;
 pub use discovery_commands::*;

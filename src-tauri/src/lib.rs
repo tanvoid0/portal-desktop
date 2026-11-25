@@ -268,6 +268,7 @@ pub fn run() {
             app.manage(domains::disk::commands::VerifyControl::default());
             app.manage(domains::projects::discovery_commands::DiscoveryControl::default());
             app.manage(domains::projects::move_commands::MoveControl::default());
+            app.manage(domains::projects::sync_all_commands::SyncAllControl::default());
             log_info!("Tauri", "Disk utility domain initialized");
 
             // Initialize IDE storage
@@ -473,6 +474,7 @@ pub fn run() {
             domains::projects::toggle_project_star,
             domains::projects::set_project_stage,
             domains::projects::set_project_archived,
+            domains::projects::set_project_push_ok,
             domains::projects::open_project,
             domains::projects::refresh_project_metadata,
             domains::projects::get_projects_with_filters,
@@ -491,6 +493,8 @@ pub fn run() {
             domains::projects::discovery_commands::discover_and_import_projects,
             domains::projects::discovery_commands::import_discovered_projects,
             domains::projects::discovery_commands::cancel_discovery,
+            domains::projects::sync_all_commands::sync_all_projects,
+            domains::projects::sync_all_commands::cancel_sync_all,
             domains::projects::discovery_commands::get_discovery_state,
             domains::projects::discovery_commands::save_discovery_config,
             domains::projects::discovery_commands::export_discovery_csv,
