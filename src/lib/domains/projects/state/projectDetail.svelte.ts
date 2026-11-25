@@ -9,7 +9,11 @@ import { buildTabUrl, resolveUrlTab } from '$lib/utils/url-tabs';
 import { projectService, createProjectQuery, createProjectsQuery } from '$lib/domains/projects';
 import { createProjectModulesQuery } from '$lib/domains/projects/queries/moduleQueries';
 import { refreshProjectModules } from '$lib/domains/projects/api/moduleApi';
-import { openProjectInIde, toggleProjectStar } from '$lib/domains/projects/api/projectApi';
+import {
+  openProjectInIde,
+  setProjectPushOk,
+  toggleProjectStar,
+} from '$lib/domains/projects/api/projectApi';
 import { queryClient, queryKeys } from '$lib/domains/shared/query';
 import { breadcrumbActions } from '$lib/domains/shared/stores/breadcrumbStore';
 import { logger } from '$lib/domains/shared/services/logger';
@@ -295,6 +299,17 @@ export class ProjectDetailState {
       toast.error('Could not re-detect the project');
     } finally {
       this.refreshing = false;
+    }
+  };
+
+  handleSetPushOk = async (pushOk: boolean) => {
+    if (!this.project) return;
+    try {
+      await setProjectPushOk(Number(this.project.id), pushOk);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+    } catch (err) {
+      log.error('Failed to set push permission', err);
+      toast.error('Could not update push permission');
     }
   };
 

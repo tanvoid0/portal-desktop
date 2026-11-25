@@ -7,6 +7,8 @@
   import GitBranch from '~icons/fa6-solid/code-branch';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
+  import { Switch } from '$lib/components/ui/switch';
+  import { Label } from '$lib/components/ui/label';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import type { Project } from '$lib/domains/projects/types';
   import { getProjectGitBranch } from '$lib/domains/projects/utils/display';
@@ -17,9 +19,17 @@
     refreshing?: boolean;
     onRedetect?: () => void;
     onTerminal?: () => void;
+    onSetPushOk?: (pushOk: boolean) => void;
   }
 
-  let { project, githubUrl, refreshing = false, onRedetect, onTerminal }: Props = $props();
+  let {
+    project,
+    githubUrl,
+    refreshing = false,
+    onRedetect,
+    onTerminal,
+    onSetPushOk,
+  }: Props = $props();
 
   const branch = $derived(getProjectGitBranch(project));
   const unpushed = $derived(project.unpushed_commits ?? 0);
@@ -84,6 +94,15 @@
       {:else if project.git_repository}
         <p class="font-mono text-xs break-all text-muted-foreground">{project.git_repository}</p>
       {/if}
+    {/if}
+    {#if onSetPushOk}
+      <div class="flex items-center justify-between gap-3 border-t pt-3">
+        <div class="space-y-0.5">
+          <Label for="push-ok">Allow push to remote</Label>
+          <p class="text-xs text-muted-foreground">Sync all only pushes repos you've cleared</p>
+        </div>
+        <Switch id="push-ok" checked={project.push_ok} onCheckedChange={onSetPushOk} />
+      </div>
     {/if}
   </CardContent>
 </Card>

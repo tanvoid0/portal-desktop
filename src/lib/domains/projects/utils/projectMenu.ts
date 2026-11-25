@@ -5,6 +5,7 @@ import FaBoxArchive from '~icons/fa6-solid/box-archive';
 import FaClipboard from '~icons/fa6-solid/clipboard';
 import FaRobot from '~icons/fa6-solid/robot';
 import FaBolt from '~icons/fa6-solid/bolt';
+import FaUpload from '~icons/fa6-solid/upload';
 import FaTrash from '~icons/fa6-solid/trash';
 import type { MenuItem } from '$lib/components/menu/types';
 import { copyText } from '$lib/domains/shared/utils/clipboard';
@@ -13,6 +14,7 @@ import type { Project } from '../types';
 export interface ProjectMenuHandlers {
   onToggleStar?: (project: Project) => void;
   onSetArchived?: (project: Project, archived: boolean) => void;
+  onSetPushOk?: (project: Project, pushOk: boolean) => void;
   onCopyReference?: (project: Project) => void;
   onLaunchCoder?: (project: Project) => void;
   onLaunchAgents?: (project: Project) => void;
@@ -42,6 +44,13 @@ export function buildProjectMenu(project: Project, h: ProjectMenuHandlers): Menu
       label: project.archived ? 'Unarchive' : 'Archive',
       icon: FaBoxArchive,
       onSelect: () => h.onSetArchived!(project, !project.archived),
+    });
+  }
+  if (h.onSetPushOk) {
+    items.push({
+      label: project.push_ok ? 'Block push in Sync all' : 'Allow push in Sync all',
+      icon: FaUpload,
+      onSelect: () => h.onSetPushOk!(project, !project.push_ok),
     });
   }
 

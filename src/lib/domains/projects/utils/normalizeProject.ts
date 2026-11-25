@@ -86,6 +86,7 @@ export function normalizeProject(raw: RawProject): Project {
     parent_id: (raw.parent_id ?? raw.parentId ?? null) as number | null,
     stage: (raw.stage ?? null) as ProjectStage | null,
     archived: Boolean(raw.archived),
+    push_ok: Boolean(raw.push_ok ?? raw.pushOk),
     created_at: createdAt,
     updated_at: updatedAt,
     metadata,

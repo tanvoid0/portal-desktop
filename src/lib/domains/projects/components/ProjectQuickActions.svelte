@@ -20,6 +20,7 @@
   import Select from '$lib/components/ui/select.svelte';
   import { cn } from '$lib/utils';
   import Archive from '~icons/fa6-solid/box-archive';
+  import Upload from '~icons/fa6-solid/upload';
   import TruckMoving from '~icons/fa6-solid/truck-moving';
   import CloudArrowUp from '~icons/fa6-solid/cloud-arrow-up';
   import Ellipsis from '~icons/fa6-solid/ellipsis';
@@ -56,6 +57,7 @@
     onToggleStar?: (project: Project) => void;
     onSetStage?: (project: Project, stage: ProjectStage | null) => void;
     onSetArchived?: (project: Project, archived: boolean) => void;
+    onSetPushOk?: (project: Project, pushOk: boolean) => void;
     class?: string;
   }
 
@@ -67,6 +69,7 @@
     onToggleStar = () => {},
     onSetStage = () => {},
     onSetArchived = () => {},
+    onSetPushOk = () => {},
     class: className = '',
   }: Props = $props();
 
@@ -205,6 +208,10 @@
       <DropdownMenuItem onclick={() => onSetArchived(project, !project.archived)}>
         <Archive class="mr-2 h-4 w-4" />
         {project.archived ? 'Unarchive' : 'Archive'}
+      </DropdownMenuItem>
+      <DropdownMenuItem onclick={() => onSetPushOk(project, !project.push_ok)}>
+        <Upload class="mr-2 h-4 w-4" />
+        {project.push_ok ? 'Block push in Sync all' : 'Allow push in Sync all'}
       </DropdownMenuItem>
       <DropdownMenuItem disabled={!!activeMove} onclick={() => (moveOpen = true)}>
         <TruckMoving class="mr-2 h-4 w-4" />

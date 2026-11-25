@@ -48,6 +48,8 @@ export interface Project extends BaseEntity {
    * (missing on disk, not "I archived this").
    */
   archived: boolean;
+  /** Cleared for Sync all's push step. */
+  push_ok: boolean;
   created_at?: Date;
   updated_at?: Date;
   metadata: ProjectMetadata;

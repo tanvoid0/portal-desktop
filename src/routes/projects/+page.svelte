@@ -44,12 +44,19 @@
     toggleProjectStar,
     setProjectStage,
     setProjectArchived,
+    setProjectPushOk,
   } from '$lib/domains/projects/api/projectApi';
   import { toast } from '$lib/utils/toast';
   import { projectIconRegistry } from '$lib/domains/projects/utils/iconRegistry';
   import { logger } from '$lib/domains/shared/services/logger';
   import { confirmAction } from '$lib/utils/confirm';
   import { breadcrumbActions } from '$lib/domains/shared/stores/breadcrumbStore';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import { vaultGate } from '$lib/domains/credentials';
+  import { createSyncStatusQuery } from '$lib/domains/sync/queries/syncQueries';
+  import PasswordDialog from '$lib/domains/sync/components/PasswordDialog.svelte';
+  import SyncAllPanel from '$lib/domains/projects/components/SyncAllPanel.svelte';
+  import { syncAll } from '$lib/domains/projects/state/syncAll.svelte';
   import { PageHeader, PageLoading, PageError, PageEmpty, PageStats } from '$lib/components/shell';
   import type { PageStat } from '$lib/components/shell';
 
@@ -270,6 +277,37 @@
     }
   };
 
+  const handleSetPushOk = async (project: Project, pushOk: boolean) => {
+    try {
+      await setProjectPushOk(Number(project.id), pushOk);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+    } catch (error) {
+      log.error('Failed to set push permission', error);
+      toast.error('Could not update push permission');
+    }
+  };
+
+  const syncStatus = createSyncStatusQuery();
+  let pwOpen = $state(false);
+
+  async function startSyncAll() {
+    if (syncAll.running) {
+      syncAll.open = true;
+      return;
+    }
+    // A cancelled unlock still proceeds; the env phase then reports the vault as locked.
+    await vaultGate.ensureUnlocked('Unlock to back up env files');
+    if (syncStatus.data?.configured) {
+      pwOpen = true;
+      return;
+    }
+    const ok = await confirmAction(
+      'No sync server is configured, so the cloud snapshot is skipped. Git and env backup still run. Continue?',
+      'Sync all projects'
+    );
+    if (ok) void syncAll.start({ snapshotPassword: null });
+  }
+
   const handleSetParent = async (projectId: string, parentId: number | null) => {
     try {
       await projectService.setProjectParent(projectId, parentId);
@@ -301,6 +339,10 @@
 <div class="space-y-6">
   <PageHeader title="Projects" description="Manage your development projects">
     {#snippet actions()}
+      <Button variant="outline" onclick={startSyncAll}>
+        <RefreshCw class="mr-2 h-4 w-4 {syncAll.running ? 'animate-spin' : ''}" />
+        {syncAll.running ? `Syncing ${syncAll.done}/${syncAll.total}` : 'Sync all'}
+      </Button>
       <Button variant="outline" onclick={() => goto('/projects/audit')}>
         <ScanSearch class="mr-2 h-4 w-4" />
         Audit
@@ -364,6 +406,7 @@
         onToggleStar={handleToggleStar}
         onSetStage={handleSetStage}
         onSetArchived={handleSetArchived}
+        onSetPushOk={handleSetPushOk}
       />
     {/snippet}
 
@@ -378,6 +421,7 @@
         onToggleStar={handleToggleStar}
         onSetStage={handleSetStage}
         onSetArchived={handleSetArchived}
+        onSetPushOk={handleSetPushOk}
       />
     {/snippet}
 
@@ -393,3 +437,13 @@
     />
   {/if}
 </div>
+
+<SyncAllPanel />
+<PasswordDialog
+  bind:open={pwOpen}
+  mode="backup"
+  confirmTwice={!syncStatus.data?.cloud && !syncStatus.data?.cloudError}
+  onSubmit={async (pw) => {
+    void syncAll.start({ snapshotPassword: pw });
+  }}
+/>

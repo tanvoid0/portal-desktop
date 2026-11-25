@@ -213,6 +213,7 @@
             refreshing={d.refreshing}
             onRedetect={d.handleRedetect}
             onTerminal={d.switchToTerminal}
+            onSetPushOk={d.handleSetPushOk}
           />
           <ProjectAgentSessionsCard project={currentProject} sessions={d.agentSessionsForProject} />
         </div>

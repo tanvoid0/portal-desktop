@@ -34,6 +34,7 @@
     onToggleStar?: (project: Project) => void;
     onSetStage?: (project: Project, stage: ProjectStage | null) => void;
     onSetArchived?: (project: Project, archived: boolean) => void;
+    onSetPushOk?: (project: Project, pushOk: boolean) => void;
   }
 
   let {
@@ -46,6 +47,7 @@
     onToggleStar = () => {},
     onSetStage = () => {},
     onSetArchived = () => {},
+    onSetPushOk = () => {},
   }: Props = $props();
 
   const stageLabel = $derived(PROJECT_STAGES.find((s) => s.value === project.stage)?.label);
@@ -85,6 +87,7 @@
   items={buildProjectMenu(project, {
     onToggleStar,
     onSetArchived,
+    onSetPushOk,
     onCopyReference: (p) => copyProjectReference(p),
     onLaunchCoder: launchInCoder,
     onLaunchAgents: launchInAgents,
@@ -194,6 +197,7 @@
           {onToggleStar}
           {onSetStage}
           {onSetArchived}
+          {onSetPushOk}
         />
       </div>
     </Card>

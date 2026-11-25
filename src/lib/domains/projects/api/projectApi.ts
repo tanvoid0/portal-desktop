@@ -56,6 +56,12 @@ export async function setProjectStage(
   return project ? normalizeProject(project as Record<string, unknown>) : null;
 }
 
+/** Clears or revokes a project for Sync all's push step. */
+export async function setProjectPushOk(id: number, pushOk: boolean): Promise<Project | null> {
+  const project = await invokeClient.post<unknown>('set_project_push_ok', { id, pushOk });
+  return project ? normalizeProject(project as Record<string, unknown>) : null;
+}
+
 /** Flags a project archived or active. */
 export async function setProjectArchived(id: number, archived: boolean): Promise<Project | null> {
   const project = await invokeClient.post<unknown>('set_project_archived', { id, archived });
