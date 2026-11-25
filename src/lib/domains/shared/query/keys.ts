@@ -9,6 +9,8 @@ export const queryKeys = {
     /** Under `projects` so any project write refetches it. */
     unavailable: ['projects', 'unavailable'] as const,
     env: (id: number) => ['projects', id, 'env'] as const,
+    /** Settings > Vault: env files vs. their vault copies, across all projects. */
+    envBackup: ['projects', 'env-backup'] as const,
     moves: ['projects', 'moves'] as const,
   },
   actions: {

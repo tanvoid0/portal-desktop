@@ -217,6 +217,7 @@
         { value: 'ssh_key', label: 'SSH Keys' },
         { value: 'api_token', label: 'API Tokens' },
         { value: 'env_var', label: 'Environment Variables' },
+        { value: 'env_file', label: 'Env Files' },
         { value: 'database', label: 'Database' },
         { value: 'cloud_provider', label: 'Cloud Provider' },
         { value: 'registry', label: 'Registry' },

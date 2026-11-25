@@ -13,7 +13,7 @@
   import { Input } from '$lib/components/ui/input';
   import { Button } from '$lib/components/ui/button';
   import { credentialService } from '$lib/domains/credentials';
-  import type { Credential } from '$lib/domains/credentials/types';
+  import { CredentialType, type Credential } from '$lib/domains/credentials/types';
   import { linkProjectEnv } from '../api/projectEnvApi';
   import type { EnvLinkView } from '../generated';
   import { queryClient } from '$lib/domains/shared/query/queryClient';
@@ -40,9 +40,11 @@
   async function load(query: string) {
     loading = true;
     try {
-      credentials = query.trim()
+      const found = query.trim()
         ? await credentialService.searchCredentials(query.trim())
         : await credentialService.getCredentials();
+      // A whole backed-up .env file is not the value of one key.
+      credentials = found.filter((c) => c.type !== CredentialType.ENV_FILE);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to load credentials');
     } finally {

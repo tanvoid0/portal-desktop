@@ -6,6 +6,8 @@ export enum CredentialType {
   SSH_KEY = 'ssh_key',
   API_TOKEN = 'api_token',
   ENV_VAR = 'env_var',
+  /** A whole backed-up `.env*` file (Settings > Vault > Project env files). Not user-creatable. */
+  ENV_FILE = 'env_file',
   DATABASE = 'database',
   CLOUD_PROVIDER = 'cloud_provider',
   REGISTRY = 'registry',
