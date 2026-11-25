@@ -96,9 +96,9 @@
   /** Unlock first (a clean prompt, not a command that waits on one), then run. */
   async function guarded(reason: string, work: () => Promise<void>) {
     if (busy) return;
-    if (!(await vaultGate.ensureUnlocked(reason))) return;
     busy = true;
     try {
+      if (!(await vaultGate.ensureUnlocked(reason))) return;
       await work();
     } catch (err) {
       toast.error(getErrorMessage(err, 'Env backup failed.'));
