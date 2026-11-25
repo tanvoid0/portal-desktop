@@ -1,5 +1,15 @@
 # Portal Desktop - Release Notes
 
+## Version 0.22.0
+
+### Highlights
+
+- Sync: encrypted whole-database backup and restore across devices, with conflict handling
+- Vault: change the master password
+- Vault: back up and restore project .env files in bulk (Settings > Vault > Project env files)
+
+---
+
 ## Version 0.21.0
 
 ### Highlights
