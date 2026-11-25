@@ -86,7 +86,8 @@ pub struct SyncAllProgress {
     pub project: Option<SyncProjectEvent>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, ts_rs::TS)]
+// No `Debug`: this holds the snapshot password; keep it un-formattable so it can't leak via `{:?}`.
+#[derive(Clone, Default, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../../src/lib/domains/projects/generated/")]
 pub struct SyncAllOptions {
