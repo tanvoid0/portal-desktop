@@ -185,7 +185,10 @@
         <CardContent class="space-y-4">
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div class="rounded-md border p-3 text-sm">
-              <div class="mb-1 font-medium">This machine</div>
+              <div class="mb-1 flex items-center justify-between font-medium">
+                This machine
+                <Badge variant="outline">Synced v{s.baseVersion}</Badge>
+              </div>
               <div>{formatAbsolute(s.localDbModifiedAt)}</div>
               <div class="text-muted-foreground">{formatRelative(s.localDbModifiedAt)}</div>
               <div>{formatBytes(s.localDbSize)}</div>
@@ -195,11 +198,16 @@
               </div>
             </div>
             <div class="rounded-md border p-3 text-sm">
-              <div class="mb-1 font-medium">Cloud</div>
+              <div class="mb-1 flex items-center justify-between font-medium">
+                Cloud
+                {#if s.cloud}<Badge>Latest v{s.cloud.version}</Badge>{/if}
+              </div>
               {#if s.cloud}
-                <div>{formatAbsolute(s.cloud.clientUpdatedAt)}</div>
-                <div class="text-muted-foreground">{formatRelative(s.cloud.clientUpdatedAt)}</div>
-                <div>{formatBytes(s.cloud.size)} - v{s.cloud.version}</div>
+                <div>{formatAbsolute(s.cloud.createdAt || s.cloud.clientUpdatedAt)}</div>
+                <div class="text-muted-foreground">
+                  uploaded {formatRelative(s.cloud.createdAt || s.cloud.clientUpdatedAt)}
+                </div>
+                <div>{formatBytes(s.cloud.size)}</div>
                 <div class="truncate text-xs text-muted-foreground" title={s.cloud.deviceId}>
                   from {s.cloud.deviceId}
                 </div>
@@ -239,17 +247,30 @@
               <Table.Header>
                 <Table.Row>
                   <Table.Head>Version</Table.Head>
-                  <Table.Head>Time</Table.Head>
+                  <Table.Head>Uploaded</Table.Head>
                   <Table.Head>Device</Table.Head>
                   <Table.Head>Size</Table.Head>
                   <Table.Head class="w-0"></Table.Head>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {#each versions.data ?? [] as v (v.version)}
-                  <Table.Row>
-                    <Table.Cell>v{v.version}</Table.Cell>
-                    <Table.Cell>{formatAbsolute(v.clientUpdatedAt)}</Table.Cell>
+                {#each [...(versions.data ?? [])].sort((a, b) => b.version - a.version) as v, i (v.version)}
+                  <Table.Row class={i === 0 ? 'bg-primary/5' : ''}>
+                    <Table.Cell>
+                      <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="font-medium">v{v.version}</span>
+                        {#if i === 0}<Badge>Latest</Badge>{/if}
+                        {#if v.version === s.baseVersion}<Badge variant="outline"
+                            >This machine</Badge
+                          >{/if}
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <div>{formatAbsolute(v.createdAt || v.clientUpdatedAt)}</div>
+                      <div class="text-xs text-muted-foreground">
+                        {formatRelative(v.createdAt || v.clientUpdatedAt)}
+                      </div>
+                    </Table.Cell>
                     <Table.Cell class="max-w-40 truncate" title={v.deviceId}
                       >{v.deviceId}</Table.Cell
                     >
