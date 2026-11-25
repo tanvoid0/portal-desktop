@@ -267,14 +267,26 @@ impl ExecutionService {
         execution_id: &str,
         events: Arc<dyn EventSink>,
     ) -> Result<Value, String> {
-        if self.is_running(execution_id) {
-            return Err("This run is still going; stop it before retrying.".to_string());
-        }
-        let exec = self
-            .execution_repo
-            .get_by_id(execution_id)
-            .await?
-            .ok_or_else(|| "Execution not found".to_string())?;
+        // The driver writes `failed` a moment before it frees its run slot, so an
+        // immediate Retry gives a failed run's driver up to 2s to leave.
+        let mut waits = 0;
+        let exec = loop {
+            // Slot before row: a row read first could predate the driver leaving.
+            let running = self.is_running(execution_id);
+            let exec = self
+                .execution_repo
+                .get_by_id(execution_id)
+                .await?
+                .ok_or_else(|| "Execution not found".to_string())?;
+            if !running {
+                break exec;
+            }
+            if exec.status != "failed" || waits == 100 {
+                return Err("This run is still going; stop it before retrying.".to_string());
+            }
+            waits += 1;
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        };
         if exec.status != "failed" {
             return Err(format!(
                 "Only a failed run can be retried (this one is {}).",
@@ -361,7 +373,7 @@ impl ExecutionService {
 
         // Reserve the run slot before the writes below, so two concurrent retries of
         // the same run cannot both drive it (which would, for a release, ship twice).
-        // The top `is_running` check is only a fast path; this is the real guard.
+        // The `is_running` wait at the top is only a courtesy; this is the real guard.
         let Some((cancel_rx, children)) =
             self.reserve_run(execution_id, project.path.clone(), false)
         else {
@@ -2490,7 +2502,18 @@ mod tests {
         assert!(!path.join("done.txt").exists(), "s3 must not run after s2 fails");
         assert_eq!(count_lines(), 1);
 
-        // Same run, retried: s1 is skipped, s2 now passes, s3 runs.
+        // Same run, retried: s1 is skipped, s2 now passes, s3 runs. The driver
+        // writes `failed` before it frees its slot; hold the slot a while so the
+        // retry always lands inside that gap.
+        while svc.is_running(&id) {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        assert!(svc.reserve_run(&id, String::new(), false).is_some());
+        let (held, held_id) = (svc.clone(), id.clone());
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            held.running.lock().unwrap().remove(&held_id);
+        });
         svc.retry_execution(&id, Arc::new(Quiet)).await.unwrap();
         let run = finished(&svc, &id).await;
         assert_eq!(run.status, "success");
