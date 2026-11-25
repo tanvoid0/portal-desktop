@@ -33,7 +33,7 @@ import { groupSessionsByProject } from '$lib/domains/agents/utils/groupSessions'
 
 const log = logger.createScoped('ProjectDetailsPage');
 
-const PROJECT_TABS = ['overview', 'apps', 'actions', 'env', 'terminal'] as const;
+const PROJECT_TABS = ['overview', 'apps', 'actions', 'env', 'backup', 'terminal'] as const;
 export type ProjectTab = (typeof PROJECT_TABS)[number];
 
 export class ProjectDetailState {
