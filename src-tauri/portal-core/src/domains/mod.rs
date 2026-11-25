@@ -23,6 +23,7 @@ pub mod scripts;
 pub mod sdk;
 pub mod settings;
 pub mod shared;
+pub mod sync;
 pub mod tasks;
 pub mod terminal;
 pub mod uninstaller;

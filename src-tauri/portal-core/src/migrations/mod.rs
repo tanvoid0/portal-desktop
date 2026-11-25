@@ -53,6 +53,7 @@ pub mod m20261118_000050_add_workflow_run_to_script_executions;
 pub mod m20261119_000051_unify_runs;
 pub mod m20261119_000052_catch_up_script_history;
 pub mod m20261120_000053_create_project_env_files_table;
+pub mod m20261125_000054_create_project_device_paths_table;
 pub mod runner;
 
 // Re-export all migrations for easy access
@@ -109,6 +110,7 @@ pub use m20261118_000050_add_workflow_run_to_script_executions::Migration as add
 pub use m20261119_000051_unify_runs::Migration as unifyRuns;
 pub use m20261119_000052_catch_up_script_history::Migration as catchUpScriptHistory;
 pub use m20261120_000053_create_project_env_files_table::Migration as createProjectEnvFilesTable;
+pub use m20261125_000054_create_project_device_paths_table::Migration as createProjectDevicePathsTable;
 
 pub struct Migrator;
 
@@ -199,5 +201,6 @@ pub fn get_migrations() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(unifyRuns),
         Box::new(catchUpScriptHistory),
         Box::new(createProjectEnvFilesTable),
+        Box::new(createProjectDevicePathsTable),
     ]
 }

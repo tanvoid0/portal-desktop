@@ -13,6 +13,7 @@ use base64::{engine::general_purpose, Engine as _};
 use chrono::Utc;
 use data_encoding::BASE32_NOPAD;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::super::entities::vault::{ActiveModel as VaultActive, Entity as VaultEntity};
@@ -24,8 +25,14 @@ use super::encryption_service::{
 use super::vault_session::VaultSession;
 
 const VAULT_ID: i32 = 1;
+const KEYCHAIN_KEY_NAME: &str = "credential-master-key-v1";
 const RECOVERY_KEY_BYTES: usize = 20;
 const RECOVERY_HKDF_INFO: &[u8] = b"portal-desktop-vault-recovery";
+
+/// Marker file in the data dir, written when a sync restore swaps in a vault from another
+/// device: this device's keychain key no longer matches the vault's master key. Cleared by
+/// the next password/recovery unlock, which re-seeds the keychain with the restored key.
+pub const KEYCHAIN_STALE_FLAG: &str = "vault_keychain_stale";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VaultState {
@@ -45,6 +52,7 @@ pub struct VaultService {
     db: DatabaseConnection,
     session: Arc<VaultSession>,
     encryption: EncryptionService,
+    data_dir: Option<PathBuf>,
 }
 
 impl VaultService {
@@ -53,6 +61,29 @@ impl VaultService {
             db,
             session,
             encryption: EncryptionService::new(),
+            data_dir: None,
+        }
+    }
+
+    /// Enables the post-restore stale-keychain check (see `KEYCHAIN_STALE_FLAG`).
+    pub fn with_data_dir(mut self, data_dir: &Path) -> Self {
+        self.data_dir = Some(data_dir.to_path_buf());
+        self
+    }
+
+    fn stale_flag(&self) -> Option<PathBuf> {
+        self.data_dir.as_ref().map(|d| d.join(KEYCHAIN_STALE_FLAG))
+    }
+
+    /// After a password/recovery unlock, replace a stale keychain key with the real one.
+    fn reseed_keychain(&self, mk: &[u8; 32]) {
+        let Some(flag) = self.stale_flag().filter(|f| f.exists()) else {
+            return;
+        };
+        let stored = keyring::Entry::new(crate::app_paths::app_identifier(), KEYCHAIN_KEY_NAME)
+            .and_then(|e| e.set_secret(mk));
+        if stored.is_ok() {
+            let _ = std::fs::remove_file(flag);
         }
     }
 
@@ -158,7 +189,9 @@ impl VaultService {
             })
             .map_err(|_| CredentialError::InvalidMasterPassword)?;
 
-        self.session.unlock(decode_mk(&mk_b64)?);
+        let mk = decode_mk(&mk_b64)?;
+        self.reseed_keychain(&mk);
+        self.session.unlock(mk);
         Ok(())
     }
 
@@ -166,6 +199,12 @@ impl VaultService {
     /// it only reads the keychain and unlocks the session. Async: blocking a
     /// tokio worker on the DB reads (`futures::executor::block_on`) could hang.
     pub async fn unlock_with_keychain(&self) -> Result<(), CredentialError> {
+        if self.stale_flag().is_some_and(|f| f.exists()) {
+            return Err(CredentialError::EncryptionFailed(
+                "this vault was restored from another device; unlock with your vault password once"
+                    .to_string(),
+            ));
+        }
         let exists = VaultEntity::find_by_id(VAULT_ID)
             .one(&self.db)
             .await?
@@ -238,6 +277,7 @@ impl VaultService {
         };
         active.update(&self.db).await?;
 
+        self.reseed_keychain(&mk);
         self.session.unlock(mk);
         Ok(())
     }
@@ -250,7 +290,7 @@ impl VaultService {
     /// only safe to mint a brand new random key when there is nothing encrypted under the
     /// old one to lose (see QA-049).
     fn read_keychain_master_key(credential_count: usize) -> Result<[u8; 32], CredentialError> {
-        const KEY_NAME: &str = "credential-master-key-v1";
+        const KEY_NAME: &str = KEYCHAIN_KEY_NAME;
 
         // A dev build keeps its own entry, so it can never overwrite the release's key.
         let entry =

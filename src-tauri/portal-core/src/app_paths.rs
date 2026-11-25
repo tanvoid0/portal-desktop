@@ -108,7 +108,17 @@ pub fn config_dir() -> PathBuf {
     dir
 }
 
-/// Copy every file in `src` into `dst`, skipping ones that already exist.
+/// Machine-local sync bookkeeping that must never be seeded into another data dir: it
+/// carries this device's identity and any in-flight restore.
+fn is_sync_local(name: &str) -> bool {
+    name == "sync_state.json"
+        || [".restore-pending", ".restore-meta", ".restore-incoming", ".pre-restore.bak"]
+            .iter()
+            .any(|m| name.contains(m))
+}
+
+/// Copy every file in `src` into `dst`, skipping ones that already exist (and sync
+/// bookkeeping, see `is_sync_local`).
 ///
 /// Shallow on purpose — both dirs hold flat files. The source is left in place so a
 /// partial migration can be retried by hand.
@@ -124,6 +134,9 @@ pub fn copy_files_into(src: &Path, dst: &Path) {
     for entry in entries.flatten() {
         let from = entry.path();
         if !from.is_file() {
+            continue;
+        }
+        if is_sync_local(&entry.file_name().to_string_lossy()) {
             continue;
         }
         let to = dst.join(entry.file_name());
@@ -179,6 +192,14 @@ mod tests {
         std::fs::write(src.path().join("portal_desktop.db"), b"old-main").unwrap();
         std::fs::write(src.path().join("disk_utility.db"), b"old-disk").unwrap();
         std::fs::create_dir(src.path().join("subdir")).unwrap();
+        for f in [
+            "sync_state.json",
+            "portal_desktop.db.restore-pending",
+            "portal_desktop.db.restore-meta",
+            "portal_desktop.db.pre-restore.bak-wal",
+        ] {
+            std::fs::write(src.path().join(f), b"x").unwrap();
+        }
         std::fs::write(dst.path().join("disk_utility.db"), b"already-here").unwrap();
 
         copy_files_into(src.path(), dst.path());
@@ -192,6 +213,12 @@ mod tests {
             std::fs::read(dst.path().join("disk_utility.db")).unwrap(),
             b"already-here"
         );
+
+        // Sync identity / restore bookkeeping is never seeded.
+        assert!(std::fs::read_dir(dst.path()).unwrap().all(|e| {
+            let n = e.unwrap().file_name().to_string_lossy().to_string();
+            !n.contains("sync_state") && !n.contains("restore")
+        }));
 
         // Shallow: directories are skipped, not recursed into.
         assert!(!dst.path().join("subdir").exists());

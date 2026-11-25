@@ -13,6 +13,7 @@
   import Download from '~icons/fa6-solid/download';
   import Languages from '~icons/fa6-solid/language';
   import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import Cloud from '~icons/fa6-solid/cloud';
   import FolderGit2 from '~icons/fa6-solid/folder-tree';
 
   // Sections with `subSections` are group labels, not links: their children are the pages.
@@ -76,6 +77,12 @@
       label: 'GitHub',
       icon: FolderGit2,
       path: '/settings/github',
+    },
+    {
+      id: 'sync' as const,
+      label: 'Online sync',
+      icon: Cloud,
+      path: '/settings/sync',
     },
     {
       id: 'theme' as const,

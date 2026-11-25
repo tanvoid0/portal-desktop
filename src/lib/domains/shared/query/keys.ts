@@ -55,6 +55,13 @@ export const queryKeys = {
     feed: (backendId: string) => ['agents', 'events', backendId] as const,
     analytics: (backendId: string) => ['agents', 'analytics', backendId] as const,
   },
+  sync: {
+    all: ['sync'] as const,
+    config: ['sync', 'config'] as const,
+    status: ['sync', 'status'] as const,
+    versions: ['sync', 'versions'] as const,
+    unresolved: ['sync', 'unresolved'] as const,
+  },
   database: {
     sources: ['database', 'sources'] as const,
     tables: (sourceId: string) => ['database', sourceId, 'tables'] as const,

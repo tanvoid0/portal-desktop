@@ -199,7 +199,8 @@ pub async fn vault_unlock_with_password(
     session: State<'_, Arc<VaultSession>>,
     prompter: State<'_, Arc<crate::domains::credentials::prompter::TauriVaultPrompter>>,
 ) -> Result<(), String> {
-    let service = VaultService::new(db.get_connection_clone(), session.inner().clone());
+    let service = VaultService::new(db.get_connection_clone(), session.inner().clone())
+        .with_data_dir(db.data_dir());
     service
         .unlock_with_password(&password)
         .await
@@ -235,7 +236,8 @@ pub async fn vault_unlock_with_hello(
         return Err("Windows Hello verification was not completed".to_string());
     }
 
-    let service = VaultService::new(db.get_connection_clone(), session.inner().clone());
+    let service = VaultService::new(db.get_connection_clone(), session.inner().clone())
+        .with_data_dir(db.data_dir());
     service
         .unlock_with_keychain()
         .await
@@ -273,7 +275,8 @@ pub async fn vault_reset_password(
     session: State<'_, Arc<VaultSession>>,
     prompter: State<'_, Arc<crate::domains::credentials::prompter::TauriVaultPrompter>>,
 ) -> Result<(), String> {
-    let service = VaultService::new(db.get_connection_clone(), session.inner().clone());
+    let service = VaultService::new(db.get_connection_clone(), session.inner().clone())
+        .with_data_dir(db.data_dir());
     service
         .reset_password(&recovery_key, &new_password)
         .await

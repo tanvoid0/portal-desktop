@@ -15,6 +15,7 @@ pub use project_entity::Model as ProjectModel;
 #[derive(Clone)]
 pub struct DatabaseManager {
     conn: DatabaseConnection,
+    data_dir: PathBuf,
 }
 
 impl DatabaseManager {
@@ -31,6 +32,9 @@ impl DatabaseManager {
 
         // Migrate legacy database from CWD-relative path if present
         Self::migrate_legacy_database(&data_dir);
+
+        // A restore staged by the previous run goes live here, before any pool exists.
+        crate::domains::sync::snapshot::apply_pending_restore(&data_dir);
 
         let db_path = data_dir.join("portal_desktop.db");
         let database_url = format!("sqlite://{}?mode=rwc", db_path.display());
@@ -56,7 +60,12 @@ impl DatabaseManager {
             "Database initialization completed successfully"
         );
 
-        Ok(DatabaseManager { conn })
+        Ok(DatabaseManager { conn, data_dir })
+    }
+
+    /// Directory holding `portal_desktop.db` (and the sync state/restore files).
+    pub fn data_dir(&self) -> &Path {
+        &self.data_dir
     }
 
     pub fn get_connection(&self) -> &DatabaseConnection {
