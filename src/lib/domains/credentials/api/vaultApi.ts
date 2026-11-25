@@ -39,6 +39,11 @@ export async function resetVaultPassword(recoveryKey: string, newPassword: strin
   });
 }
 
+/** Verifies the current password, then re-wraps the master key under the new one. */
+export async function changeVaultPassword(oldPassword: string, newPassword: string): Promise<void> {
+  await invokeClient.post<void>('vault_change_password', { oldPassword, newPassword });
+}
+
 /** Answer to the backend's `vault://unlock-requested`: releases commands waiting on the vault. */
 export async function settleVaultUnlock(ok: boolean): Promise<void> {
   await invokeClient.post<void>('vault_unlock_settled', { ok });

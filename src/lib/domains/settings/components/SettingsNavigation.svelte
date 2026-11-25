@@ -15,6 +15,7 @@
   import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
   import Cloud from '~icons/fa6-solid/cloud';
   import FolderGit2 from '~icons/fa6-solid/folder-tree';
+  import Lock from '~icons/fa6-solid/lock';
 
   // Sections with `subSections` are group labels, not links: their children are the pages.
   // `path` on a group is only used for the collapsed rail icon.
@@ -83,6 +84,12 @@
       label: 'Online sync',
       icon: Cloud,
       path: '/settings/sync',
+    },
+    {
+      id: 'vault' as const,
+      label: 'Vault',
+      icon: Lock,
+      path: '/settings/vault',
     },
     {
       id: 'theme' as const,

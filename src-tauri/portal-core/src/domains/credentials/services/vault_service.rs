@@ -1,13 +1,13 @@
 /**
- * Vault Service - setup, unlock, lock and password reset for the credential
- * master key (MK).
+ * Vault Service - setup, unlock, lock, password change and password reset for
+ * the credential master key (MK).
  *
  * MK itself never changes. It is stored wrapped two ways in the single-row
  * `vault` table: under a key derived from the master password (PBKDF2) and
  * under a key derived from the recovery key (HKDF). The OS keychain also
  * keeps a raw copy, gated by a Windows Hello consent check upstream of
- * `unlock_with_keychain`. Because MK never changes, a password reset never
- * touches the already-encrypted `credentials` rows.
+ * `unlock_with_keychain`. Because MK never changes, a password change or reset
+ * never touches the already-encrypted `credentials` rows.
  */
 use base64::{engine::general_purpose, Engine as _};
 use chrono::Utc;
@@ -16,7 +16,9 @@ use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use super::super::entities::vault::{ActiveModel as VaultActive, Entity as VaultEntity};
+use super::super::entities::vault::{
+    ActiveModel as VaultActive, Entity as VaultEntity, Model as VaultModel,
+};
 use super::super::entities::Entity as CredentialEntity;
 use super::super::CredentialError;
 use super::encryption_service::{
@@ -26,6 +28,8 @@ use super::vault_session::VaultSession;
 
 const VAULT_ID: i32 = 1;
 const KEYCHAIN_KEY_NAME: &str = "credential-master-key-v1";
+/// Shortest master password setup, reset and change accept (the UI forms enforce the same 8).
+const MIN_PASSWORD_LEN: usize = 8;
 const RECOVERY_KEY_BYTES: usize = 20;
 const RECOVERY_HKDF_INFO: &[u8] = b"portal-desktop-vault-recovery";
 
@@ -120,7 +124,7 @@ impl VaultService {
         mk: [u8; 32],
         password: &str,
     ) -> Result<String, CredentialError> {
-        if password.len() < 8 {
+        if password.len() < MIN_PASSWORD_LEN {
             return Err(CredentialError::InvalidMasterPassword);
         }
         if VaultEntity::find_by_id(VAULT_ID)
@@ -170,6 +174,20 @@ impl VaultService {
             .await?
             .ok_or(CredentialError::VaultNotSetUp)?;
 
+        let mk = self.unwrap_mk_with_password(&row, password)?;
+        self.reseed_keychain(&mk);
+        self.session.unlock(mk);
+        Ok(())
+    }
+
+    /// Unwraps MK with the master password, using the salt and iteration count stored in
+    /// `row`. Shared by unlock and password change so both verify a password the same way:
+    /// a wrong one fails the AEAD tag check and surfaces as `InvalidMasterPassword`.
+    fn unwrap_mk_with_password(
+        &self,
+        row: &VaultModel,
+        password: &str,
+    ) -> Result<[u8; 32], CredentialError> {
         let salt = general_purpose::STANDARD
             .decode(&row.pw_salt)
             .map_err(|e| CredentialError::DeserializationError(e.to_string()))?;
@@ -189,10 +207,7 @@ impl VaultService {
             })
             .map_err(|_| CredentialError::InvalidMasterPassword)?;
 
-        let mk = decode_mk(&mk_b64)?;
-        self.reseed_keychain(&mk);
-        self.session.unlock(mk);
-        Ok(())
+        decode_mk(&mk_b64)
     }
 
     /// Caller must already have Windows Hello consent before calling this —
@@ -230,7 +245,7 @@ impl VaultService {
         recovery_key: &str,
         new_password: &str,
     ) -> Result<(), CredentialError> {
-        if new_password.len() < 8 {
+        if new_password.len() < MIN_PASSWORD_LEN {
             return Err(CredentialError::InvalidMasterPassword);
         }
         let row = VaultEntity::find_by_id(VAULT_ID)
@@ -259,11 +274,48 @@ impl VaultService {
             .map_err(|_| CredentialError::InvalidRecoveryKey)?;
         let mk = decode_mk(&mk_b64)?;
 
+        self.rewrap_under_password(row, mk, new_password).await
+    }
+
+    /// Rotates the master password: verifies `old_password` exactly like
+    /// `unlock_with_password` (a wrong one is `InvalidMasterPassword` and nothing is written),
+    /// then re-wraps the SAME MK under `new_password`. MK is unchanged, so the `credentials`
+    /// rows are not re-encrypted: unwrapping MK with the old password and wrapping it with
+    /// the new one is the "decrypt with old, encrypt with new" step. `recovery_*` is
+    /// untouched, so the recovery key keeps working. Leaves the session unlocked.
+    pub async fn change_password(
+        &self,
+        old_password: &str,
+        new_password: &str,
+    ) -> Result<(), CredentialError> {
+        if new_password.len() < MIN_PASSWORD_LEN || new_password == old_password {
+            return Err(CredentialError::InvalidMasterPassword);
+        }
+        let row = VaultEntity::find_by_id(VAULT_ID)
+            .one(&self.db)
+            .await?
+            .ok_or(CredentialError::VaultNotSetUp)?;
+
+        let mk = self.unwrap_mk_with_password(&row, old_password)?;
+        self.rewrap_under_password(row, mk, new_password).await
+    }
+
+    /// Wraps MK under `new_password` with a fresh salt and the current iteration count,
+    /// writes the new password fields in one update (`recovery_*` carried over as is), then
+    /// re-seeds the keychain and unlocks the session. Shared by reset and change.
+    async fn rewrap_under_password(
+        &self,
+        row: VaultModel,
+        mk: [u8; 32],
+        new_password: &str,
+    ) -> Result<(), CredentialError> {
         let new_salt = self.encryption.generate_salt()?;
         let new_pw_key = self
             .encryption
             .derive_key(new_password, &new_salt, PBKDF2_ITERATIONS)?;
-        let new_wrapped = self.encryption.encrypt(&mk_b64, &new_pw_key)?;
+        let new_wrapped = self
+            .encryption
+            .encrypt(&general_purpose::STANDARD.encode(mk), &new_pw_key)?;
 
         let active = VaultActive {
             id: Set(row.id),
@@ -470,6 +522,138 @@ mod tests {
             .await
             .expect("decrypt after reset");
         assert_eq!(decrypted, "super-secret");
+    }
+
+    async fn vault_row(db: &DatabaseConnection) -> VaultModel {
+        VaultEntity::find_by_id(VAULT_ID)
+            .one(db)
+            .await
+            .expect("query vault")
+            .expect("vault row")
+    }
+
+    #[tokio::test]
+    async fn password_change_rewraps_same_mk_and_keeps_credentials_and_recovery_working() {
+        let db = test_db().await;
+        let session = Arc::new(VaultSession::default());
+        let vault = VaultService::new(db.clone(), session.clone());
+
+        let recovery = vault
+            .setup_with_master_key([7u8; 32], "password-one")
+            .await
+            .expect("setup");
+        let credentials = CredentialService::new(db.clone(), session.clone());
+        let created = credentials
+            .create_credential(CredentialCreateRequest {
+                name: "test".into(),
+                credential_type: "password".into(),
+                description: None,
+                tags: None,
+                value: "super-secret".into(),
+                fields: None,
+                metadata: None,
+                expires_at: None,
+            })
+            .await
+            .expect("create credential");
+        let before = vault_row(&db).await;
+
+        // Locked on purpose: the old password alone proves the right to rotate, and unlocks.
+        vault.lock();
+        vault
+            .change_password("password-one", "password-two")
+            .await
+            .expect("change password");
+        assert!(session.is_unlocked());
+
+        // Fresh salt and wrap, current iteration count; recovery fields and created_at untouched.
+        let after = vault_row(&db).await;
+        assert_ne!(after.pw_salt, before.pw_salt);
+        assert_ne!(after.pw_wrapped_mk, before.pw_wrapped_mk);
+        assert_eq!(after.pw_iterations, PBKDF2_ITERATIONS as i32);
+        assert_eq!(after.recovery_salt, before.recovery_salt);
+        assert_eq!(after.recovery_wrapped_mk, before.recovery_wrapped_mk);
+        assert_eq!(after.created_at, before.created_at);
+        assert_ne!(after.updated_at, before.updated_at);
+
+        vault.lock();
+        assert!(matches!(
+            vault.unlock_with_password("password-one").await,
+            Err(CredentialError::InvalidMasterPassword)
+        ));
+        vault
+            .unlock_with_password("password-two")
+            .await
+            .expect("unlock with new password");
+
+        // Same MK, so the row encrypted before the change still decrypts.
+        let decrypted = credentials
+            .decrypt_credential(&created.id)
+            .await
+            .expect("decrypt after change");
+        assert_eq!(decrypted, "super-secret");
+
+        // The recovery key still resets the password, and the credential still decrypts.
+        vault
+            .reset_password(&recovery, "password-three")
+            .await
+            .expect("reset with the original recovery key");
+        vault.lock();
+        vault
+            .unlock_with_password("password-three")
+            .await
+            .expect("unlock after reset");
+        let decrypted = credentials
+            .decrypt_credential(&created.id)
+            .await
+            .expect("decrypt after reset");
+        assert_eq!(decrypted, "super-secret");
+    }
+
+    #[tokio::test]
+    async fn password_change_with_wrong_old_password_leaves_the_vault_untouched() {
+        let db = test_db().await;
+        let session = Arc::new(VaultSession::default());
+        let vault = VaultService::new(db.clone(), session.clone());
+        vault
+            .setup_with_master_key([7u8; 32], "password-one")
+            .await
+            .expect("setup");
+        let before = vault_row(&db).await;
+
+        vault.lock();
+        assert!(matches!(
+            vault
+                .change_password("not-the-password", "password-two")
+                .await,
+            Err(CredentialError::InvalidMasterPassword)
+        ));
+        assert_eq!(vault_row(&db).await, before);
+        assert!(!session.is_unlocked());
+
+        vault
+            .unlock_with_password("password-one")
+            .await
+            .expect("old password still works");
+    }
+
+    #[tokio::test]
+    async fn password_change_rejects_a_short_or_unchanged_new_password() {
+        let db = test_db().await;
+        let vault = VaultService::new(db.clone(), Arc::new(VaultSession::default()));
+        vault
+            .setup_with_master_key([7u8; 32], "password-one")
+            .await
+            .expect("setup");
+        let before = vault_row(&db).await;
+
+        for new_password in ["short", "password-one"] {
+            assert!(matches!(
+                vault.change_password("password-one", new_password).await,
+                Err(CredentialError::InvalidMasterPassword)
+            ));
+        }
+        assert_eq!(vault_row(&db).await, before);
     }
 
     #[test]

@@ -612,6 +612,7 @@ pub fn run() {
             domains::credentials::commands::vault_lock,
             domains::credentials::commands::vault_unlock_settled,
             domains::credentials::commands::vault_reset_password,
+            domains::credentials::commands::vault_change_password,
             // Database explorer commands
             domains::database_explorer::commands::db_list_sources,
             domains::database_explorer::commands::db_open_sqlite,

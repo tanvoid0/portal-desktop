@@ -285,6 +285,27 @@ pub async fn vault_reset_password(
     Ok(())
 }
 
+/// Change the master password: the current one is verified, then the master key is re-wrapped
+/// under the new one. The master key itself is unchanged, so credentials are not re-encrypted
+/// and the recovery key keeps working. Leaves the vault unlocked.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn vault_change_password(
+    old_password: String,
+    new_password: String,
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+    prompter: State<'_, Arc<crate::domains::credentials::prompter::TauriVaultPrompter>>,
+) -> Result<(), String> {
+    let service = VaultService::new(db.get_connection_clone(), session.inner().clone())
+        .with_data_dir(db.data_dir());
+    service
+        .change_password(&old_password, &new_password)
+        .await
+        .map_err(|e| e.to_string())?;
+    prompter.settle(true);
+    Ok(())
+}
+
 /// Search credentials
 #[portal_rpc_macro::rpc]
 pub async fn search_credentials(
