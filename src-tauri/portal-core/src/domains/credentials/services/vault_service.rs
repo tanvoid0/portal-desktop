@@ -274,7 +274,7 @@ impl VaultService {
             .map_err(|_| CredentialError::InvalidRecoveryKey)?;
         let mk = decode_mk(&mk_b64)?;
 
-        self.rewrap_under_password(row, mk, new_password).await
+        self.rewrap_under_password(mk, new_password).await
     }
 
     /// Rotates the master password: verifies `old_password` exactly like
@@ -283,13 +283,20 @@ impl VaultService {
     /// rows are not re-encrypted: unwrapping MK with the old password and wrapping it with
     /// the new one is the "decrypt with old, encrypt with new" step. `recovery_*` is
     /// untouched, so the recovery key keeps working. Leaves the session unlocked.
+    ///
+    /// A too-short or unchanged new password is refused first, before any key derivation, with
+    /// its own error so it never reads as a wrong current password. Setup and reset keep
+    /// answering `InvalidMasterPassword` for a short one.
     pub async fn change_password(
         &self,
         old_password: &str,
         new_password: &str,
     ) -> Result<(), CredentialError> {
-        if new_password.len() < MIN_PASSWORD_LEN || new_password == old_password {
-            return Err(CredentialError::InvalidMasterPassword);
+        if new_password.len() < MIN_PASSWORD_LEN {
+            return Err(CredentialError::WeakPassword(MIN_PASSWORD_LEN));
+        }
+        if new_password == old_password {
+            return Err(CredentialError::PasswordUnchanged);
         }
         let row = VaultEntity::find_by_id(VAULT_ID)
             .one(&self.db)
@@ -297,15 +304,15 @@ impl VaultService {
             .ok_or(CredentialError::VaultNotSetUp)?;
 
         let mk = self.unwrap_mk_with_password(&row, old_password)?;
-        self.rewrap_under_password(row, mk, new_password).await
+        self.rewrap_under_password(mk, new_password).await
     }
 
-    /// Wraps MK under `new_password` with a fresh salt and the current iteration count,
-    /// writes the new password fields in one update (`recovery_*` carried over as is), then
-    /// re-seeds the keychain and unlocks the session. Shared by reset and change.
+    /// Wraps MK under `new_password` with a fresh salt and the current iteration count and
+    /// writes only the password fields (`pw_*`, `updated_at`) in one update: `recovery_*` and
+    /// `created_at` are not part of the statement, so nothing is rewritten from an earlier
+    /// read. Then re-seeds the keychain and unlocks the session. Shared by reset and change.
     async fn rewrap_under_password(
         &self,
-        row: VaultModel,
         mk: [u8; 32],
         new_password: &str,
     ) -> Result<(), CredentialError> {
@@ -318,14 +325,12 @@ impl VaultService {
             .encrypt(&general_purpose::STANDARD.encode(mk), &new_pw_key)?;
 
         let active = VaultActive {
-            id: Set(row.id),
+            id: Set(VAULT_ID),
             pw_salt: Set(general_purpose::STANDARD.encode(new_salt)),
             pw_iterations: Set(PBKDF2_ITERATIONS as i32),
             pw_wrapped_mk: Set(serde_json::to_string(&new_wrapped)?),
-            recovery_salt: Set(row.recovery_salt),
-            recovery_wrapped_mk: Set(row.recovery_wrapped_mk),
-            created_at: Set(row.created_at),
             updated_at: Set(Utc::now().to_rfc3339()),
+            ..Default::default()
         };
         active.update(&self.db).await?;
 
@@ -647,13 +652,125 @@ mod tests {
             .expect("setup");
         let before = vault_row(&db).await;
 
-        for new_password in ["short", "password-one"] {
-            assert!(matches!(
-                vault.change_password("password-one", new_password).await,
-                Err(CredentialError::InvalidMasterPassword)
-            ));
-        }
+        // Own variants, so neither reads as a wrong current password.
+        let weak = vault
+            .change_password("password-one", "short")
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            weak,
+            CredentialError::WeakPassword(MIN_PASSWORD_LEN)
+        ));
+        assert_eq!(
+            weak.to_string(),
+            "New password must be at least 8 characters"
+        );
+
+        let unchanged = vault
+            .change_password("password-one", "password-one")
+            .await
+            .unwrap_err();
+        assert!(matches!(unchanged, CredentialError::PasswordUnchanged));
+        assert_eq!(
+            unchanged.to_string(),
+            "New password must be different from the current one"
+        );
+
+        // Setup and reset still answer a short password with InvalidMasterPassword.
+        assert!(matches!(
+            vault.setup_with_master_key([1u8; 32], "short").await,
+            Err(CredentialError::InvalidMasterPassword)
+        ));
+        assert!(matches!(
+            vault.reset_password("irrelevant", "short").await,
+            Err(CredentialError::InvalidMasterPassword)
+        ));
+        // All of them fail before any key derivation, so the row is untouched.
         assert_eq!(vault_row(&db).await, before);
+    }
+
+    #[tokio::test]
+    async fn password_change_on_a_vault_that_is_not_set_up_fails() {
+        let vault = VaultService::new(test_db().await, Arc::new(VaultSession::default()));
+        assert!(matches!(
+            vault.change_password("password-one", "password-two").await,
+            Err(CredentialError::VaultNotSetUp)
+        ));
+    }
+
+    #[tokio::test]
+    async fn password_change_verifies_with_the_stored_iteration_count_and_writes_the_current_one() {
+        const LEGACY_ITERATIONS: u32 = 1_000;
+        let db = test_db().await;
+        let session = Arc::new(VaultSession::default());
+        let vault = VaultService::new(db.clone(), session.clone());
+        let mk = [7u8; 32];
+        vault
+            .setup_with_master_key(mk, "password-one")
+            .await
+            .expect("setup");
+        let credentials = CredentialService::new(db.clone(), session.clone());
+        let created = credentials
+            .create_credential(CredentialCreateRequest {
+                name: "test".into(),
+                credential_type: "password".into(),
+                description: None,
+                tags: None,
+                value: "super-secret".into(),
+                fields: None,
+                metadata: None,
+                expires_at: None,
+            })
+            .await
+            .expect("create credential");
+
+        // Rewrap under the same password with fewer rounds, as an older install stored it.
+        let row = vault_row(&db).await;
+        let salt = general_purpose::STANDARD
+            .decode(&row.pw_salt)
+            .expect("salt");
+        let legacy_key = vault
+            .encryption
+            .derive_key("password-one", &salt, LEGACY_ITERATIONS)
+            .expect("derive");
+        let legacy_wrap = vault
+            .encryption
+            .encrypt(&general_purpose::STANDARD.encode(mk), &legacy_key)
+            .expect("wrap");
+        let mut legacy: VaultActive = row.into();
+        legacy.pw_iterations = Set(LEGACY_ITERATIONS as i32);
+        legacy.pw_wrapped_mk = Set(serde_json::to_string(&legacy_wrap).expect("json"));
+        legacy.update(&db).await.expect("write legacy row");
+        assert_eq!(vault_row(&db).await.pw_iterations, LEGACY_ITERATIONS as i32);
+
+        vault.lock();
+        vault
+            .unlock_with_password("password-one")
+            .await
+            .expect("the legacy wrap unlocks with its stored count");
+
+        // Verified with the stored count (a fixed 600k would fail), written with the current one.
+        vault.lock();
+        vault
+            .change_password("password-one", "password-two")
+            .await
+            .expect("change password");
+        assert_eq!(vault_row(&db).await.pw_iterations, PBKDF2_ITERATIONS as i32);
+
+        vault.lock();
+        assert!(matches!(
+            vault.unlock_with_password("password-one").await,
+            Err(CredentialError::InvalidMasterPassword)
+        ));
+        vault
+            .unlock_with_password("password-two")
+            .await
+            .expect("unlock with new password");
+        let decrypted = credentials
+            .decrypt_credential(&created.id)
+            .await
+            .expect("decrypt after change");
+        assert_eq!(decrypted, "super-secret");
     }
 
     #[test]

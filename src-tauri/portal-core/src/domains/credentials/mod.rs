@@ -11,6 +11,10 @@ pub enum CredentialError {
     EncryptionFailed(String),
     DecryptionFailed(String),
     InvalidMasterPassword,
+    /// `change_password` pre-check: the new password is shorter than this many characters.
+    WeakPassword(usize),
+    /// `change_password` pre-check: the new password is the same as the current one.
+    PasswordUnchanged,
     InvalidRecoveryKey,
     VaultAlreadySetUp,
     VaultNotSetUp,
@@ -35,6 +39,12 @@ impl std::fmt::Display for CredentialError {
             CredentialError::EncryptionFailed(msg) => write!(f, "Encryption failed: {}", msg),
             CredentialError::DecryptionFailed(msg) => write!(f, "Decryption failed: {}", msg),
             CredentialError::InvalidMasterPassword => write!(f, "Invalid master password"),
+            CredentialError::WeakPassword(min) => {
+                write!(f, "New password must be at least {} characters", min)
+            }
+            CredentialError::PasswordUnchanged => {
+                write!(f, "New password must be different from the current one")
+            }
             CredentialError::InvalidRecoveryKey => write!(f, "Invalid recovery key"),
             CredentialError::VaultAlreadySetUp => write!(f, "Vault is already set up"),
             CredentialError::VaultNotSetUp => write!(f, "Vault is not set up"),

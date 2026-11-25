@@ -43,7 +43,9 @@
   let submitting = $state(false);
   let formError = $state<string | null>(null);
 
-  /** Flags only what the user has already typed into, so the form does not open in an error. */
+  /** Flags only what the user has already typed into, so the form does not open in an error.
+   *  The first two mirror the backend's `WeakPassword` / `PasswordUnchanged` messages, which
+   *  `formError` shows verbatim should one get through. */
   const problem = $derived.by(() => {
     if (newPassword && newPassword.length < MIN_PASSWORD_LENGTH)
       return `New password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
@@ -132,6 +134,7 @@
       {:else}
         <form
           class="space-y-4"
+          oninput={() => (formError = null)}
           onsubmit={(e) => {
             e.preventDefault();
             void handleSubmit();
@@ -172,6 +175,10 @@
             {submitting ? 'Changing…' : 'Change password'}
           </Button>
         </form>
+        <p class="text-sm text-muted-foreground">
+          Restoring an older backup or sync snapshot brings back the password that was current when
+          it was made. The recovery key is unchanged.
+        </p>
       {/if}
     </SettingsSection>
   </div>
