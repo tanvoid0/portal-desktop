@@ -283,7 +283,11 @@ pub async fn resolve_interrupted_move(
     let row = mv
         .resolve_interrupted_move(&id, action, &mut emit)
         .await
-        .map_err(describe_move_error)?;
+        .map_err(|e| {
+            let msg = describe_move_error(e);
+            crate::log_warn!("Moves", "resolve_interrupted_move: failed move {}: {}", id, msg);
+            msg
+        })?;
     control.cancelled.lock().unwrap().remove(&id);
     Ok(row.map(|r| MoveSummary::from_row(r, false, false)))
 }
@@ -399,7 +403,11 @@ pub async fn remove_moved_source(
         pipelines_repo: &pipelines_repo,
         moves_dir: moves_dir(&app)?,
     };
-    mv.remove_moved_source(&id).await.map_err(describe_move_error)
+    mv.remove_moved_source(&id).await.map_err(|e| {
+        let msg = describe_move_error(e);
+        crate::log_warn!("Moves", "remove_moved_source: failed move {}: {}", id, msg);
+        msg
+    })
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
