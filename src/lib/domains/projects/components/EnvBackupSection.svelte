@@ -30,6 +30,21 @@
   import { createEnvBackupScanQuery } from '../queries/envBackupQueries';
   import type { EnvBackupFile, EnvFileState, EnvItemResult, EnvOutcome } from '../generated';
 
+  interface Props {
+    /** When set, scope the whole view to this one project (its id in `scan.files`). */
+    projectId?: number;
+    /** Required with `projectId` to scope the "not backed up" footer, which is a string. */
+    projectName?: string;
+    title?: string;
+    description?: string;
+  }
+  let {
+    projectId,
+    projectName,
+    title = 'Project env files',
+    description = "Back up each project's .env files into the vault, encrypted, and write them back on this or another machine. They are never sent anywhere unencrypted.",
+  }: Props = $props();
+
   const stateUi: Record<EnvFileState, { label: string; variant: BadgeVariant }> = {
     new: { label: 'Not backed up', variant: 'secondary' },
     inSync: { label: 'In sync', variant: 'outline' },
@@ -58,7 +73,15 @@
   /** The last run, minus the rows where nothing happened. */
   let lastRun = $state<EnvItemResult[]>([]);
 
-  const files = $derived(scan?.files ?? []);
+  const files = $derived(
+    (scan?.files ?? []).filter((f) => projectId == null || f.projectId === projectId)
+  );
+  /** `scan.skipped` is `projectName/rel (why)` strings; scope by name prefix for one project. */
+  const skipped = $derived(
+    (scan?.skipped ?? []).filter(
+      (s) => projectId == null || (!!projectName && s.startsWith(`${projectName}/`))
+    )
+  );
   const rows = $derived.by(() => {
     const q = filter.trim().toLowerCase();
     return q
@@ -188,11 +211,7 @@
     });
 </script>
 
-<SettingsSection
-  title="Project env files"
-  description="Back up each project's .env files into the vault, encrypted, and write them back on this or another machine. They are never sent anywhere unencrypted."
-  icon={FileLines}
->
+<SettingsSection {title} {description} icon={FileLines}>
   {#if scanQuery.isPending}
     <PageLoading message="Scanning projects..." />
   {:else if !scan}
@@ -246,7 +265,9 @@
 
     {#if files.length === 0}
       <p class="text-sm text-muted-foreground">
-        No .env files found in your projects, and none in the vault.
+        {projectId == null
+          ? 'No .env files found in your projects, and none in the vault.'
+          : 'No .env files in this project, and none in the vault.'}
       </p>
     {:else if rows.length === 0}
       <p class="text-sm text-muted-foreground">Nothing matches that filter.</p>
@@ -325,13 +346,13 @@
       </div>
     {/if}
 
-    {#if scan.skipped.length > 0}
+    {#if skipped.length > 0}
       <p class="text-sm text-muted-foreground">
-        Not backed up (not UTF-8 text, or over 1 MiB): {scan.skipped.join(', ')}.
+        Not backed up (not UTF-8 text, or over 1 MiB): {skipped.join(', ')}.
       </p>
     {/if}
 
-    {#if scan.unmatched.length > 0}
+    {#if projectId == null && scan.unmatched.length > 0}
       <p class="text-sm text-muted-foreground">
         {scan.unmatched.length} vault {scan.unmatched.length === 1
           ? 'entry belongs'

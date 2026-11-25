@@ -11,6 +11,7 @@
   import Layers from '~icons/fa6-solid/layer-group';
   import Workflow from '~icons/fa6-solid/diagram-project';
   import FileKey from '~icons/fa6-solid/key';
+  import BoxArchive from '~icons/fa6-solid/box-archive';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { ProjectTerminal } from '$lib/domains/terminal';
   import ProjectSummary from '$lib/domains/projects/components/ProjectSummary.svelte';
@@ -19,6 +20,7 @@
   import ProjectTechStack from '$lib/domains/projects/components/ProjectTechStack.svelte';
   import ProjectGitCard from '$lib/domains/projects/components/ProjectGitCard.svelte';
   import ProjectEnv from '$lib/domains/projects/components/ProjectEnv.svelte';
+  import EnvBackupSection from '$lib/domains/projects/components/EnvBackupSection.svelte';
   import ProjectActionsPanel from '$lib/domains/actions/components/ProjectActionsPanel.svelte';
   import { PageHeader, PageLoading, PageError, ResponsivePanel } from '$lib/components/shell';
   import { Badge } from '$lib/components/ui/badge';
@@ -104,6 +106,10 @@
               <FileKey class="h-4 w-4" />
               Env
             </TabsTrigger>
+            <TabsTrigger value="backup" class="gap-2">
+              <BoxArchive class="h-4 w-4" />
+              Backup
+            </TabsTrigger>
             <TabsTrigger value="terminal" class="gap-2">
               <Terminal class="h-4 w-4" />
               Terminal
@@ -145,6 +151,15 @@
               projectId={Number(currentProject.id)}
               projectPath={currentProject.path}
               enabled={d.activeTab === 'env'}
+            />
+          </TabsContent>
+
+          <TabsContent value="backup" class="mt-6">
+            <EnvBackupSection
+              projectId={Number(currentProject.id)}
+              projectName={currentProject.name}
+              title="Env file backup"
+              description="Back up this project's .env files into the vault, encrypted, and restore them on this or another machine. They are never sent anywhere unencrypted."
             />
           </TabsContent>
 
