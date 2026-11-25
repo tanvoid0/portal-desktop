@@ -10,7 +10,10 @@ use tauri::State;
 
 use crate::database::DatabaseManager;
 use crate::domains::credentials::services::VaultSession;
-use crate::domains::projects::env::{EnvLinkView, ProjectEnv, ProjectEnvService};
+use crate::domains::projects::env::{
+    EnvBackupReport, EnvBackupScan, EnvBackupService, EnvFileRef, EnvLinkView, EnvRestoreItem,
+    ProjectEnv, ProjectEnvService,
+};
 
 #[portal_rpc_macro::rpc(local_only)]
 pub async fn get_project_env(
@@ -82,6 +85,44 @@ pub async fn remove_project_env_file(
 ) -> Result<(), String> {
     ProjectEnvService::new(&db, session.inner().clone())
         .remove_file(project_id, rel_path)
+        .await
+}
+
+/// Env files on disk next to their vault copies. Read-only and never prompts for the vault:
+/// with it locked, rows that exist on both sides come back `unknown`.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn env_backup_scan(
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<EnvBackupScan, String> {
+    EnvBackupService::new(db.get_connection_clone(), session.inner().clone())
+        .scan()
+        .await
+}
+
+/// Disk to vault: `files = None` backs up every env file found, otherwise only those listed.
+/// Prompts for the vault once, up front.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn env_backup_import(
+    files: Option<Vec<EnvFileRef>>,
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<EnvBackupReport, String> {
+    EnvBackupService::new(db.get_connection_clone(), session.inner().clone())
+        .import(files)
+        .await
+}
+
+/// Vault to disk. Creates missing files; a differing file is reported as a conflict and
+/// replaced only for an item sent with `overwrite: true`. Prompts for the vault once.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn env_backup_restore(
+    items: Vec<EnvRestoreItem>,
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<EnvBackupReport, String> {
+    EnvBackupService::new(db.get_connection_clone(), session.inner().clone())
+        .restore(items)
         .await
 }
 
