@@ -14,7 +14,7 @@
   import { toast } from '$lib/utils/toast';
   import { getErrorMessage } from '$lib/utils/errorMessage';
   import { queryKeys } from '$lib/domains/shared/query/keys';
-  import { setSyncConfig } from '../api/syncApi';
+  import { setSyncConfig, syncLogin } from '../api/syncApi';
 
   interface Props {
     open: boolean;
@@ -27,16 +27,24 @@
   const client = useQueryClient();
   let url = $state('');
   let token = $state('');
+  let email = $state('');
+  let password = $state('');
 
   $effect(() => {
     if (open) {
       url = serverUrl;
       token = '';
+      email = '';
+      password = '';
     }
   });
 
+  // Email + password wins: it yields a refreshable session. The pasted token is the fallback.
   const save = createMutation(() => ({
-    mutationFn: () => setSyncConfig(url.trim(), token.trim() || undefined),
+    mutationFn: () =>
+      email.trim() && password
+        ? syncLogin(url.trim(), email.trim(), password)
+        : setSyncConfig(url.trim(), token.trim() || undefined),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: queryKeys.sync.all });
       toast.success('Sync server saved');
@@ -60,7 +68,21 @@
         <Input id="sync-url" bind:value={url} placeholder="https://sync.example.com" />
       </div>
       <div class="space-y-1.5">
-        <Label for="sync-token">Access token</Label>
+        <Label for="sync-email">Email</Label>
+        <Input id="sync-email" type="email" bind:value={email} autocomplete="username" />
+      </div>
+      <div class="space-y-1.5">
+        <Label for="sync-password">Password</Label>
+        <Input
+          id="sync-password"
+          type="password"
+          bind:value={password}
+          autocomplete="current-password"
+          placeholder={hasToken ? 'Logged in - leave blank to keep' : ''}
+        />
+      </div>
+      <div class="space-y-1.5">
+        <Label for="sync-token">Or paste an access token</Label>
         <Input
           id="sync-token"
           type="password"

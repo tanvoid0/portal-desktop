@@ -9,6 +9,7 @@ use super::{paths, snapshot};
 
 const STATE_FILE: &str = "sync_state.json";
 const TOKEN_KEY: &str = "sync-token";
+const REFRESH_KEY: &str = "sync-refresh-token";
 
 /// Serializes push/pull so two runs never stage, build or save state at once.
 static SYNC_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -86,18 +87,48 @@ pub struct SyncService {
     data_dir: PathBuf,
 }
 
-fn token_entry() -> Result<keyring::Entry, String> {
-    keyring::Entry::new(crate::app_paths::app_identifier(), TOKEN_KEY)
+fn entry(key: &str) -> Result<keyring::Entry, String> {
+    keyring::Entry::new(crate::app_paths::app_identifier(), key)
         .map_err(|e| format!("Keychain access failed: {e}"))
 }
 
-fn get_token() -> Option<String> {
-    token_entry()
-        .ok()?
-        .get_password()
-        .ok()
-        .filter(|t| !t.is_empty())
+fn get_secret(key: &str) -> Option<String> {
+    entry(key).ok()?.get_password().ok().filter(|t| !t.is_empty())
 }
+
+fn get_token() -> Option<String> {
+    get_secret(TOKEN_KEY)
+}
+
+fn put_secret(key: &str, v: &str) -> Result<(), String> {
+    entry(key)?
+        .set_password(v)
+        .map_err(|e| format!("Failed to store token: {e}"))
+}
+
+/// Token pair as `/api/auth/refresh` returns it (and as `/api/auth/login` nests it under `tokens`).
+#[derive(Deserialize)]
+struct Tokens {
+    access_token: String,
+    refresh_token: String,
+}
+
+fn store_tokens(t: &Tokens) -> Result<(), String> {
+    put_secret(TOKEN_KEY, &t.access_token)?;
+    put_secret(REFRESH_KEY, &t.refresh_token)
+}
+
+fn parse_login(body: &str) -> Result<Tokens, String> {
+    #[derive(Deserialize)]
+    struct R {
+        tokens: Tokens,
+    }
+    serde_json::from_str::<R>(body)
+        .map(|r| r.tokens)
+        .map_err(|e| format!("Unexpected login response: {e}"))
+}
+
+const RELOGIN: &str = "Sync server error 401: session expired, log in again";
 
 /// Modified time (latest of db and -wal) and size (sum): WAL mode keeps recent writes in the
 /// -wal file, so the main file alone looks stale.
@@ -176,11 +207,64 @@ impl SyncService {
         s.server_url = server_url.trim().trim_end_matches('/').to_string();
         self.save(&s)?;
         if let Some(t) = token.filter(|t| !t.is_empty()) {
-            token_entry()?
-                .set_password(&t)
-                .map_err(|e| format!("Failed to store token: {e}"))?;
+            put_secret(TOKEN_KEY, &t)?;
+            // A pasted token has no refresh pair; drop the old one so it can't swap sessions.
+            let _ = entry(REFRESH_KEY)?.delete_credential();
         }
         Ok(())
+    }
+
+    /// Email+password login: stores access and refresh tokens, never the password.
+    pub async fn login(
+        &self,
+        server_url: String,
+        email: String,
+        password: String,
+    ) -> Result<(), String> {
+        let this = Self::new(&self.data_dir);
+        let url = server_url.clone();
+        tokio::task::spawn_blocking(move || this.set_config(url, None))
+            .await
+            .map_err(|e| e.to_string())??;
+        let url = server_url.trim().trim_end_matches('/');
+        let r = reqwest::Client::new()
+            .post(format!("{url}/api/auth/login"))
+            .json(&serde_json::json!({ "email": email.trim(), "password": password }))
+            .send()
+            .await
+            .map_err(|e| format!("{UNREACHABLE}: {e}"))?;
+        match r.status().as_u16() {
+            200 | 201 => {}
+            400 | 401 => return Err("Invalid email or password".into()),
+            c => return Err(format!("Sync server error {c}")),
+        }
+        let tokens = parse_login(&r.text().await.map_err(|e| e.to_string())?)?;
+        tokio::task::spawn_blocking(move || store_tokens(&tokens))
+            .await
+            .map_err(|e| e.to_string())?
+    }
+
+    /// Exchange the stored refresh token for a new pair; returns the new access token.
+    async fn refresh(&self, client: &reqwest::Client, s: &SyncState) -> Result<String, String> {
+        let rt = tokio::task::spawn_blocking(|| get_secret(REFRESH_KEY))
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or(RELOGIN)?;
+        let r = client
+            .post(format!("{}/api/auth/refresh", s.server_url))
+            .json(&serde_json::json!({ "refresh_token": rt }))
+            .send()
+            .await
+            .map_err(|e| format!("{UNREACHABLE}: {e}"))?;
+        if !r.status().is_success() {
+            return Err(RELOGIN.into());
+        }
+        let t: Tokens = r.json().await.map_err(|e| e.to_string())?;
+        let access = t.access_token.clone();
+        tokio::task::spawn_blocking(move || store_tokens(&t))
+            .await
+            .map_err(|e| e.to_string())??;
+        Ok(access)
     }
 
     fn local_info(&self, s: &SyncState) -> LocalInfo {
@@ -192,12 +276,15 @@ impl SyncService {
         }
     }
 
+    /// Sends the request with the stored token; on a 401 refreshes once and retries once.
+    /// `f` decorates the builder (query, body) and may run twice.
     async fn request(
         &self,
         s: &SyncState,
         method: reqwest::Method,
         path: &str,
-    ) -> Result<reqwest::RequestBuilder, String> {
+        f: impl Fn(reqwest::RequestBuilder) -> reqwest::RequestBuilder,
+    ) -> Result<reqwest::Response, String> {
         let token = tokio::task::spawn_blocking(get_token)
             .await
             .map_err(|e| e.to_string())?;
@@ -208,18 +295,29 @@ impl SyncService {
             .timeout(std::time::Duration::from_secs(300))
             .build()
             .map_err(|e| e.to_string())?;
-        Ok(client
-            .request(method, format!("{}{}", s.server_url, path))
-            .bearer_auth(token.unwrap_or_default()))
+        let url = format!("{}{}", s.server_url, path);
+        let send = |t: String| {
+            f(client.request(method.clone(), &url).bearer_auth(t)).send()
+        };
+        let r = send(token.unwrap_or_default())
+            .await
+            .map_err(|e| format!("{UNREACHABLE}: {e}"))?;
+        if r.status().as_u16() != 401 {
+            return Ok(r);
+        }
+        let r = send(self.refresh(&client, s).await?)
+            .await
+            .map_err(|e| format!("{UNREACHABLE}: {e}"))?;
+        if r.status().as_u16() == 401 {
+            return Err(RELOGIN.into());
+        }
+        Ok(r)
     }
 
     async fn latest(&self, s: &SyncState) -> Result<Option<SnapshotRecord>, String> {
         let r = self
-            .request(s, reqwest::Method::GET, "/api/sync/snapshot/latest")
-            .await?
-            .send()
-            .await
-            .map_err(|e| format!("{UNREACHABLE}: {e}"))?;
+            .request(s, reqwest::Method::GET, "/api/sync/snapshot/latest", |b| b)
+            .await?;
         match r.status().as_u16() {
             404 => Ok(None),
             200 => Ok(Some(r.json().await.map_err(|e| e.to_string())?)),
@@ -262,11 +360,8 @@ impl SyncService {
         }
         let s = self.load()?;
         let r = self
-            .request(&s, reqwest::Method::GET, "/api/sync/snapshot/versions")
-            .await?
-            .send()
-            .await
-            .map_err(|e| format!("{UNREACHABLE}: {e}"))?;
+            .request(&s, reqwest::Method::GET, "/api/sync/snapshot/versions", |b| b)
+            .await?;
         if !r.status().is_success() {
             return Err(format!("Sync server error {}", r.status().as_u16()));
         }
@@ -303,14 +398,12 @@ impl SyncService {
             q.push(("force", "true".into()));
         }
         let r = self
-            .request(&s, reqwest::Method::POST, "/api/sync/snapshot")
-            .await?
-            .query(&q)
-            .header("content-type", "application/octet-stream")
-            .body(blob)
-            .send()
-            .await
-            .map_err(|e| format!("{UNREACHABLE}: {e}"))?;
+            .request(&s, reqwest::Method::POST, "/api/sync/snapshot", |b| {
+                b.query(&q)
+                    .header("content-type", "application/octet-stream")
+                    .body(blob.clone())
+            })
+            .await?;
         match r.status().as_u16() {
             200 | 201 => {
                 let record: SnapshotRecord = r.json().await.map_err(|e| e.to_string())?;
@@ -363,11 +456,9 @@ impl SyncService {
                 &s,
                 reqwest::Method::GET,
                 &format!("/api/sync/snapshot/{}/download", record.version),
+                |b| b,
             )
-            .await?
-            .send()
-            .await
-            .map_err(|e| format!("{UNREACHABLE}: {e}"))?;
+            .await?;
         if !r.status().is_success() {
             return Err(format!("Sync server error {}", r.status().as_u16()));
         }
@@ -432,6 +523,16 @@ mod tests {
             .await
             .unwrap_err();
         assert!(e.contains("Restart Portal"), "{e}");
+    }
+
+    #[test]
+    fn login_response_yields_both_tokens() {
+        let t = parse_login(
+            r#"{"user":{"id":"1","email":"a@b.c"},"tokens":{"access_token":"A","refresh_token":"R","token_type":"bearer"}}"#,
+        )
+        .unwrap();
+        assert_eq!((t.access_token.as_str(), t.refresh_token.as_str()), ("A", "R"));
+        assert!(parse_login(r#"{"access_token":"A"}"#).is_err());
     }
 
     #[test]

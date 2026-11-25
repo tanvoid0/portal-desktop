@@ -60,14 +60,16 @@ pub fn resolve_for_device(file: &Path, device_id: &str) -> Result<u32, String> {
         return Ok(0);
     }
     let e = |x: rusqlite::Error| format!("resolve project paths: {x}");
-    let projects: Vec<(i64, String)> = c
-        .prepare("SELECT id, path FROM projects")
+    let projects: Vec<(i64, String, Option<String>)> = c
+        .prepare("SELECT id, path, git_repository FROM projects")
         .map_err(e)?
-        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
         .map_err(e)?
         .collect::<Result<_, _>>()
         .map_err(e)?;
-    for (id, path) in projects {
+    // Scanned on first need only: most restores never reach the remote-match fallback.
+    let mut repos: Option<Vec<(String, String)>> = None;
+    for (id, path, remote) in projects {
         let own: Option<String> = c
             .query_row(
                 "SELECT status FROM project_device_paths WHERE project_id=?1 AND device_id=?2",
@@ -94,9 +96,24 @@ pub fn resolve_for_device(file: &Path, device_id: &str) -> Result<u32, String> {
                 .map_err(e)?;
             }
             None => {
-                // ponytail: same-path check only; folder-name/git-remote matching against
-                // discovery roots is left to the user-triggered discovery + manual resolve.
-                if !path.is_empty() && Path::new(&path).is_dir() {
+                // Same path exists here, else the one discovery-root repo whose origin matches.
+                // ponytail: no folder-name matching; 2+ remote matches stay unresolved.
+                let found = if !path.is_empty() && Path::new(&path).is_dir() {
+                    Some(path)
+                } else {
+                    remote.as_deref().map(normalize_remote).filter(|r| !r.is_empty()).and_then(|r| {
+                        let mut hits: Vec<&String> = repos
+                            .get_or_insert_with(local_repos)
+                            .iter()
+                            .filter(|(n, _)| *n == r)
+                            .map(|(_, p)| p)
+                            .collect();
+                        hits.dedup();
+                        (hits.len() == 1).then(|| hits[0].clone())
+                    })
+                };
+                if let Some(p) = found {
+                    c.execute("UPDATE projects SET path=?2 WHERE id=?1", params![id, p]).map_err(e)?;
                     upsert_row(&c, id, device_id, RESOLVED).map_err(e)?;
                 } else {
                     c.execute("UPDATE projects SET path='' WHERE id=?1", [id]).map_err(e)?;
@@ -105,6 +122,48 @@ pub fn resolve_for_device(file: &Path, device_id: &str) -> Result<u32, String> {
         }
     }
     unresolved_count(&c, device_id).map_err(e)
+}
+
+/// `host/owner/repo` with scheme, user, port, `.git` and trailing slash gone and the host
+/// lowercased, so ssh and https forms of one remote compare equal.
+pub fn normalize_remote(url: &str) -> String {
+    let u = url.trim();
+    let scheme = u.contains("://");
+    let mut rest = u.split_once("://").map_or(u, |(_, r)| r);
+    if let Some((auth, r)) = rest.split_once('@') {
+        if !auth.contains('/') {
+            rest = r;
+        }
+    }
+    let Some(i) = rest.find(['/', ':']) else {
+        return String::new();
+    };
+    let (host, mut path) = (&rest[..i], &rest[i + 1..]);
+    if scheme && rest[i..].starts_with(':') {
+        path = path.split_once('/').map_or("", |x| x.1); // drop the port
+    }
+    let path = path.trim_matches('/');
+    let path = path.strip_suffix(".git").unwrap_or(path).trim_end_matches('/');
+    format!("{}/{path}", host.to_lowercase())
+}
+
+/// (normalised origin, abs path) for every git repo under the saved discovery roots.
+fn local_repos() -> Vec<(String, String)> {
+    use crate::domains::projects::discovery::{git, scan, state};
+    let cfg = scan::DiscoveryConfig {
+        skip_git: true,
+        ..state::load().config
+    };
+    scan::discover(&cfg, |_| true)
+        .projects
+        .into_iter()
+        .flat_map(|p| p.modules)
+        .filter(|m| m.git)
+        .filter_map(|m| {
+            let r = normalize_remote(&git::remote_url(Path::new(&m.abs))?);
+            (!r.is_empty()).then_some((r, m.abs))
+        })
+        .collect()
 }
 
 fn unresolved_count(c: &Connection, device_id: &str) -> rusqlite::Result<u32> {
@@ -241,6 +300,19 @@ mod tests {
         // Back on A: own row applies exactly.
         assert_eq!(resolve_for_device(&db, "A").unwrap(), 0);
         assert_eq!(path_of(&db), a_dir.to_str().unwrap());
+    }
+
+    #[test]
+    fn remote_forms_normalise_alike() {
+        for u in [
+            "git@GitHub.com:Acme/Repo.git",
+            "https://github.com/Acme/Repo.git/",
+            "ssh://git@github.com:22/Acme/Repo",
+            "https://user@GITHUB.com/Acme/Repo",
+        ] {
+            assert_eq!(normalize_remote(u), "github.com/Acme/Repo", "{u}");
+        }
+        assert_eq!(normalize_remote("nonsense"), "");
     }
 
     #[test]

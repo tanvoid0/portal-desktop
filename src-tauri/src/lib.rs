@@ -760,6 +760,7 @@ pub fn run() {
             domains::settings::commands::import_settings_command,
             domains::sync::commands::sync_get_config,
             domains::sync::commands::sync_set_config,
+            domains::sync::commands::sync_login,
             domains::sync::commands::sync_status,
             domains::sync::commands::sync_list_versions,
             domains::sync::commands::sync_push,

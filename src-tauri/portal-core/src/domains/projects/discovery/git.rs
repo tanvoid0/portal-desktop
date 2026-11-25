@@ -73,6 +73,11 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
     }
 }
 
+/// `origin` URL only -- skips the expensive parts of `probe`.
+pub fn remote_url(dir: &Path) -> Option<String> {
+    git(dir, &["remote", "get-url", "origin"])
+}
+
 fn git_count(dir: &Path, args: &[&str]) -> Option<i64> {
     git(dir, args).and_then(|s| s.trim().parse::<i64>().ok())
 }

@@ -37,6 +37,17 @@ pub async fn sync_set_config(
     blocking(move || s.set_config(server_url, token)).await
 }
 
+/// Email+password login; the password is never stored.
+#[portal_rpc_macro::rpc]
+pub async fn sync_login(
+    server_url: String,
+    email: String,
+    password: String,
+    db: State<'_, Arc<DatabaseManager>>,
+) -> Result<(), String> {
+    svc(&db).login(server_url, email, password).await
+}
+
 #[portal_rpc_macro::rpc]
 pub async fn sync_status(db: State<'_, Arc<DatabaseManager>>) -> Result<SyncStatus, String> {
     svc(&db).status().await
