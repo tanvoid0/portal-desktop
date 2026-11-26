@@ -1,5 +1,13 @@
 # Portal Desktop - Release Notes
 
+## Version 0.23.0
+
+### Highlights
+
+- Sync all projects: one-click fetch, ff-only pull, allowlisted push (push_ok), env vault backup + DB snapshot, behind a progress sheet
+
+---
+
 ## Version 0.22.0
 
 ### Highlights
