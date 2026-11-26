@@ -202,14 +202,24 @@ fn git_net(dir: &Path, args: &[&str], cancel: &AtomicBool) -> Result<String, Str
     if status.success() {
         Ok(out.trim().to_string())
     } else {
-        Err(err
-            .lines()
-            .rev()
-            .map(str::trim)
-            .find(|l| !l.is_empty())
-            .unwrap_or("git failed")
-            .to_string())
+        Err(error_line(&err))
     }
+}
+
+/// The line of git's stderr that says what went wrong: the first `fatal:` /
+/// `error:` one (the last line is often advice, e.g. "and the repository
+/// exists."), else the last non-empty line.
+fn error_line(stderr: &str) -> String {
+    let lines = || stderr.lines().map(str::trim).filter(|l| !l.is_empty());
+    lines()
+        .find(|l| {
+            ["fatal:", "error:", "ERROR:"]
+                .iter()
+                .any(|p| l.starts_with(p))
+        })
+        .or_else(|| lines().last())
+        .unwrap_or("git failed")
+        .to_string()
 }
 
 /// Fetches the upstream's remote, else `origin`.
@@ -228,8 +238,9 @@ pub fn ahead_behind(dir: &Path) -> Option<(i64, i64)> {
 }
 
 /// Fast-forwards to the already-fetched upstream; never creates a merge commit.
-pub fn git_pull_ff_only(dir: &Path, cancel: &AtomicBool) -> Result<(), String> {
-    git_net(dir, &["merge", "--ff-only", "@{u}"], cancel).map(|_| ())
+/// Not cancellable: killing a checkout half-way leaves a stale `index.lock`.
+pub fn git_pull_ff_only(dir: &Path) -> Result<(), String> {
+    git_net(dir, &["merge", "--ff-only", "@{u}"], &AtomicBool::new(false)).map(|_| ())
 }
 
 /// Pushes the current branch (never forced). Returns the branch pushed.
@@ -260,5 +271,21 @@ pub fn busy(dir: &Path) -> Option<&'static str> {
         Some("detached HEAD")
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::error_line;
+
+    #[test]
+    fn sync_all_error_line_prefers_the_cause() {
+        let ssh = "git@github.com: Permission denied (publickey).\n\
+                   fatal: Could not read from remote repository.\n\n\
+                   Please make sure you have the correct access rights\n\
+                   and the repository exists.\n";
+        assert_eq!(error_line(ssh), "fatal: Could not read from remote repository.");
+        assert_eq!(error_line("one\ntwo\n\n"), "two");
+        assert_eq!(error_line(""), "git failed");
     }
 }

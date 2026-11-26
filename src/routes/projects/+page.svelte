@@ -296,7 +296,7 @@
       return;
     }
     // A cancelled unlock still proceeds; the env phase then reports the vault as locked.
-    await vaultGate.ensureUnlocked('Unlock to back up env files');
+    await vaultGate.ensureUnlocked('Unlock to back up env files.');
     if (syncStatus.data?.configured) {
       pwOpen = true;
       return;

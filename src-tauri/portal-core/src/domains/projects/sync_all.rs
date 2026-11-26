@@ -154,6 +154,10 @@ fn net_steps(dir: &Path, push_ok: bool, cancel: &AtomicBool, on: OnStep) {
     on(Fetch, S::Running, None);
     match git::git_fetch(dir, cancel) {
         Ok(()) => on(Fetch, S::Ok, None),
+        // Killed by Cancel, not a failure.
+        Err(_) if cancel.load(Ordering::Relaxed) => {
+            return skip_all(on, &[Fetch, Pull, Push], "cancelled");
+        }
         Err(e) => {
             on(Fetch, S::Failed, Some(e));
             return skip_all(on, &[Pull, Push], "fetch failed");
@@ -173,7 +177,7 @@ fn net_steps(dir: &Path, push_ok: bool, cancel: &AtomicBool, on: OnStep) {
         Some((_, 0)) => on(Pull, S::Ok, Some("up to date".into())),
         Some((0, behind)) => {
             on(Pull, S::Running, None);
-            match git::git_pull_ff_only(dir, cancel) {
+            match git::git_pull_ff_only(dir) {
                 Ok(()) => on(Pull, S::Ok, Some(format!("fast-forwarded {behind}"))),
                 Err(e) => {
                     on(Pull, S::Failed, Some(e));
@@ -208,6 +212,9 @@ fn net_steps(dir: &Path, push_ok: bool, cancel: &AtomicBool, on: OnStep) {
         on(Push, S::Running, None);
         match git::git_push_net(dir, cancel) {
             Ok(b) => on(Push, S::Ok, Some(format!("pushed {b}"))),
+            Err(_) if cancel.load(Ordering::Relaxed) => {
+                on(Push, S::Skipped, Some("cancelled".into()))
+            }
             Err(e) => on(Push, S::Failed, Some(e)),
         }
     }
