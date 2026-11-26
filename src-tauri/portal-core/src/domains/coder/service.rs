@@ -451,6 +451,9 @@ impl CoderService {
             .map_err(|e| format!("invalid multitask request: {e}"))?;
             let started = self.service_arc()?.multitask_spawn(request).await?;
             serde_json::to_string(&started).unwrap_or_else(|_| "[]".to_string())
+        } else if tool == "ask_user" {
+            // The tool_call message already put the question card on screen.
+            self.wait_user_answer(local_thread_id, call_id).await
         } else if tool == "list_terminals" {
             self.emit(
                 "coder://list_terminals",
@@ -590,6 +593,26 @@ impl CoderService {
             _ => {
                 self.pending_commands.lock().await.remove(&key);
                 Err(())
+            }
+        }
+    }
+
+    /// Park an `ask_user` call until the card answers (or Stop cancels it).
+    // ponytail: the platform drops a delegated call after 300s, so give up just
+    // before that; waiting longer needs a platform-side change.
+    async fn wait_user_answer(&self, thread_id: &str, call_id: &str) -> String {
+        let key = Self::pending_key(thread_id, call_id);
+        let (tx, rx) = oneshot::channel();
+        self.pending_commands
+            .lock()
+            .await
+            .insert(key.clone(), PendingCommand { tx });
+        match tokio::time::timeout(std::time::Duration::from_secs(290), rx).await {
+            Ok(Ok(answer)) => answer,
+            _ => {
+                self.pending_commands.lock().await.remove(&key);
+                "Error: the user did not answer in time. Do not assume an answer; end your turn."
+                    .into()
             }
         }
     }

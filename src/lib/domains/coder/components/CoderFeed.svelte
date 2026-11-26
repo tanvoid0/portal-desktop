@@ -8,6 +8,7 @@
   import ToolCallCard from './ToolCallCard.svelte';
   import CoderSubAgentInline from './CoderSubAgentInline.svelte';
   import ApprovalBanner from './ApprovalBanner.svelte';
+  import AskUserCard from './AskUserCard.svelte';
   import type { PendingApproval } from '../types.js';
   import { stripLeakedToolSyntax } from '../utils/leakedToolCall.js';
   import { Button } from '$lib/components/ui/button';
@@ -153,6 +154,8 @@
           />
         {/each}
       </CoderActivitySummary>
+    {:else if block.kind === 'tool' && block.call.function.name === 'ask_user'}
+      <AskUserCard call={block.call} result={block.result} {threadId} active={running} />
     {:else if block.kind === 'tool'}
       <ToolCallCard
         call={block.call}

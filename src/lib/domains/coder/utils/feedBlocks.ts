@@ -207,15 +207,18 @@ function groupConsecutiveTools(blocks: FeedBlock[]): FeedBlock[] {
 
   while (i < blocks.length) {
     const block = blocks[i];
-    if (block.kind !== 'tool') {
+    // A question for the user stays on screen, never folded into an activity group.
+    if (block.kind !== 'tool' || block.call.function.name === 'ask_user') {
       result.push(block);
       i++;
       continue;
     }
 
     const run: Extract<FeedBlock, { kind: 'tool' }>[] = [];
-    while (i < blocks.length && blocks[i].kind === 'tool') {
-      run.push(blocks[i] as Extract<FeedBlock, { kind: 'tool' }>);
+    while (i < blocks.length) {
+      const next = blocks[i];
+      if (next.kind !== 'tool' || next.call.function.name === 'ask_user') break;
+      run.push(next);
       i++;
     }
 

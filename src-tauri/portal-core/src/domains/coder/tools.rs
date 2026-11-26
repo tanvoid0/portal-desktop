@@ -98,6 +98,33 @@ pub fn tool_specs() -> Vec<Value> {
                 "properties": {},
             }),
         ),
+        spec(
+            "ask_user",
+            "Ask the user to decide something. The user gets clickable options. ALWAYS use this              instead of asking in your reply text: for choices, opinions, confirmations              (e.g. Yes / No) and go-aheads. Blocks until answered.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "questions": {
+                        "type": "array",
+                        "description": "1-4 questions, shown one step at a time.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "question": { "type": "string" },
+                                "options": {
+                                    "type": "array",
+                                    "description": "2-4 short answers, recommended first. The user can also type their own.",
+                                    "items": { "type": "string" }
+                                },
+                                "multi_select": { "type": "boolean", "description": "True if several options may be picked." }
+                            },
+                            "required": ["question", "options"]
+                        }
+                    }
+                },
+                "required": ["questions"]
+            }),
+        ),
     ]
 }
 
@@ -218,7 +245,7 @@ pub fn write_raw(root: &str, rel: &str, content: &str) -> Result<(), String> {
 pub fn is_read_only(tool: &str) -> bool {
     matches!(
         tool,
-        "read_file" | "list_dir" | "search_files" | "list_terminals" | "web_search"
+        "read_file" | "list_dir" | "search_files" | "list_terminals" | "web_search" | "ask_user"
     )
 }
 

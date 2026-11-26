@@ -187,7 +187,8 @@ export function inferPending(messages: ChatMessage[]): PendingApproval | null {
     const m = messages[i];
     if (m.role !== 'assistant' || !m.tool_calls?.length) continue;
     const open = m.tool_calls.find((c) => !answered.has(c.id));
-    if (!open) return null;
+    // `ask_user` is answered on its own card, not approved.
+    if (!open || open.function.name === 'ask_user') return null;
     const args = parseToolArgs(open.function.arguments);
     return {
       call_id: open.id,
