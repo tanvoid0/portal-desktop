@@ -38,7 +38,7 @@
   <div
     class="divider-edge-b divider-edge-full flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 bg-background px-3 py-2 md:px-4"
   >
-    <AITabBar class="w-[200px] shrink-0" />
+    <AITabBar class="shrink-0" />
     {#if isAiCoderRoute(page.url.pathname)}
       <CoderEngineTabs class="min-w-0 shrink" />
     {/if}

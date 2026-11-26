@@ -55,34 +55,39 @@
 
 <div class={cn('relative w-full', className)}>
   <Popover.Root bind:open>
+    <!-- The Button is the trigger itself: wrapping it in the trigger's own button
+         let that outer one grow past this box and over its neighbours. -->
     <Popover.Trigger>
-      <Button
-        variant="outline"
-        role="combobox"
-        aria-expanded={open}
-        aria-label={ariaLabel}
-        aria-busy={loading}
-        {disabled}
-        class={cn(
-          'w-full justify-between px-3 font-normal',
-          !selectedModel && 'text-muted-foreground',
-          open && 'border-ring'
-        )}
-      >
-        <span class="min-w-0 flex-1 truncate text-left">
-          {#if selectedModel}
-            <ModelSelectOption model={selectedModel} compact />
-          {:else}
-            {placeholder}
-          {/if}
-        </span>
-        <ChevronsUpDown
+      {#snippet child({ props })}
+        <Button
+          {...props}
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          aria-label={ariaLabel}
+          aria-busy={loading}
+          {disabled}
           class={cn(
-            'ms-2 size-4 shrink-0 opacity-50 transition-transform duration-200',
-            open && 'rotate-180'
+            'w-full justify-between px-3 font-normal',
+            !selectedModel && 'text-muted-foreground',
+            open && 'border-ring'
           )}
-        />
-      </Button>
+        >
+          <span class="min-w-0 flex-1 truncate text-left">
+            {#if selectedModel}
+              <ModelSelectOption model={selectedModel} compact />
+            {:else}
+              {placeholder}
+            {/if}
+          </span>
+          <ChevronsUpDown
+            class={cn(
+              'ms-2 size-4 shrink-0 opacity-50 transition-transform duration-200',
+              open && 'rotate-180'
+            )}
+          />
+        </Button>
+      {/snippet}
     </Popover.Trigger>
 
     <Popover.Content class="w-[min(100vw-2rem,46rem)] p-0 shadow-md" align="start" sideOffset={4}>
