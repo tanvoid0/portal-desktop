@@ -18,7 +18,9 @@
   import Spinner from '~icons/fa6-solid/spinner';
   import Hand from '~icons/fa6-solid/hand';
   import { openCoderSession } from '$lib/domains/coder/utils/launch';
+  import { toast } from '$lib/utils/toast';
   import { syncAll, type SyncRow } from '../state/syncAll.svelte';
+  import { commonDir } from '../utils/commonDir';
   import type { SyncStep } from '../generated/SyncStep';
   import type { SyncStepResult } from '../generated/SyncStepResult';
   import type { SyncStepStatus } from '../generated/SyncStepStatus';
@@ -80,6 +82,18 @@
   const problems = (rs: SyncStepResult[]) =>
     rs.filter((s) => s.step !== 'env' && (s.status === 'attention' || s.status === 'failed'));
 
+  const RULES = [
+    'Inspect each repository (git status, git log) first, then resolve these.',
+    'Do not push, force, reset --hard, rewrite published history or delete files without asking me.',
+    'Never commit .env files, keys or other secrets.',
+    'Show me what you are going to commit or merge before you do it.',
+  ];
+  const detail = (r: SyncRow) =>
+    problems(results(r)).map((s) => `- ${s.step}: ${s.detail ?? LABEL[s.status]}`);
+
+  // Only the final report carries paths, so this is empty while a run is in flight.
+  const stuck = $derived(rows.filter((r) => r.path && problems(results(r)).length));
+
   // The coder pre-fills this and waits for the user to send it. The sheet stays
   // open in `syncAll`, so it is there again on returning to /projects.
   function resolve(row: SyncRow, path: string) {
@@ -88,12 +102,27 @@
       projectId: String(row.id),
       prompt: [
         `"Sync all projects" could not finish syncing "${row.name}":`,
-        ...problems(results(row)).map((s) => `- ${s.step}: ${s.detail ?? LABEL[s.status]}`),
+        ...detail(row),
         '',
-        'Inspect the repository (git status, git log) first, then resolve these.',
-        'Do not push, force, reset --hard, rewrite published history or delete files without asking me.',
-        'Never commit .env files, keys or other secrets.',
-        'Show me what you are going to commit or merge before you do it.',
+        ...RULES,
+      ].join('\n'),
+    });
+  }
+
+  // One session rooted above every stuck repo, working through them in turn.
+  function resolveAll() {
+    const root = commonDir(stuck.map((r) => r.path!));
+    if (!root) {
+      toast.error('These projects share no parent folder. Resolve them one by one.');
+      return;
+    }
+    openCoderSession({
+      workspaceRoot: root,
+      prompt: [
+        `"Sync all projects" could not finish syncing ${stuck.length} projects. Work through them one at a time:`,
+        ...stuck.flatMap((r) => ['', `${r.name} (${r.path})`, ...detail(r)]),
+        '',
+        ...RULES,
       ].join('\n'),
     });
   }
@@ -131,16 +160,21 @@
           <Button variant="outline" size="sm" onclick={() => syncAll.cancel()}>Cancel</Button>
         {/if}
       </div>
-      <ToggleGroup
-        type="single"
-        variant="outline"
-        size="sm"
-        bind:value={filter}
-        aria-label="Filter projects"
-      >
-        <ToggleGroupItem value="attention">Needs attention</ToggleGroupItem>
-        <ToggleGroupItem value="all">All ({rows.length})</ToggleGroupItem>
-      </ToggleGroup>
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          bind:value={filter}
+          aria-label="Filter projects"
+        >
+          <ToggleGroupItem value="attention">Needs attention</ToggleGroupItem>
+          <ToggleGroupItem value="all">All ({rows.length})</ToggleGroupItem>
+        </ToggleGroup>
+        {#if stuck.length > 1}
+          <Button size="sm" onclick={resolveAll}>Resolve all with AI ({stuck.length})</Button>
+        {/if}
+      </div>
     </div>
 
     <ul class="flex-1 space-y-2 overflow-y-auto px-4">
