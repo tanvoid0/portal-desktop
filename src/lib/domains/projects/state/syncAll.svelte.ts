@@ -15,6 +15,8 @@ import type { SyncStepResult } from '../generated/SyncStepResult';
 export interface SyncRow {
   id: number;
   name: string;
+  /** Only known once the final report lands. */
+  path?: string;
   steps: Partial<Record<SyncStep, SyncStepResult>>;
 }
 

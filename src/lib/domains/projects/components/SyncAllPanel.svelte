@@ -17,6 +17,7 @@
   import CircleXmark from '~icons/fa6-solid/circle-xmark';
   import Spinner from '~icons/fa6-solid/spinner';
   import Hand from '~icons/fa6-solid/hand';
+  import { openCoderSession } from '$lib/domains/coder/utils/launch';
   import { syncAll, type SyncRow } from '../state/syncAll.svelte';
   import type { SyncStep } from '../generated/SyncStep';
   import type { SyncStepResult } from '../generated/SyncStepResult';
@@ -59,6 +60,7 @@
       ? syncAll.report.projects.map((p) => ({
           id: p.id,
           name: p.name,
+          path: p.path,
           steps: Object.fromEntries(p.steps.map((s) => [s.step, s])),
         }))
       : Object.values(syncAll.rows)
@@ -74,6 +76,28 @@
           )
         )
   );
+  // Env steps are vault work, which the coder can't do, so they don't count.
+  const problems = (rs: SyncStepResult[]) =>
+    rs.filter((s) => s.step !== 'env' && (s.status === 'attention' || s.status === 'failed'));
+
+  // The coder pre-fills this and waits for the user to send it. The sheet stays
+  // open in `syncAll`, so it is there again on returning to /projects.
+  function resolve(row: SyncRow, path: string) {
+    openCoderSession({
+      workspaceRoot: path,
+      projectId: String(row.id),
+      prompt: [
+        `"Sync all projects" could not finish syncing "${row.name}":`,
+        ...problems(results(row)).map((s) => `- ${s.step}: ${s.detail ?? LABEL[s.status]}`),
+        '',
+        'Inspect the repository (git status, git log) first, then resolve these.',
+        'Do not push, force, reset --hard, rewrite published history or delete files without asking me.',
+        'Never commit .env files, keys or other secrets.',
+        'Show me what you are going to commit or merge before you do it.',
+      ].join('\n'),
+    });
+  }
+
   const percent = $derived(
     syncAll.total > 0 ? Math.round((syncAll.done / syncAll.total) * 100) : 0
   );
@@ -123,7 +147,15 @@
       {#each shown as row (row.id)}
         {@const rs = results(row)}
         <li class="space-y-1 rounded-md border p-2 text-sm">
-          <a href="/projects/{row.id}" class="font-medium hover:underline">{row.name}</a>
+          <div class="flex items-center justify-between gap-2">
+            <a href="/projects/{row.id}" class="font-medium hover:underline">{row.name}</a>
+            {#if row.path && problems(rs).length}
+              {@const path = row.path}
+              <Button variant="outline" size="sm" onclick={() => resolve(row, path)}>
+                Resolve with AI
+              </Button>
+            {/if}
+          </div>
           <div class="flex flex-wrap gap-1">
             {#each rs as s (s.step)}{@render stepBadge(s)}{/each}
           </div>
