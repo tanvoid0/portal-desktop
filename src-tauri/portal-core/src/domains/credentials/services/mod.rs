@@ -8,4 +8,6 @@ pub mod vault_session;
 
 pub use credential_service::CredentialService;
 pub use vault_service::VaultService;
-pub use vault_session::{VaultPrompter, VaultSession, REMOTE_CALLER};
+pub use vault_session::{
+    KeepUnlocked, LockPolicy, OsSession, VaultPrompter, VaultSession, REMOTE_CALLER,
+};

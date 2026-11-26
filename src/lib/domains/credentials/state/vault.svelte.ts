@@ -31,7 +31,7 @@ class VaultGateState {
   }
 
   /** Startup: if the vault has credentials but is locked, ask once so the key is held for the
-   *  rest of the run (the backend has no idle lock). Skips needs_setup — nothing to unlock. */
+   *  rest of the run, subject to the lock policy. Skips needs_setup — nothing to unlock. */
   async promptIfLocked(): Promise<void> {
     const status = await fetchVaultStatus();
     if (status.state === 'locked' && status.hasCredentials)

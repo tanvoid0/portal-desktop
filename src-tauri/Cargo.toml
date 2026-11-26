@@ -90,7 +90,7 @@ tempfile = "3.14"
 # Pinned to the exact version tauri itself resolves (see Cargo.lock) so
 # `WebviewWindow::hwnd()`'s `HWND` is the same type, no cast needed.
 [target.'cfg(windows)'.dependencies]
-windows = { version = "=0.62.2", features = ["Security_Credentials_UI", "Win32_System_WinRT", "Win32_Foundation", "Foundation"] }
+windows = { version = "=0.62.2", features = ["Security_Credentials_UI", "Win32_System_WinRT", "Win32_Foundation", "Foundation", "Win32_Security", "Win32_System_Threading", "Win32_System_SystemInformation", "Win32_UI_Input_KeyboardAndMouse"] }
 windows-future = { version = "=0.3.2", default-features = false }
 
 # Ship a smaller, faster binary. Slower to compile, so release-only — `cargo

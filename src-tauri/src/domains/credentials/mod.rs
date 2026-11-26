@@ -10,4 +10,5 @@ pub use portal_core::domains::credentials::*;
 
 pub mod commands;
 pub mod hello;
+pub mod idle;
 pub mod prompter;

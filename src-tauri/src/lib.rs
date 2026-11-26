@@ -203,9 +203,24 @@ pub fn run() {
                 Err(e) => log_warn!("Moves", "Failed to re-arm interrupted moves: {}", e),
             }
 
-            // In-memory vault session (master key, if unlocked). Starts
-            // locked every launch — nothing here persists across restarts.
+            // In-memory vault session (master key, if unlocked). Starts locked unless
+            // the user's lock policy says this launch should come back unlocked.
             let vault_session = std::sync::Arc::new(VaultSession::default());
+            vault_session.enable_persistence(
+                db_manager_arc.data_dir(),
+                domains::credentials::idle::os_session(),
+            );
+            if vault_session.should_restore() {
+                let vault = portal_core::domains::credentials::services::vault_service::VaultService::new(
+                    db_manager_arc.get_connection_clone(),
+                    vault_session.clone(),
+                )
+                .with_data_dir(db_manager_arc.data_dir());
+                if let Err(e) = tauri::async_runtime::block_on(vault.unlock_with_keychain()) {
+                    log_warn!("Vault", "Could not restore the unlocked vault: {}", e);
+                }
+            }
+            domains::credentials::idle::spawn_idle_lock(app.handle().clone(), vault_session.clone());
             app.manage(vault_session.clone());
             // Locked vault + a command that needs the key → ask the UI to unlock, then continue.
             let vault_prompter = std::sync::Arc::new(
@@ -618,6 +633,8 @@ pub fn run() {
             domains::credentials::commands::vault_unlock_with_hello,
             domains::credentials::commands::vault_lock,
             domains::credentials::commands::vault_unlock_settled,
+            domains::credentials::commands::vault_get_lock_policy,
+            domains::credentials::commands::vault_set_lock_policy,
             domains::credentials::commands::vault_reset_password,
             domains::credentials::commands::vault_change_password,
             // Database explorer commands

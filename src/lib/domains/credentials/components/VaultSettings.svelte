@@ -21,6 +21,7 @@
   import { createVaultStatusQuery } from '../queries/vaultQueries';
   import { vaultGate } from '../state/vault.svelte';
   import type { VaultStatus } from '../types';
+  import VaultLockSettings from './VaultLockSettings.svelte';
 
   /** Same minimum the setup and reset forms use; the backend enforces it too. */
   const MIN_PASSWORD_LENGTH = 8;
@@ -120,6 +121,10 @@
         {/if}
       </div>
     </SettingsSection>
+
+    {#if status.state !== 'needs_setup'}
+      <VaultLockSettings unlocked={status.state === 'unlocked'} />
+    {/if}
 
     <SettingsSection
       title="Change master password"

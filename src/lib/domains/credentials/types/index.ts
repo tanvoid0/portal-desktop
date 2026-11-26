@@ -63,6 +63,15 @@ export interface VaultStatus {
   hasCredentials: boolean;
 }
 
+/** How long an unlock outlives the app. */
+export type KeepUnlocked = 'app_close' | 'system_restart' | 'until_locked';
+
+export interface VaultLockPolicy {
+  keepUnlocked: KeepUnlocked;
+  /** Lock after this many idle minutes while the app runs; 0 = never. */
+  idleMinutes: number;
+}
+
 /** Returned once, by `vault_setup`, and never again. */
 export interface VaultSetupResult {
   recoveryKey: string;

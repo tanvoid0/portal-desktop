@@ -7,6 +7,8 @@
   import { onMount } from 'svelte';
   import { listen } from '@tauri-apps/api/event';
   import { isTauriEnvironment } from '$lib/utils/tauri';
+  import { queryClient } from '$lib/domains/shared/query/queryClient';
+  import { queryKeys } from '$lib/domains/shared/query/keys';
   import { settleVaultUnlock } from '../api/vaultApi';
   import { createVaultStatusQuery } from '../queries/vaultQueries';
   import { vaultGate } from '../state/vault.svelte';
@@ -26,7 +28,14 @@
         .catch(() => false);
       await settleVaultUnlock(ok).catch(() => {});
     });
-    return () => void unlisten.then((fn) => fn());
+    // The idle timeout locked the vault in the backend.
+    const unlistenLocked = listen('vault://locked', () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.credentials.status });
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+      void unlistenLocked.then((fn) => fn());
+    };
   });
 </script>
 

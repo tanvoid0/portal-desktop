@@ -40,6 +40,7 @@ export const queryKeys = {
   },
   credentials: {
     status: ['credentials', 'vault-status'] as const,
+    lockPolicy: ['credentials', 'vault-lock-policy'] as const,
   },
   cloud: {
     resources: (type: string, namespace: string) => ['cloud', type, namespace] as const,

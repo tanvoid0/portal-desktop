@@ -1,7 +1,7 @@
 use crate::database::DatabaseManager;
 use crate::domains::credentials::hello;
 use crate::domains::credentials::services::vault_service::{VaultService, VaultState};
-use crate::domains::credentials::services::{CredentialService, VaultSession};
+use crate::domains::credentials::services::{CredentialService, LockPolicy, VaultSession};
 use std::sync::Arc;
 /**
  * Credentials Tauri Commands
@@ -246,11 +246,29 @@ pub async fn vault_unlock_with_hello(
     Ok(())
 }
 
-/// Lock the vault immediately. It otherwise stays unlocked until the app exits.
+/// Lock the vault immediately. Also stops the next launch from unlocking itself.
 #[portal_rpc_macro::rpc(local_only)]
 pub async fn vault_lock(session: State<'_, Arc<VaultSession>>) -> Result<(), String> {
     session.lock();
     Ok(())
+}
+
+/// When the vault locks itself again.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn vault_get_lock_policy(
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<LockPolicy, String> {
+    Ok(session.policy())
+}
+
+/// Needs an unlocked vault: loosening the policy is as sensitive as using a credential.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn vault_set_lock_policy(
+    policy: LockPolicy,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<(), String> {
+    session.require_key().await.map_err(|e| e.to_string())?;
+    session.set_policy(policy).map_err(|e| e.to_string())
 }
 
 /// Frontend's answer to `vault://unlock-requested`: `true` once unlocked,
