@@ -1,5 +1,14 @@
 # Portal Desktop - Release Notes
 
+## Version 0.24.0
+
+### Highlights
+
+- Sync all: Resolve all with AI opens one coder session for every stuck repo
+- AI: Portal re-pairs itself with the local agent-platform when its token is rejected
+
+---
+
 ## Version 0.23.0
 
 ### Highlights
