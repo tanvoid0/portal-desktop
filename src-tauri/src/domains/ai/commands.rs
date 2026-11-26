@@ -285,12 +285,33 @@ pub async fn ai_cancel_model_build_job(
         .map_err(|e| e.to_string())
 }
 
-/// Reachability + auth state of the local agent-platform server.
+/// Reachability + auth state of the local agent-platform server. A rejected
+/// token on the local daemon is re-paired here before answering.
 #[portal_rpc_macro::rpc(local_only)]
 pub async fn ai_platform_health(
     settings_service: State<'_, Arc<AISettingsService>>,
+    ai_service: State<'_, Arc<AIService>>,
 ) -> Result<PlatformHealth, String> {
+    let health = platform_admin::platform_health(&settings_service).await;
+    if !platform_admin::self_pair(&settings_service, &health).await {
+        return Ok(health);
+    }
+    reload_platform_provider(&settings_service, &ai_service).await?;
     Ok(platform_admin::platform_health(&settings_service).await)
+}
+
+/// Re-register the live provider with the saved config.
+async fn reload_platform_provider(
+    settings_service: &AISettingsService,
+    ai_service: &AIService,
+) -> Result<(), String> {
+    let config = settings_service
+        .get_provider_config(ProviderType::AgentPlatform)
+        .map_err(|e| e.to_string())?;
+    ai_service
+        .update_provider_config(config)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Attach to the agent-platform daemon on the platform port, or spawn the
@@ -331,13 +352,7 @@ pub async fn pair_agent_platform(
 ) -> Result<PairResult, String> {
     let result = platform_admin::pair_platform(&settings_service, &master_key).await;
     if result.ok {
-        let config = settings_service
-            .get_provider_config(ProviderType::AgentPlatform)
-            .map_err(|e| e.to_string())?;
-        ai_service
-            .update_provider_config(config)
-            .await
-            .map_err(|e| e.to_string())?;
+        reload_platform_provider(&settings_service, &ai_service).await?;
     }
     Ok(result)
 }

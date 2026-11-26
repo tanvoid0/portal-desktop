@@ -19,6 +19,7 @@ use super::services::AISettingsService;
 use reqwest::{Client, StatusCode};
 use serde::Serialize;
 use serde_json::{json, Value};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 #[derive(Debug, Clone, Serialize)]
@@ -128,6 +129,33 @@ pub async fn platform_health(settings: &AISettingsService) -> PlatformHealth {
         .map(str::trim)
         .filter(|s| !s.is_empty());
     probe(&base_of(&c), token).await
+}
+
+/// Only the daemon on our own default loopback address may be sent the install
+/// key: a custom or remote base URL is never self-paired.
+fn can_self_pair(h: &PlatformHealth) -> bool {
+    h.base_url == DEFAULT_PLATFORM_BASE && h.reachable && h.auth_required && !h.authenticated
+}
+
+/// Repair a missing or dead token by pairing with the `master.key` already on
+/// this machine, so a local install never asks the user to paste one. True when
+/// a new token was saved.
+///
+/// One attempt until a probe next authenticates: a 401 that a new token cannot
+/// fix must not mint a token on every health check.
+pub async fn self_pair(settings: &AISettingsService, health: &PlatformHealth) -> bool {
+    static TRIED: AtomicBool = AtomicBool::new(false);
+    if health.authenticated {
+        TRIED.store(false, Ordering::Relaxed);
+    }
+    if !can_self_pair(health) || TRIED.swap(true, Ordering::Relaxed) {
+        return false;
+    }
+    // Read only: creating a key here would not match a daemon someone else started.
+    match std::fs::read_to_string(daemon::data_dir().join("master.key")) {
+        Ok(key) => pair_platform(settings, &key).await.ok,
+        Err(_) => false,
+    }
 }
 
 /// `/health` reachable, then does the daemon accept *our* master key. A status
@@ -317,6 +345,24 @@ pub async fn pair_platform(settings: &AISettingsService, master_key: &str) -> Pa
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn self_pairs_only_the_default_local_daemon() {
+        let mut h = PlatformHealth {
+            base_url: DEFAULT_PLATFORM_BASE.to_string(),
+            reachable: true,
+            auth_required: true,
+            authenticated: false,
+            detail: None,
+            installed: true,
+        };
+        assert!(can_self_pair(&h));
+        h.authenticated = true;
+        assert!(!can_self_pair(&h));
+        h.authenticated = false;
+        h.base_url = "http://192.168.1.5:18410".to_string();
+        assert!(!can_self_pair(&h));
+    }
 
     #[test]
     fn parses_workspace_and_token_bodies() {
