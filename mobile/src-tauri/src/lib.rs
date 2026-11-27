@@ -448,6 +448,54 @@ fn alert_for(event: &str, payload: &Value) -> Option<Alert> {
                 _ => None,
             }
         }
+        // Every provider's thread frame, but only Portal threads alert from here: CLI
+        // runs still alert from `agents://event` above (also when the desktop predates
+        // the thread log) until S5 removes those emits; alerting both would double.
+        "coder://thread-event" => {
+            if payload["provider"].as_str()? != "portal" {
+                return None;
+            }
+            let route = format!("/ai/coder?id={}", payload["thread_id"].as_str()?);
+            let ev = &payload["event"];
+            match ev["type"].as_str()? {
+                // Tool name only, like the CLI arm: `summary` can hold a whole shell
+                // command (`$ curl -H "Authorization: …"`), which a lock screen shows.
+                "approval_requested" => {
+                    let tool = ev["approval"]["tool"].as_str().unwrap_or("a tool");
+                    Some(Alert {
+                        title: "Agent needs your approval".into(),
+                        body: format!("Wants to run {tool}"),
+                        route,
+                    })
+                }
+                // stopped/interrupted: the user ended it, nothing to say.
+                "turn_ended" => match ev["outcome"].as_str()? {
+                    "exhausted" => Some(Alert {
+                        title: "Agent paused".into(),
+                        body: "It hit its step limit and is waiting for you to continue".into(),
+                        route,
+                    }),
+                    "completed" => {
+                        let body: String = ev["final_text"]
+                            .as_str()
+                            .filter(|s| !s.is_empty())
+                            .map(|s| s.chars().take(120).collect::<String>())
+                            .unwrap_or_else(|| "The run completed".into());
+                        Some(Alert { title: "Agent finished".into(), body, route })
+                    }
+                    "error" => {
+                        let body: String = ev["error"]
+                            .as_str()
+                            .filter(|s| !s.is_empty())
+                            .map(|s| s.chars().take(120).collect::<String>())
+                            .unwrap_or_else(|| "The run failed".into());
+                        Some(Alert { title: "Agent run failed".into(), body, route })
+                    }
+                    _ => None,
+                },
+                _ => None,
+            }
+        }
         "pipeline-execution-update" => {
             let execution_id = payload["id"].as_str()?;
             // Same route the in-app toast uses (app-shell.svelte): one page for this
@@ -843,6 +891,36 @@ mod tests {
 
         let exited_unknown = json!({ "run_id": "r1", "seq": 6, "event": { "type": "exited" } });
         assert!(alert_for("agents://event", &exited_unknown).is_none());
+    }
+
+    #[test]
+    fn alert_for_thread_events() {
+        let frame = |event: Value| json!({ "thread_id": "t1", "provider": "portal", "seq": 1, "event": event });
+        let approval = frame(json!({ "type": "approval_requested",
+            "approval": { "call_id": "c", "tool": "Bash", "summary": "rm -rf x" } }));
+        let a = alert_for("coder://thread-event", &approval).unwrap();
+        assert_eq!(a.route, "/ai/coder?id=t1");
+        assert_eq!(a.body, "Wants to run Bash"); // never the command itself
+
+        let exhausted = frame(json!({ "type": "turn_ended", "outcome": "exhausted" }));
+        assert_eq!(alert_for("coder://thread-event", &exhausted).unwrap().title, "Agent paused");
+
+        let done = frame(json!({ "type": "turn_ended", "outcome": "completed", "final_text": "ok" }));
+        assert_eq!(alert_for("coder://thread-event", &done).unwrap().body, "ok");
+
+        let err = frame(json!({ "type": "turn_ended", "outcome": "error", "error": "boom" }));
+        assert_eq!(alert_for("coder://thread-event", &err).unwrap().body, "boom");
+
+        let stopped = frame(json!({ "type": "turn_ended", "outcome": "stopped" }));
+        assert!(alert_for("coder://thread-event", &stopped).is_none());
+
+        // CLI threads alert from agents://event; a frame without a provider is skipped.
+        let mut cli = approval.clone();
+        cli["provider"] = json!("claude-code");
+        assert!(alert_for("coder://thread-event", &cli).is_none());
+        let mut bare = approval;
+        bare.as_object_mut().unwrap().remove("provider");
+        assert!(alert_for("coder://thread-event", &bare).is_none());
     }
 
     #[test]
