@@ -616,8 +616,7 @@ async fn fixture(hub: &Arc<ThreadHub>, id: &str) -> String {
     let events = hub.events_since(id, 0).await.unwrap().events;
     let mut v = json!({ "events": events, "snapshot": snapshot });
     stabilize(&mut v, &mut Vec::new());
-    serde_json::to_string_pretty(&v).unwrap() + "
-"
+    serde_json::to_string_pretty(&v).unwrap() + "\n"
 }
 
 /// `UPDATE_THREAD_FIXTURES=1 cargo test threads::tests::fixtures` rewrites them; without it
@@ -637,9 +636,7 @@ async fn fixtures_match_checked_in() {
             std::fs::create_dir_all(&dir).unwrap();
             std::fs::write(&path, got).unwrap();
         } else {
-            let want = std::fs::read_to_string(&path).unwrap_or_default().replace("
-", "
-");
+            let want = std::fs::read_to_string(&path).unwrap_or_default();
             assert_eq!(got, want, "{name} drifted; rerun with UPDATE_THREAD_FIXTURES=1");
         }
     }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { applyDelta, applyEvent, emptyView, fromSnapshot, type ThreadView } from './reducer';
 import type { ThreadDeltaFrame, ThreadEventFrame, ThreadSnapshot } from '../generated';
 import claudeRun from './fixtures/claude_run.json';
@@ -53,6 +53,21 @@ it('portal fixture covers stop_requested and sub_agent_updated', () => {
   expect(kinds).toContain('sub_agent_updated');
   expect(fold(events.slice(0, kinds.indexOf('stop_requested') + 1)).stopping).toBe(true);
   expect(fold(events).subAgents).toHaveLength(1);
+});
+
+it('an unknown event type is a no-op that advances the cursor', () => {
+  const frame = {
+    thread_id: 't',
+    provider: 'portal',
+    seq: 1,
+    at: '',
+    actor: 'system',
+    event: { type: 'from_the_future' },
+  } as unknown as ThreadEventFrame;
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  const v = applyEvent(emptyView(), frame);
+  expect(v).toEqual({ ...emptyView(), seq: 1 });
+  warn.mockRestore();
 });
 
 const base = (over: Partial<ThreadView> = {}): ThreadView => ({

@@ -224,8 +224,9 @@ export function applyEvent(v: ThreadView, f: ThreadEventFrame): ThreadView | nul
       clearStream(n);
       break;
     default: {
-      const unhandled: never = e;
-      throw new Error(`unhandled thread event ${JSON.stringify(unhandled)}`);
+      // Compile-time exhaustive; at runtime a newer daemon's event is skipped, cursor still advances.
+      const _unhandled: never = e;
+      console.warn('unknown thread event', _unhandled);
     }
   }
   return withRetry(n);

@@ -7,7 +7,7 @@
  * `visibilitychange`. Design: docs/development/CODER_THREAD_LOG_DESIGN.md section 4.
  */
 import { threadApi, type ThreadHeartbeatFrame } from '../api/threadApi';
-import { applyDelta, applyEvent, emptyView, fromSnapshot, type ThreadView } from '../utils/reducer';
+import { applyDelta, applyEvent, fromSnapshot, type ThreadView } from '../utils/reducer';
 import type { ThreadDeltaFrame, ThreadEventFrame } from '../generated';
 import { queryClient } from '$lib/domains/shared/query/queryClient';
 import { queryKeys } from '$lib/domains/shared/query/keys';
@@ -50,9 +50,9 @@ class ThreadStore {
         }
       );
     }
+    const mine = s;
     return () => {
-      const cur = this.subs.get(id);
-      if (!cur || --cur.refs > 0) return;
+      if (this.subs.get(id) !== mine || --mine.refs > 0) return;
       this.subs.delete(id);
       const { [id]: _gone, ...rest } = this.views;
       this.views = rest;
@@ -101,7 +101,16 @@ class ThreadStore {
   }
 
   private handle(id: string, s: Sub, item: Item) {
-    const v = this.views[id] ?? emptyView(); // no snapshot yet (failed, or the thread is not created): fold from 0
+    const v = this.views[id];
+    if (!v) {
+      // No snapshot yet (it failed, or the thread is not created). Never fold from empty: an
+      // imported thread has a projection at seq 0 with no events. A live frame retries the snapshot.
+      if ('event' in item) {
+        s.buffer.push(item);
+        if (!s.snapping) void this.resnapshot(id);
+      }
+      return;
+    }
     if ('event' in item) {
       const n = applyEvent(v, item.event);
       if (n === null) {
@@ -143,7 +152,7 @@ class ThreadStore {
       } finally {
         s.snapping = null;
         s.ready = true;
-        this.replay(id, s);
+        if (this.views[id]) this.replay(id, s); // no view: keep the buffer for the next snapshot
       }
     })();
     return s.snapping;
@@ -152,9 +161,10 @@ class ThreadStore {
   private async catchUp(id: string): Promise<void> {
     const s = this.subs.get(id);
     if (!s || s.catching || s.snapping) return;
+    if (!this.views[id]) return void this.resnapshot(id);
     s.catching = true;
     try {
-      const page = await threadApi.eventsSince(id, (this.views[id] ?? emptyView()).seq);
+      const page = await threadApi.eventsSince(id, this.views[id].seq);
       // A snapshot started meanwhile owns the buffer and will overwrite the view; stand down.
       if (s.snapping || this.subs.get(id) !== s) return;
       if (page.reset) return await this.resnapshot(id);
@@ -170,7 +180,8 @@ class ThreadStore {
   }
 
   private catchUpAll() {
-    for (const [id, s] of this.subs) if (s.ready) void this.catchUp(id);
+    for (const [id, s] of this.subs)
+      if (s.ready) void (this.views[id] ? this.catchUp(id) : this.resnapshot(id));
     void queryClient.invalidateQueries({ queryKey: queryKeys.threads.list });
   }
 }
