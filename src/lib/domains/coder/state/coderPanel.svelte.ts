@@ -12,6 +12,7 @@ import { coderService } from '../services/coderService.js';
 import { withMessageTimestamps } from '../utils/messageTimestamps.js';
 import { formatConversationForCopy } from '../utils/formatConversation.js';
 import { toastSubAgentEvent } from '../utils/subAgentToasts.js';
+import { deleteHistoryMessage } from '../utils/threadMenu.js';
 import type { CoderThread, GitDiffStats } from '../types.js';
 
 /**
@@ -231,6 +232,22 @@ export class CoderPanelState {
       toast.success('Session deleted');
     } catch (e) {
       toast.error(`Failed to delete session: ${e}`);
+    }
+  };
+
+  /** Delete a workspace's chat history after one confirm. */
+  deleteSessions = async (threads: CoderThread[], label: string, kept: number) => {
+    const ok = await confirmAction(
+      deleteHistoryMessage(threads.length, label, kept),
+      'Delete chat history',
+      { confirmLabel: 'Delete', destructive: true }
+    );
+    if (!ok) return;
+    try {
+      await coderSession.removeThreads(threads);
+      toast.success('Chat history deleted');
+    } catch (e) {
+      toast.error(`Failed to delete chat history: ${e}`);
     }
   };
 

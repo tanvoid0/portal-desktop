@@ -1385,12 +1385,23 @@ class CoderSessionState {
   }
 
   async removeThread(t: CoderThread) {
-    await coderService.deleteThread(t.id);
-    delete this.runtimes[t.id];
-    coderTerminalStore.clearThread(t.id);
-    this.touchRuntime();
-    if (this.activeThreadId === t.id) this.newSession();
-    await this.refreshThreads();
+    await this.removeThreads([t]);
+  }
+
+  async removeThreads(threads: CoderThread[]) {
+    try {
+      // ponytail: one invoke per thread; add a bulk command if histories reach hundreds.
+      for (const t of threads) {
+        await coderService.deleteThread(t.id);
+        delete this.runtimes[t.id];
+        coderTerminalStore.clearThread(t.id);
+        if (this.activeThreadId === t.id) this.newSession();
+      }
+    } finally {
+      // Also after a partial failure, so the list shows what is really left.
+      this.touchRuntime();
+      await this.refreshThreads();
+    }
   }
 
   async cancelSubAgent(subAgentId: string) {

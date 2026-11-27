@@ -34,9 +34,44 @@ export class CoderUiState {
   expandedProjects = $state<Record<string, boolean>>({});
   /** When true, show sessions grouped under all workspaces. */
   showAllWorkspaces = $state(false);
+  /** Starred session ids and non-project folder paths. Projects use their own star. */
+  starred = $state<string[]>([]);
+  /** Workspace paths in the order set by hand; empty = follow the sort. */
+  order = $state<string[]>([]);
+
+  toggleStar(key: string): void {
+    this.starred = this.starred.includes(key)
+      ? this.starred.filter((k) => k !== key)
+      : [...this.starred, key];
+    this.persistPrefs();
+  }
+
+  setOrder(paths: string[]): void {
+    this.order = paths;
+    this.persistPrefs();
+  }
+
+  private persistPrefs(): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(
+        `${this.storageKey}-prefs`,
+        JSON.stringify({ starred: this.starred, order: this.order })
+      );
+    } catch {
+      // ignore
+    }
+  }
 
   initFromStorage(): void {
     if (typeof window === 'undefined') return;
+    try {
+      const prefs = JSON.parse(localStorage.getItem(`${this.storageKey}-prefs`) ?? '{}');
+      this.starred = Array.isArray(prefs.starred) ? prefs.starred : [];
+      this.order = Array.isArray(prefs.order) ? prefs.order : [];
+    } catch {
+      // corrupt or unavailable: start without stars or manual order
+    }
     try {
       const cached = localStorage.getItem(this.storageKey);
       const cachedId = localStorage.getItem(this.projectIdKey);
@@ -123,12 +158,11 @@ export class CoderUiState {
     };
   }
 
+  /** An explicit open/close wins, so the active workspace can be collapsed too. */
   isExpanded(path: string): boolean {
-    if (this.showAllWorkspaces) {
-      return this.expandedProjects[path] ?? true;
-    }
-    if (path === this.activeProjectPath) return true;
-    return this.expandedProjects[path] ?? false;
+    return (
+      this.expandedProjects[path] ?? (this.showAllWorkspaces || path === this.activeProjectPath)
+    );
   }
 
   syncFromThread(workspaceRoot: string, projectId?: number | null): void {

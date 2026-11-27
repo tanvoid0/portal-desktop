@@ -57,6 +57,7 @@
     }}
     onCreateNew={p.newSession}
     onDeleteThread={p.deleteSession}
+    onDeleteThreads={p.deleteSessions}
     queuedCountFor={(id) => {
       coderSession.runtimeRevision;
       return coderSession.queuedCountFor(id);

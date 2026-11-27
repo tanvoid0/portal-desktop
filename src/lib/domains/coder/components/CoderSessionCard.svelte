@@ -21,6 +21,8 @@
     extraBadges?: SessionCardBadge[];
     /** Menu action for the workspace; undefined = open it in Portal's Coder, null = omit. */
     onLaunchWorkspace?: ((thread: CoderThread) => void) | null;
+    starred?: boolean;
+    onToggleStar?: (thread: CoderThread) => void;
   }
 
   let {
@@ -34,6 +36,8 @@
     hideProject = false,
     extraBadges = [],
     onLaunchWorkspace,
+    starred = false,
+    onToggleStar,
   }: Props = $props();
 
   const messageCount = $derived(
@@ -41,11 +45,14 @@
       thread.messages.filter((m) => m.role === 'user' || m.role === 'assistant').length
   );
 
-  const inlineBadges = $derived(
-    thread.thread_kind === 'coordinator'
-      ? [{ label: 'Coordinator', variant: 'secondary' as const }]
-      : []
-  );
+  const inlineBadges = $derived.by(() => {
+    const badges: SessionCardBadge[] = [];
+    if (starred) badges.push({ label: '★', variant: 'secondary' });
+    if (thread.thread_kind === 'coordinator') {
+      badges.push({ label: 'Coordinator', variant: 'secondary' });
+    }
+    return badges;
+  });
 
   const trailingBadges = $derived.by(() => {
     const badges: SessionCardBadge[] = [...extraBadges];
@@ -70,6 +77,8 @@
 <ContextMenuList
   items={buildCoderThreadMenu(thread, {
     onOpen: onClick ? () => onClick() : undefined,
+    starred,
+    onToggleStar,
     onCopyReference: () => copyText(String(thread.id), 'Session ID copied'),
     onCopyLink: () => copyText(sessionPath(PORTAL_ENGINE_TAB.id, thread.id), 'Session link copied'),
     onLaunchWorkspace:

@@ -2,7 +2,7 @@ import type { Project } from '$lib/domains/projects/types';
 import type { CoderThread } from '../types.js';
 
 /** Bucket for sessions with no workspace path, so they can still be opened or deleted. */
-const UNKNOWN_FOLDER = '(unknown folder)';
+export const UNKNOWN_FOLDER = '(unknown folder)';
 
 export interface ProjectWorkspace {
   path: string;
@@ -302,4 +302,35 @@ export function sortThreadsForWorkspace(
   runningThreadIds: Set<string>
 ): CoderThread[] {
   return [...threads].sort((a, b) => compareSessions(a, b, sort, runningThreadIds));
+}
+
+/**
+ * Sidebar tier: with sessions before without, starred before the rest. Rows can only be
+ * moved by hand within a tier — the sort would undo a move across one.
+ */
+export function workspaceTier(workspace: ProjectWorkspace, starred: boolean): number {
+  return (workspace.threads.length ? 0 : 2) + (starred ? 0 : 1);
+}
+
+/**
+ * By tier, then the order set by hand. Rows never placed by hand come first in their tier,
+ * in the order the list already had, so a new workspace does not sink to the bottom.
+ */
+export function arrangeWorkspaces(
+  workspaces: ProjectWorkspace[],
+  isStarred: (workspace: ProjectWorkspace) => boolean,
+  order: string[]
+): ProjectWorkspace[] {
+  const manual = (w: ProjectWorkspace) => order.indexOf(w.path);
+  return [...workspaces].sort(
+    (a, b) =>
+      workspaceTier(a, isStarred(a)) - workspaceTier(b, isStarred(b)) || manual(a) - manual(b)
+  );
+}
+
+/** `paths` with the entry at `from` moved to `to`. */
+export function movePath(paths: string[], from: number, to: number): string[] {
+  const next = [...paths];
+  next.splice(to, 0, ...next.splice(from, 1));
+  return next;
 }

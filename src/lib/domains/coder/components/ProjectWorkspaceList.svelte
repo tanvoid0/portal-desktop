@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
+  import { goto } from '$app/navigation';
   import { open } from '@tauri-apps/plugin-dialog';
   import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
   import { Button } from '$lib/components/ui/button';
@@ -8,12 +9,22 @@
   import Loader2 from '~icons/fa6-solid/spinner';
   import { projectService } from '$lib/domains/projects';
   import type { Project } from '$lib/domains/projects';
+  import { toggleProjectStar } from '$lib/domains/projects/api/projectApi';
+  import { queryClient } from '$lib/domains/shared/query/queryClient';
+  import { queryKeys } from '$lib/domains/shared/query/keys';
+  import { copyText } from '$lib/domains/shared/utils/clipboard';
+  import { toast } from '$lib/utils/toast';
+  import { buildWorkspaceMenu } from '../utils/threadMenu';
   import ProjectWorkspaceSection from './ProjectWorkspaceSection.svelte';
   import { coderUi, type CoderUiState } from '../state/coderUi.svelte.js';
   import {
     groupSessionsByProject,
     sortThreadsForWorkspace,
     filterAndSortSessions,
+    arrangeWorkspaces,
+    workspaceTier,
+    movePath,
+    UNKNOWN_FOLDER,
     type ProjectWorkspace,
     type SessionListFilters,
     type SessionSortKey,
@@ -29,6 +40,8 @@
     loading?: boolean;
     onThreadClick?: (thread: CoderThread) => void;
     onDeleteThread?: (thread: CoderThread) => void;
+    /** Delete a workspace's whole history; `kept` counts the running sessions left out. */
+    onDeleteThreads?: (threads: CoderThread[], label: string, kept: number) => void;
     onProjectSelect?: (path: string, projectId?: string) => void;
     queuedCountFor?: (threadId: string) => number;
     subAgentSummaryFor?: (threadId: string) => { running: number; total: number };
@@ -45,6 +58,7 @@
     loading = false,
     onThreadClick,
     onDeleteThread,
+    onDeleteThreads,
     onProjectSelect,
     queuedCountFor,
     subAgentSummaryFor,
@@ -134,17 +148,75 @@
     selectProjectByPath(project.path, project.id);
   }
 
+  const isStarred = (w: ProjectWorkspace) =>
+    w.projectId
+      ? (projects.find((p) => p.id === w.projectId)?.starred ?? false)
+      : ui.starred.includes(w.path);
+
+  // A hand-set order only applies to the default sort; picking another sort overrides it.
+  const manualSort = $derived(filters.sort === 'updated_desc');
   const workspaces = $derived(
-    groupSessionsByProject(threads, projects, filters.sort as SessionSortKey, runningThreadIds)
+    arrangeWorkspaces(
+      groupSessionsByProject(threads, projects, filters.sort as SessionSortKey, runningThreadIds),
+      isStarred,
+      manualSort ? ui.order : []
+    )
   );
-  // Sessions in folders that are not registered projects.
-  const otherWorkspaces = $derived(workspaces.filter((w) => !w.projectId && w.threads.length > 0));
-  const projectWorkspaces = $derived(workspaces.filter((w) => w.projectId));
   const searching = $derived(filters.search.trim() !== '');
   const hasMatches = (w: ProjectWorkspace) =>
     !searching || threadsForWorkspace(w.path, w.threads).length > 0;
-  const otherVisible = $derived(otherWorkspaces.some(hasMatches));
-  const projectVisible = $derived(projectWorkspaces.some(hasMatches));
+  const anyVisible = $derived(workspaces.some(hasMatches));
+
+  async function toggleStar(w: ProjectWorkspace) {
+    if (!w.projectId) return ui.toggleStar(w.path);
+    try {
+      await toggleProjectStar(Number(w.projectId));
+      projects = projects.map((p) => (p.id === w.projectId ? { ...p, starred: !p.starred } : p));
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+    } catch {
+      toast.error('Could not update the star');
+    }
+  }
+
+  function deleteHistoryFor(w: ProjectWorkspace): (() => void) | undefined {
+    const idle = w.threads.filter((t) => !runningThreadIds.has(t.id));
+    if (!onDeleteThreads || idle.length === 0) return undefined;
+    return () => onDeleteThreads(idle, w.label, w.threads.length - idle.length);
+  }
+
+  function menuFor(w: ProjectWorkspace, expanded: boolean) {
+    const at = workspaces.indexOf(w);
+    const tier = workspaceTier(w, isStarred(w));
+    const sameTier = (other: ProjectWorkspace | undefined) =>
+      !!other && workspaceTier(other, isStarred(other)) === tier;
+    const canMove = manualSort && !searching;
+    const moveTo = (to: number) => () => {
+      const paths = workspaces.map((x) => x.path);
+      ui.setOrder(movePath(paths, at, to));
+    };
+    const up = canMove && sameTier(workspaces[at - 1]);
+    const real = w.path !== UNKNOWN_FOLDER;
+    return buildWorkspaceMenu({
+      starred: isStarred(w),
+      expanded,
+      onToggleStar: () => void toggleStar(w),
+      onToggle: () => ui.toggleExpanded(w.path),
+      onMoveTop: up ? moveTo(workspaces.findIndex(sameTier)) : undefined,
+      onMoveUp: up ? moveTo(at - 1) : undefined,
+      onMoveDown: canMove && sameTier(workspaces[at + 1]) ? moveTo(at + 1) : undefined,
+      onResetOrder: canMove && ui.order.length ? () => ui.setOrder([]) : undefined,
+      onOpenProject: w.projectId ? () => void goto(`/projects/${w.projectId}`) : undefined,
+      onAddProject:
+        !w.projectId && real
+          ? () => {
+              importPath = w.path;
+              importError = null;
+            }
+          : undefined,
+      onCopyPath: real ? () => copyText(w.path, 'Path copied') : undefined,
+      onDeleteHistory: deleteHistoryFor(w),
+    });
+  }
 
   function threadsForWorkspace(path: string, raw: CoderThread[]): CoderThread[] {
     const scopedFilters = {
@@ -152,16 +224,28 @@
       project: 'all' as const,
     };
     let scoped = filterAndSortSessions(raw, scopedFilters, runningThreadIds, queuedCountFor);
-    return sortThreadsForWorkspace(scoped, filters.sort as SessionSortKey, runningThreadIds);
+    // Stable sort: starred sessions float up, the chosen order holds within each half.
+    return sortThreadsForWorkspace(scoped, filters.sort as SessionSortKey, runningThreadIds).sort(
+      (a, b) => Number(ui.starred.includes(b.id)) - Number(ui.starred.includes(a.id))
+    );
   }
 
-  // Follow the open conversation: expand its workspace, then scroll its row into view.
-  // Re-runs when the list changes too, so a deep link scrolls once threads have loaded.
+  // Follow the open conversation once per selection: expand its workspace and scroll its row
+  // into view. Repeating this on every list refresh dragged the list back while scrolling.
+  let followedId: string | null = null;
   $effect(() => {
     const id = selectedThreadId;
-    if (!id) return;
-    const ws = threads.find((t) => t.id === id)?.workspace_root;
-    if (ws && ui.showAllWorkspaces && !ui.isExpanded(ws)) ui.toggleExpanded(ws);
+    if (!id) {
+      followedId = null;
+      return;
+    }
+    if (id === followedId || projectsLoading) return;
+    const ws = workspaces.find((w) => w.threads.some((t) => t.id === id));
+    if (!ws) return;
+    followedId = id;
+    untrack(() => {
+      if (!ui.isExpanded(ws.path)) ui.toggleExpanded(ws.path);
+    });
     void tick().then(() => {
       const el = listEl?.querySelector(`[data-session-id="${CSS.escape(id)}"]`);
       el?.scrollIntoView({ block: 'nearest' });
@@ -234,33 +318,20 @@
           No workspaces yet. Add a project folder to get started.
         </p>
       {:else}
-        {#if otherVisible}
-          <p class="px-2 pt-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            Other folders
-          </p>
-          {#each otherWorkspaces as workspace (workspace.path)}
-            {@render workspaceRow(workspace, true)}
-          {/each}
-          {#if projectVisible}
-            <p class="px-2 pt-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              Projects
-            </p>
-          {/if}
-        {/if}
-        {#if searching && !otherVisible && !projectVisible}
+        {#if searching && !anyVisible}
           <p class="px-2 py-4 text-center text-xs text-muted-foreground">No matching sessions</p>
         {/if}
-        {#each projectWorkspaces as workspace (workspace.path)}
-          {@render workspaceRow(workspace, false)}
+        {#each workspaces as workspace (workspace.path)}
+          {@render workspaceRow(workspace)}
         {/each}
       {/if}
     </div>
   </ScrollArea>
 </div>
 
-{#snippet workspaceRow(workspace: ProjectWorkspace, orphan: boolean)}
+{#snippet workspaceRow(workspace: ProjectWorkspace)}
   {@const isActive = workspace.path === ui.activeProjectPath}
-  {@const expanded = orphan || searching ? true : ui.isExpanded(workspace.path)}
+  {@const expanded = searching || ui.isExpanded(workspace.path)}
   {@const wsThreads = expanded ? threadsForWorkspace(workspace.path, workspace.threads) : []}
   {#if !searching || wsThreads.length > 0}
     <ProjectWorkspaceSection
@@ -282,6 +353,11 @@
       {subAgentSummaryFor}
       {badgeFor}
       {onLaunchWorkspace}
+      menuItems={menuFor(workspace, expanded)}
+      starred={isStarred(workspace)}
+      onDeleteHistory={deleteHistoryFor(workspace)}
+      starredThreadIds={ui.starred}
+      onToggleThreadStar={(t) => ui.toggleStar(t.id)}
     />
   {/if}
 {/snippet}

@@ -1,7 +1,11 @@
 <script lang="ts">
   import ChevronRight from '~icons/fa6-solid/chevron-right';
   import Folder from '~icons/fa6-solid/folder';
+  import Star from '~icons/fa6-solid/star';
+  import Trash from '~icons/fa6-solid/trash';
   import { Button } from '$lib/components/ui/button';
+  import ContextMenuList from '$lib/components/menu/ContextMenuList.svelte';
+  import type { MenuItem } from '$lib/components/menu/types';
   import CoderSessionCard from './CoderSessionCard.svelte';
   import type { SessionCardBadge } from '$lib/domains/ai/components/shared/AISessionCard.svelte';
   import type { CoderThread } from '../types.js';
@@ -22,6 +26,13 @@
     subAgentSummaryFor?: (threadId: string) => { running: number; total: number };
     badgeFor?: (threadId: string) => SessionCardBadge[];
     onLaunchWorkspace?: ((thread: CoderThread) => void) | null;
+    /** Right-click actions for the header. */
+    menuItems?: MenuItem[];
+    starred?: boolean;
+    /** Delete every session of this workspace; undefined hides the button. */
+    onDeleteHistory?: () => void;
+    starredThreadIds?: string[];
+    onToggleThreadStar?: (thread: CoderThread) => void;
   }
 
   let {
@@ -39,6 +50,11 @@
     subAgentSummaryFor,
     badgeFor,
     onLaunchWorkspace,
+    menuItems = [],
+    starred = false,
+    onDeleteHistory,
+    starredThreadIds = [],
+    onToggleThreadStar,
   }: Props = $props();
 
   const sessionCount = $derived(threads.length);
@@ -46,52 +62,81 @@
 </script>
 
 <div class="rounded-md {active ? 'bg-muted/50' : ''}">
-  <div
-    class="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted/60"
-  >
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      class="h-5 w-5 shrink-0"
-      title={expanded ? 'Collapse' : 'Expand'}
-      onclick={() => onToggle?.()}
-    >
-      <ChevronRight
-        class="h-3.5 w-3.5 text-muted-foreground transition-transform {expanded ? 'rotate-90' : ''}"
-      />
-    </Button>
-    <Button
-      type="button"
-      variant="ghost"
-      class="h-auto min-w-0 flex-1 justify-start gap-1.5 px-0 text-left text-sm"
-      onclick={() => {
-        onSelectProject?.();
-        if (!expanded) onToggle?.();
-      }}
-    >
-      <Folder class="h-3.5 w-3.5 shrink-0 {active ? 'text-primary' : 'text-muted-foreground'}" />
-      <span
-        class="min-w-0 flex-1 truncate font-medium {active
-          ? 'text-foreground'
-          : 'text-foreground/90'}"
-        title={workspace.path}
+  <ContextMenuList items={menuItems}>
+    {#snippet trigger(menuProps)}
+      <div
+        {...menuProps}
+        class="group flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted/60"
       >
-        {workspace.label}
-      </span>
-      {#if hasRunning}
-        <span
-          class="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary"
-          title="Running session"
-        ></span>
-      {/if}
-      {#if sessionCount > 0}
-        <span class="shrink-0 text-xs text-muted-foreground tabular-nums">
-          {sessionCount}
-        </span>
-      {/if}
-    </Button>
-  </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          class="h-5 w-5 shrink-0"
+          title={expanded ? 'Collapse' : 'Expand'}
+          onclick={() => onToggle?.()}
+        >
+          <ChevronRight
+            class="h-3.5 w-3.5 text-muted-foreground transition-transform {expanded
+              ? 'rotate-90'
+              : ''}"
+          />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          class="h-auto min-w-0 flex-1 justify-start gap-1.5 px-0 text-left text-sm"
+          onclick={() => {
+            onSelectProject?.();
+            if (!expanded) onToggle?.();
+          }}
+        >
+          <Folder
+            class="h-3.5 w-3.5 shrink-0 {active
+              ? 'text-primary'
+              : 'text-muted-foreground'} {workspace.projectId ? '' : 'opacity-40'}"
+          />
+          <span
+            class="min-w-0 flex-1 truncate font-medium {active
+              ? 'text-foreground'
+              : 'text-foreground/90'}"
+            title={workspace.projectId
+              ? workspace.path
+              : `${workspace.path} — folder not added as a project (right-click to add)`}
+          >
+            {workspace.label}
+          </span>
+          {#if starred}
+            <Star class="h-3 w-3 shrink-0 text-amber-500" aria-label="Starred" />
+          {/if}
+          {#if hasRunning}
+            <span
+              class="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary"
+              title="Running session"
+            ></span>
+          {/if}
+          {#if sessionCount > 0}
+            <span class="shrink-0 text-xs text-muted-foreground tabular-nums">
+              {sessionCount}
+            </span>
+          {/if}
+        </Button>
+        {#if onDeleteHistory}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            class="h-5 w-5 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100"
+            title="Delete chat history"
+            aria-label="Delete chat history for {workspace.label}"
+            onclick={onDeleteHistory}
+          >
+            <Trash class="h-3 w-3" />
+          </Button>
+        {/if}
+      </div>
+    {/snippet}
+  </ContextMenuList>
 
   {#if expanded && threads.length > 0}
     <div class="space-y-1 pt-0.5 pr-1 pb-1 pl-3">
@@ -108,6 +153,8 @@
             subAgentRunning={subAgentSummaryFor?.(t.id).running ?? 0}
             extraBadges={badgeFor?.(t.id)}
             {onLaunchWorkspace}
+            starred={starredThreadIds.includes(t.id)}
+            onToggleStar={onToggleThreadStar}
           />
         </div>
       {/each}

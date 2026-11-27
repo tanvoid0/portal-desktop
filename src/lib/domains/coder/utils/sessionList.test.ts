@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupSessionsByProject } from './sessionList.js';
+import { arrangeWorkspaces, groupSessionsByProject, movePath } from './sessionList.js';
 import type { CoderThread } from '../types.js';
 import type { Project } from '$lib/domains/projects/types';
 
@@ -77,5 +77,33 @@ describe('groupSessionsByProject', () => {
 
   it('defaults to recent-first when no sort is given', () => {
     expect(labels(groupSessionsByProject(THREADS, PROJECTS))[0]).toBe('zeta');
+  });
+});
+
+describe('arrangeWorkspaces', () => {
+  const ws = (path: string, sessions = 1) => ({
+    path,
+    label: path,
+    threads: Array.from({ length: sessions }, (_, i) => thread(`${path}${i}`, path, '')),
+  });
+  const paths = (list: Array<{ path: string }>) => list.map((w) => w.path);
+
+  it('keeps empty workspaces below those with sessions, starred first in each half', () => {
+    const out = arrangeWorkspaces(
+      [ws('a'), ws('empty', 0), ws('b'), ws('emptyStar', 0)],
+      (w) => w.path === 'b' || w.path === 'emptyStar',
+      []
+    );
+    expect(paths(out)).toEqual(['b', 'a', 'emptyStar', 'empty']);
+  });
+
+  it('applies the hand-set order, keeping rows never placed above it as they came', () => {
+    const out = arrangeWorkspaces([ws('a'), ws('b'), ws('c'), ws('d')], () => false, ['c', 'a']);
+    expect(paths(out)).toEqual(['b', 'd', 'c', 'a']);
+  });
+
+  it('moves one path without disturbing the rest', () => {
+    expect(movePath(['a', 'b', 'c'], 2, 0)).toEqual(['c', 'a', 'b']);
+    expect(movePath(['a', 'b', 'c'], 0, 1)).toEqual(['b', 'a', 'c']);
   });
 });

@@ -29,6 +29,7 @@
     onThreadClick?: (thread: CoderThread) => void;
     onCreateNew?: () => void;
     onDeleteThread?: (thread: CoderThread) => void;
+    onDeleteThreads?: (threads: CoderThread[], label: string, kept: number) => void;
     onProjectSelect?: (path: string, projectId?: string) => void;
     selectedThreadId?: string | null;
     runningThreadIds?: Set<string>;
@@ -54,6 +55,7 @@
     onThreadClick,
     onCreateNew,
     onDeleteThread,
+    onDeleteThreads,
     onProjectSelect,
     selectedThreadId = null,
     runningThreadIds = new Set<string>(),
@@ -249,6 +251,7 @@
     {loading}
     {onThreadClick}
     {onDeleteThread}
+    {onDeleteThreads}
     {onProjectSelect}
     {queuedCountFor}
     {subAgentSummaryFor}

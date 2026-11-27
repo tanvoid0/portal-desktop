@@ -22,6 +22,7 @@
   import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { toast } from '$lib/utils/toast';
   import CoderSessionList from '$lib/domains/coder/components/CoderSessionList.svelte';
+  import { deleteHistoryMessage } from '$lib/domains/coder/utils/threadMenu';
   import PanelRightOpen from '~icons/fa6-solid/table-columns';
   import AgentSessionPanel from './AgentSessionPanel.svelte';
   import CoderWorkspacePanel from '$lib/domains/coder/components/CoderWorkspacePanel.svelte';
@@ -190,6 +191,32 @@
     }
   }
 
+  async function deleteThreads(ts: CoderThread[], label: string, kept: number) {
+    if (
+      !(await confirmAction(deleteHistoryMessage(ts.length, label, kept), 'Delete chat history', {
+        confirmLabel: 'Delete',
+        destructive: true,
+      }))
+    )
+      return;
+    // One refusal (the backend will not delete a live run) must not stop the rest.
+    const failed: string[] = [];
+    for (const t of ts) {
+      try {
+        await agentsApi.deleteSession(t.id);
+        if (t.id === focusedId) syncUrl(null);
+      } catch (e) {
+        failed.push(String(e));
+      }
+    }
+    void queryClient.invalidateQueries({ queryKey: queryKeys.agents.sessions });
+    if (failed.length) {
+      toast.error(
+        `Deleted ${ts.length - failed.length} of ${ts.length}; ${failed.length} failed: ${failed[0]}`
+      );
+    }
+  }
+
   async function endRun() {
     if (!focusedId) return;
     try {
@@ -245,6 +272,7 @@
     onLaunchWorkspace={(t) => newRun(t.workspace_root)}
     onCreateNew={() => newRun()}
     onDeleteThread={deleteThread}
+    onDeleteThreads={deleteThreads}
   />
 {/snippet}
 
