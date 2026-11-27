@@ -1031,6 +1031,7 @@ pub fn run() {
             domains::disk::commands::list_locations,
             domains::disk::commands::disk_usage,
             domains::disk::commands::host_stats,
+            domains::disk::commands::system_details,
             domains::disk::commands::verify_proposals,
             domains::disk::commands::cancel_verify,
             domains::disk::commands::open_recycle_bin,

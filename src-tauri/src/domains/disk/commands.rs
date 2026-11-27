@@ -19,7 +19,7 @@ use crate::domains::disk::dev_cleaners::{
     self, DevCleaner, DevCleanerCleanItem, DevCleanerCleanResult, DevCleanerScan,
     DevCleanerScanContext, DevCleanerWalkHooks,
 };
-use crate::domains::disk::disk::{self, DiskUsage, HostStats};
+use crate::domains::disk::disk::{self, DiskUsage, HostStats, SystemDetails};
 use crate::domains::disk::locations::{self, Location};
 use crate::domains::disk::projects::{to_project_scan, ProjectScan};
 use crate::domains::disk::quarantine::{self, QuarantineItem, QuarantineResult};
@@ -289,10 +289,13 @@ pub fn list_locations() -> Vec<Location> {
     locations::suggested_locations()
 }
 
-/// Mounted-volume capacity readout for the Dashboard. Read-only.
+/// Mounted-volume capacity readout for the Dashboard and the System page. Read-only.
+/// Off the async runtime so a slow drive never stalls it or the UI thread.
 #[portal_rpc_macro::rpc(cap = "sysinfo")]
-pub fn disk_usage() -> Vec<DiskUsage> {
-    disk::disk_usage()
+pub async fn disk_usage() -> Result<Vec<DiskUsage>, String> {
+    tauri::async_runtime::spawn_blocking(disk::disk_usage)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// CPU / memory / GPU readout for the sidebar and the System page. Read-only.
@@ -300,6 +303,15 @@ pub fn disk_usage() -> Vec<DiskUsage> {
 #[portal_rpc_macro::rpc(cap = "sysinfo")]
 pub async fn host_stats() -> HostStats {
     disk::host_stats().await
+}
+
+/// Per-core load, network rates and top processes. Only the System page polls it.
+/// The process walk is blocking work, so it runs off the async runtime.
+#[portal_rpc_macro::rpc(cap = "sysinfo")]
+pub async fn system_details() -> Result<SystemDetails, String> {
+    tauri::async_runtime::spawn_blocking(disk::system_details)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Advisory: asks the configured AI provider (via the desktop `ai` domain) for a

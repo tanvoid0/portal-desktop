@@ -12,4 +12,8 @@ name: string,
 /**
  * Filesystem, e.g. "NTFS" | "ext4".
  */
-fsKind: string, totalBytes: number, availableBytes: number, isRemovable: boolean, };
+fsKind: string, totalBytes: number, availableBytes: number, isRemovable: boolean, 
+/**
+ * Drive temperature. `None` when the drive or OS won't say without admin rights.
+ */
+temperatureC: number | null, };

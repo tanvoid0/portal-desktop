@@ -129,8 +129,8 @@ inventory::collect!(Entry);
 /// PC is opt-in per device (the dialog renders it unchecked). Credentials carry
 /// no capability at all, so they can never be granted to anyone.
 ///
-/// `sysinfo` is the read-only CPU/memory/volume readout (`host_stats`,
-/// `disk_usage`): it writes nothing and starts nothing, so it rides the default
+/// `sysinfo` is the read-only host readout (`host_stats`, `disk_usage`, and
+/// `system_details`, which names the busiest processes): it writes nothing and starts nothing, so it rides the default
 /// grant. Move it to [`SENSITIVE_CAPS`] to make it opt-in.
 pub const DEFAULT_CAPS: &[&str] = &[
     "coder",
@@ -612,6 +612,7 @@ b",
         assert_eq!(capability("execute_script"), Some("terminal.exec"));
         assert_eq!(capability("host_stats"), Some("sysinfo"));
         assert_eq!(capability("disk_usage"), Some("sysinfo"));
+        assert_eq!(capability("system_details"), Some("sysinfo"));
         assert!(capability("execute_command_in_directory").is_none());
         assert!(capability("create_pipeline").is_none());
         assert!(capability("github_start_device_flow").is_none());

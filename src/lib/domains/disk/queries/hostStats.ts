@@ -1,7 +1,9 @@
 import { createQuery } from '@tanstack/svelte-query';
 import { invokeClient } from '$lib/utils/invokeClient';
 import { queryKeys } from '$lib/domains/shared/query/keys';
-import type { DiskUsage, HostStats } from '../generated';
+import type { DiskUsage, HostStats, SystemDetails } from '../generated';
+import { record } from '../state/history.svelte';
+import { usedPct } from '../utils';
 
 /** CPU % is a delta between two refreshes, so the backend's first reading after it starts is a
  *  meaningless 0. Take a second one before reporting it — the page shows "Measuring…" meanwhile. */
@@ -17,7 +19,26 @@ export async function fetchHostStats(): Promise<HostStats> {
 export function createHostStatsQuery() {
   return createQuery(() => ({
     queryKey: queryKeys.disk.hostStats,
-    queryFn: fetchHostStats,
+    // The sidebar polls this app-wide, so the System page's chart is already filled on arrival.
+    queryFn: async () => {
+      const h = await fetchHostStats();
+      record('load', h.cpuPercent, usedPct(h.memoryUsedBytes, h.memoryTotalBytes));
+      return h;
+    },
+    staleTime: 0,
+    refetchInterval: 2000,
+  }));
+}
+
+/** Cores, network and processes. Only the System page mounts this, so only it pays for it. */
+export function createSystemDetailsQuery() {
+  return createQuery(() => ({
+    queryKey: queryKeys.disk.systemDetails,
+    queryFn: async () => {
+      const d = await invokeClient.post<SystemDetails>('system_details');
+      if (d.measured) record('net', d.netDownBytesPerSec, d.netUpBytesPerSec);
+      return d;
+    },
     staleTime: 0,
     refetchInterval: 2000,
   }));

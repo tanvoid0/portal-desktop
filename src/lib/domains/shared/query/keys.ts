@@ -100,5 +100,6 @@ export const queryKeys = {
   disk: {
     hostStats: ['disk', 'host-stats'] as const,
     usage: ['disk', 'usage'] as const,
+    systemDetails: ['disk', 'system-details'] as const,
   },
 };
