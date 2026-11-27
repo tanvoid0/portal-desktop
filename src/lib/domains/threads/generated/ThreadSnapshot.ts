@@ -6,4 +6,8 @@ import type { ThreadSummary } from "./ThreadSummary";
 /**
  * Answered by the actor, so the partial text/thinking of a turn in flight is included.
  */
-export type ThreadSnapshot = { thread: ThreadSummary, seq: number, messages: Array<ChatMessage>, state: ThreadState, partial_text: string, partial_thinking: string, };
+export type ThreadSnapshot = { thread: ThreadSummary, seq: number, messages: Array<ChatMessage>, state: ThreadState, partial_text: string, partial_thinking: string, 
+/**
+ * Live-only, from the last heartbeat of the turn in flight.
+ */
+waited_seconds: number, };

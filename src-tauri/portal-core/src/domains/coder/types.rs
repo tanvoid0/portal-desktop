@@ -444,7 +444,7 @@ pub struct MultitaskCancelRequest {
     pub sub_agent_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct CoderSubAgent {

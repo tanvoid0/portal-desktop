@@ -4,13 +4,13 @@
 //! deltas skip the database and are coalesced into `coder://thread-delta` frames.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use tokio::sync::{mpsc, oneshot};
 
 use super::apply::apply;
-use super::decide::decide;
+use super::decide::{decide, react};
 use super::store;
 use super::types::*;
 use crate::database::DatabaseManager;
@@ -24,9 +24,13 @@ const RELOAD_BACKOFF: Duration = Duration::from_secs(1);
 const IDLE_EVICT: Duration = Duration::from_secs(10 * 60);
 const EVENT_FRAME: &str = "coder://thread-event";
 const DELTA_FRAME: &str = "coder://thread-delta";
+/// Live-only, like deltas; the name stays under the `coder` domain for `event_cap`.
+const HEARTBEAT_FRAME: &str = "coder://thread-heartbeat";
+const PORTAL: &str = "portal";
 
 enum Msg {
-    Command(Envelope),
+    /// The reply is for client commands; producers fire and forget.
+    Command(Box<Envelope>, Option<oneshot::Sender<CommandAck>>),
     Snapshot(oneshot::Sender<Option<ThreadSnapshot>>),
 }
 
@@ -34,18 +38,41 @@ pub struct ThreadHub {
     db: Arc<DatabaseManager>,
     sink: Arc<dyn EventSink>,
     actors: Mutex<HashMap<String, mpsc::UnboundedSender<Msg>>>,
+    /// Effect runners, registered once at startup: Portal threads and everything else.
+    /// Unregistered, effects are logged and dropped.
+    portal_fx: OnceLock<Arc<dyn ThreadEffects>>,
+    cli_fx: OnceLock<Arc<dyn ThreadEffects>>,
 }
 
 impl ThreadHub {
     pub fn new(db: Arc<DatabaseManager>, sink: Arc<dyn EventSink>) -> Arc<Self> {
-        Arc::new(Self { db, sink, actors: Mutex::new(HashMap::new()) })
+        Arc::new(Self {
+            db,
+            sink,
+            actors: Mutex::new(HashMap::new()),
+            portal_fx: OnceLock::new(),
+            cli_fx: OnceLock::new(),
+        })
+    }
+
+    /// First registration wins; later ones are ignored.
+    pub fn register_effects(&self, portal: Arc<dyn ThreadEffects>, cli: Arc<dyn ThreadEffects>) {
+        let _ = self.portal_fx.set(portal);
+        let _ = self.cli_fx.set(cli);
     }
 
     /// Sync and cheap (the agent pump calls it per event). An unknown thread is
     /// created by its actor from the persisted `agent_sessions` row.
     pub fn submit(self: &Arc<Self>, thread_id: &str, cmd: ThreadCommand) {
         let env = Envelope { cmd, actor: "system".into(), command_id: None };
-        self.send(thread_id, Msg::Command(env));
+        self.send(thread_id, Msg::Command(Box::new(env), None));
+    }
+
+    /// A client command: waits for the actor's verdict (accepted, duplicate or rejected).
+    pub async fn command(self: &Arc<Self>, thread_id: &str, env: Envelope) -> Result<CommandAck, String> {
+        let (tx, rx) = oneshot::channel();
+        self.send(thread_id, Msg::Command(Box::new(env), Some(tx)));
+        rx.await.map_err(|_| "threads: actor stopped".to_string())
     }
 
     pub async fn snapshot(self: &Arc<Self>, thread_id: &str) -> Result<Option<ThreadSnapshot>, String> {
@@ -116,6 +143,7 @@ struct Pending {
 
 struct Actor {
     id: String,
+    hub: Arc<ThreadHub>,
     db: Arc<DatabaseManager>,
     sink: Arc<dyn EventSink>,
     state: ThreadState,
@@ -130,11 +158,17 @@ struct Actor {
     text_units: usize,
     thinking_units: usize,
     pending: Option<Pending>,
+    /// Last heartbeat of the turn in flight; in memory only.
+    waited_seconds: u32,
+    /// Set by a commit that completed a turn with a queue behind it; `actor_loop` runs
+    /// `DrainQueue` before it reads the next message.
+    drain: bool,
 }
 
 async fn actor_loop(hub: Arc<ThreadHub>, id: String, mut rx: mpsc::UnboundedReceiver<Msg>) {
     let mut a = Actor {
         id: id.clone(),
+        hub: Arc::clone(&hub),
         db: Arc::clone(&hub.db),
         sink: Arc::clone(&hub.sink),
         state: ThreadState::default(),
@@ -145,15 +179,26 @@ async fn actor_loop(hub: Arc<ThreadHub>, id: String, mut rx: mpsc::UnboundedRece
         text_units: 0,
         thinking_units: 0,
         pending: None,
+        waited_seconds: 0,
+        drain: false,
     };
     a.ensure_trusted().await;
     loop {
+        if std::mem::take(&mut a.drain) {
+            let drain = Envelope { cmd: ThreadCommand::DrainQueue, actor: "system".into(), command_id: None };
+            a.command(drain).await;
+        }
         let wait = match &a.pending {
             Some(p) => DELTA_COALESCE.saturating_sub(p.since.elapsed()),
             None => IDLE_EVICT,
         };
         match tokio::time::timeout(wait, rx.recv()).await {
-            Ok(Some(Msg::Command(env))) => a.command(env).await,
+            Ok(Some(Msg::Command(env, reply))) => {
+                let ack = a.command(*env).await;
+                if let Some(reply) = reply {
+                    let _ = reply.send(ack);
+                }
+            }
             Ok(Some(Msg::Snapshot(reply))) => {
                 a.flush_delta(); // so the client's partial matches the next frame's offset
                 let _ = reply.send(a.snapshot().await);
@@ -194,48 +239,85 @@ impl Actor {
     }
 
     /// An untrusted actor drops the command (deltas silently); nothing ends the actor.
-    async fn command(&mut self, env: Envelope) {
+    async fn command(&mut self, env: Envelope) -> CommandAck {
+        let unavailable = |a: &Self| CommandAck { code: Some("unavailable".into()), ..CommandAck::new(AckStatus::Rejected, a.state.last_seq) };
         if !self.ensure_trusted().await {
-            return;
+            return unavailable(self);
         }
         if !self.state.created() && !matches!(env.cmd, ThreadCommand::Create(_)) {
             let meta = match store::session_meta(self.db.get_connection(), &self.id).await {
                 Ok(Some(m)) => m,
-                Ok(None) => return eprintln!("threads: no session row for {}, dropping event", self.id),
-                Err(e) => return eprintln!("{e}"),
+                Ok(None) => {
+                    eprintln!("threads: no session row for {}, dropping event", self.id);
+                    return CommandAck::rejected(&Reject::NotCreated, 0);
+                }
+                Err(e) => {
+                    eprintln!("{e}");
+                    return unavailable(self);
+                }
             };
             let create = Envelope { cmd: ThreadCommand::Create(meta), actor: "system".into(), command_id: None };
             self.run(create).await;
             if !self.trusted {
-                return;
+                return unavailable(self);
             }
+        }
+        // Live-only: nothing to decide or persist, so no seq and no dedup.
+        if let ThreadCommand::Portal(PortalInput::Heartbeat { waited_seconds }) = &env.cmd {
+            self.waited_seconds = *waited_seconds;
+            self.sink.emit(
+                HEARTBEAT_FRAME,
+                serde_json::json!({ "thread_id": self.id, "seq": self.state.last_seq, "waited_seconds": waited_seconds }),
+            );
+            return CommandAck::new(AckStatus::Accepted, self.state.last_seq);
         }
         let delta = match &env.cmd {
             ThreadCommand::Provider(AgentEvent::TextDelta { text, parent_tool_use_id: None }) => Some((false, text.clone())),
             ThreadCommand::Provider(AgentEvent::ThinkingDelta { text, parent_tool_use_id: None }) => Some((true, text.clone())),
             _ => None,
         };
-        self.run(env).await;
+        let ack = self.run(env).await;
         if let (true, Some((thinking, text))) = (self.trusted, delta) {
             self.push_delta(thinking, text);
         }
+        ack
     }
 
-    /// decide -> apply in place -> one transaction -> emit. A failed commit leaves the
-    /// state untrusted until it is reloaded.
-    async fn run(&mut self, env: Envelope) {
+    /// dedup -> decide -> apply in place -> one transaction -> emit -> effects. A failed
+    /// commit leaves the state untrusted until it is reloaded.
+    async fn run(&mut self, env: Envelope) -> CommandAck {
+        if let Some(cid) = &env.command_id {
+            match store::command_seq(self.db.get_connection(), &self.id, cid).await {
+                Ok(Some(seq)) => return CommandAck::new(AckStatus::Duplicate, seq),
+                Ok(None) => {}
+                Err(e) => {
+                    eprintln!("{e}");
+                    return CommandAck { code: Some("unavailable".into()), ..CommandAck::new(AckStatus::Rejected, self.state.last_seq) };
+                }
+            }
+        }
         // Only a tool call folds the streamed thinking into its message.
         let thinking = match &env.cmd {
             ThreadCommand::Provider(AgentEvent::ToolCall { .. }) => self.partial_thinking.clone(),
             _ => String::new(),
         };
-        let ctx = Ctx { now: now_iso(), actor: env.actor.clone(), thinking };
+        let ctx = Ctx {
+            now: now_iso(),
+            actor: env.actor.clone(),
+            thinking,
+            queue_id: uuid::Uuid::new_v4().to_string(),
+        };
         let events = match decide(&self.state, &env.cmd, &ctx) {
             Ok(e) => e,
-            Err(r) => return eprintln!("threads: {} rejected command: {r:?}", self.id),
+            Err(r) => {
+                eprintln!("threads: {} rejected command: {r:?}", self.id);
+                return CommandAck::rejected(&r, self.state.last_seq);
+            }
         };
         if events.is_empty() {
-            return;
+            // Nothing to write, but a repeated `Stop` still re-fires its `Cancel`.
+            self.dispatch(react(&self.state, &env.cmd, &[]));
+            return CommandAck::new(AckStatus::Accepted, self.state.last_seq);
         }
         self.flush_delta(); // pending deltas precede this commit's frames
         let base = self.state.last_seq;
@@ -244,9 +326,10 @@ impl Actor {
             .into_iter()
             .enumerate()
             .map(|(i, event)| {
-                apply(&mut self.state, &event);
+                apply(&mut self.state, &event, &ctx.actor);
                 ThreadEventFrame {
                     thread_id: self.id.clone(),
+                    provider: self.state.meta.provider.clone(),
                     seq: base + 1 + i as i64,
                     at: ctx.now.clone(),
                     actor: ctx.actor.clone(),
@@ -263,13 +346,15 @@ impl Actor {
             self.trusted = false;
             self.last_load = None;
             self.ensure_trusted().await;
-            return;
+            return CommandAck { code: Some("commit_failed".into()), ..CommandAck::new(AckStatus::Rejected, self.state.last_seq) };
         }
         // The turn's streamed text is superseded once the assistant's message lands or
         // the turn ends; a user message or tool result mid-turn leaves it alone.
         let clears = |e: &ThreadEvent| match e {
             ThreadEvent::MessageAppended { message } => message.role == "assistant",
-            ThreadEvent::TurnEnded { .. } | ThreadEvent::ProcessExited { .. } => true,
+            ThreadEvent::TurnEnded { .. }
+            | ThreadEvent::ProcessExited { .. }
+            | ThreadEvent::MessagesRewritten { .. } => true,
             _ => false,
         };
         if frames.iter().any(|f| clears(&f.event)) {
@@ -277,9 +362,31 @@ impl Actor {
             self.partial_thinking.clear();
             self.text_units = 0;
             self.thinking_units = 0;
+            self.waited_seconds = 0;
         }
         for f in &frames {
             self.sink.emit(EVENT_FRAME, f);
+        }
+        self.dispatch(react(&self.state, &env.cmd, &frames));
+        // A completed turn with a queue behind it drains before the loop reads the next
+        // message, so a client `Send` cannot overtake the queued ones.
+        let completed = frames.iter().any(|f| matches!(f.event, ThreadEvent::TurnEnded { outcome: TurnOutcome::Completed, .. }));
+        self.drain = completed && !self.state.queue.is_empty();
+        CommandAck::new(AckStatus::Accepted, self.state.last_seq)
+    }
+
+    /// Each effect in its own task: never awaited here, never inside the transaction.
+    fn dispatch(&self, effects: Vec<Effect>) {
+        if effects.is_empty() {
+            return;
+        }
+        let slot = if self.state.meta.provider == PORTAL { &self.hub.portal_fx } else { &self.hub.cli_fx };
+        let Some(fx) = slot.get() else {
+            return eprintln!("threads: no effects registered for {}, dropping {effects:?}", self.id);
+        };
+        for effect in effects {
+            let (fx, id) = (Arc::clone(fx), self.id.clone());
+            tokio::spawn(async move { fx.run(&id, effect).await });
         }
     }
 
@@ -325,6 +432,7 @@ impl Actor {
             state,
             partial_text: self.partial_text.clone(),
             partial_thinking: self.partial_thinking.clone(),
+            waited_seconds: self.waited_seconds,
         })
     }
 }

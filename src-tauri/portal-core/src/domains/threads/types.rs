@@ -5,7 +5,7 @@ use serde_json::Value;
 use ts_rs::TS;
 
 use crate::domains::agents::AgentEvent;
-use crate::domains::coder::types::{ChatMessage, PendingApproval};
+use crate::domains::coder::types::{ChatMessage, CoderSubAgent, PendingApproval};
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../../src/lib/domains/threads/generated/")]
@@ -66,7 +66,15 @@ pub enum TurnOutcome {
     Interrupted,
 }
 
-/// Persisted, one `seq` each. Section 2 of the design; S1 carries the CLI subset.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "../../../src/lib/domains/threads/generated/")]
+pub enum DequeueReason {
+    Sent,
+    Removed,
+}
+
+/// Persisted, one `seq` each. Section 2 of the design.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[ts(export, export_to = "../../../src/lib/domains/threads/generated/")]
@@ -118,7 +126,74 @@ pub enum ThreadEvent {
     ProcessExited {
         code: Option<i32>,
     },
+    TitleSet {
+        title: String,
+    },
+    ModelSet {
+        model: Option<String>,
+        llm_provider: Option<String>,
+    },
+    /// Edit, retry and platform reconcile: keep the first `keep` messages, then append `tail`.
+    MessagesRewritten {
+        keep: u32,
+        tail: Vec<ChatMessage>,
+    },
+    StopRequested,
+    HostRequested {
+        call_id: String,
+        /// `run_command` | `list_terminals` | `ask_user`.
+        kind: String,
+        #[ts(type = "unknown")]
+        payload: Value,
+    },
+    HostResolved {
+        call_id: String,
+    },
+    Enqueued {
+        queue_id: String,
+        text: String,
+    },
+    Dequeued {
+        queue_id: String,
+        reason: DequeueReason,
+    },
+    ChangeRecorded {
+        change_id: String,
+        path: String,
+        status: String,
+    },
+    SubAgentUpdated {
+        sub_agent: CoderSubAgent,
+    },
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/threads/generated/")]
+pub struct HostRequest {
+    pub call_id: String,
+    pub kind: String,
+    #[ts(type = "unknown")]
+    pub payload: Value,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/threads/generated/")]
+pub struct QueuedMessage {
+    pub queue_id: String,
+    pub text: String,
+}
+
+/// An approval or host request that already has an answer, and who gave it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/threads/generated/")]
+pub struct ResolvedCall {
+    pub call_id: String,
+    pub allow: bool,
+    pub by: String,
+}
+
+/// How many `recently_resolved` entries a thread remembers.
+pub const RECENTLY_RESOLVED: usize = 32;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../../src/lib/domains/threads/generated/")]
@@ -145,6 +220,13 @@ pub struct ThreadState {
     #[ts(type = "unknown")]
     pub todos: Option<Value>,
     pub subagents_running: u32,
+    pub host_requests: Vec<HostRequest>,
+    pub queue: Vec<QueuedMessage>,
+    pub sub_agents: Vec<CoderSubAgent>,
+    /// `StopRequested` until the turn actually ends.
+    pub stopping: bool,
+    /// Newest last, capped at `RECENTLY_RESOLVED`; the first-wins check reads it.
+    pub recently_resolved: Vec<ResolvedCall>,
     pub error: Option<String>,
     pub backend_session_id: Option<String>,
     #[ts(type = "number")]
@@ -169,12 +251,71 @@ pub struct Ctx {
     pub now: String,
     pub actor: String,
     pub thinking: String,
+    /// Fresh id for an `Enqueued` this command may produce.
+    pub queue_id: String,
+}
+
+/// Portal-engine producer inputs (actor `system`).
+#[derive(Debug, Clone)]
+pub enum PortalInput {
+    Reconcile { messages: Vec<ChatMessage>, title: Option<String> },
+    Title { title: String },
+    /// Live-only: the actor keeps it and emits a heartbeat frame, nothing is persisted.
+    Heartbeat { waited_seconds: u32 },
+    HostRequest { call_id: String, kind: String, payload: Value },
+    Pending(PendingApproval),
+    Failed { error: String },
+    Finished { outcome: TurnOutcome, final_text: Option<String> },
 }
 
 #[derive(Debug, Clone)]
 pub enum ThreadCommand {
     Create(ThreadMeta),
+    // Client intents.
+    Send { text: String },
+    RemoveQueued { queue_id: String },
+    EditMessage { index: usize, text: String },
+    Retry,
+    Stop,
+    Approve {
+        call_id: String,
+        allow: bool,
+        remember: bool,
+        edited_pattern: Option<String>,
+        edited_command: Option<String>,
+    },
+    ResolveHost { call_id: String, result: Value },
+    SetModel { model: Option<String>, llm_provider: Option<String> },
+    // Producer inputs.
     Provider(AgentEvent),
+    Portal(PortalInput),
+    ChangeRecorded { change_id: String, path: String, status: String },
+    SubAgentUpdated { sub_agent: CoderSubAgent },
+    /// The actor's own, after a turn completes with a queue behind it.
+    DrainQueue,
+}
+
+/// What a committed command asks the provider side to do. Provider-neutral; the
+/// registered `ThreadEffects` maps it onto the Coder service or an agent backend.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Effect {
+    StartTurn { trigger: TurnTrigger, text: String },
+    Cancel,
+    ResolveApproval {
+        call_id: String,
+        allow: bool,
+        remember: bool,
+        edited_pattern: Option<String>,
+        edited_command: Option<String>,
+    },
+    DeliverHostResult { call_id: String, result: Value },
+}
+
+/// Runs effects. Never awaited by the actor and never inside a transaction; results
+/// re-enter as commands (`ThreadHub::submit` / `command`).
+#[async_trait::async_trait]
+pub trait ThreadEffects: Send + Sync {
+    async fn run(&self, thread_id: &str, effect: Effect);
 }
 
 #[derive(Debug, Clone)]
@@ -188,12 +329,73 @@ pub struct Envelope {
 pub enum Reject {
     AlreadyCreated,
     NotCreated,
+    /// First wins: `by` (an actor) already answered with `allow`.
+    AlreadyResolved { by: String, allow: bool },
+    /// Unknown call, queue entry or message.
+    NotFound,
+    /// Edit/retry while a turn is open.
+    Busy,
+    /// Stop with nothing to stop.
+    NotRunning,
+    Invalid,
+}
+
+impl Reject {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::AlreadyCreated => "already_created",
+            Self::NotCreated => "not_created",
+            Self::AlreadyResolved { .. } => "already_resolved",
+            Self::NotFound => "not_found",
+            Self::Busy => "busy",
+            Self::NotRunning => "not_running",
+            Self::Invalid => "invalid",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "../../../src/lib/domains/threads/generated/")]
+pub enum AckStatus {
+    Accepted,
+    Duplicate,
+    Rejected,
+}
+
+/// The answer to a client command. `seq` is the thread's head after it (or the
+/// original command's last seq for a duplicate).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/threads/generated/")]
+pub struct CommandAck {
+    pub status: AckStatus,
+    #[ts(type = "number")]
+    pub seq: i64,
+    pub code: Option<String>,
+    /// `already_resolved`: who answered first, and what they chose.
+    pub resolved_by: Option<String>,
+    pub allow: Option<bool>,
+}
+
+impl CommandAck {
+    pub fn new(status: AckStatus, seq: i64) -> Self {
+        Self { status, seq, code: None, resolved_by: None, allow: None }
+    }
+    pub fn rejected(r: &Reject, seq: i64) -> Self {
+        let (resolved_by, allow) = match r {
+            Reject::AlreadyResolved { by, allow } => (Some(by.clone()), Some(*allow)),
+            _ => (None, None),
+        };
+        Self { code: Some(r.code().into()), resolved_by, allow, ..Self::new(AckStatus::Rejected, seq) }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../../src/lib/domains/threads/generated/")]
 pub struct ThreadEventFrame {
     pub thread_id: String,
+    /// `meta.provider` of the thread, so a client can route a frame without a lookup.
+    pub provider: String,
     #[ts(type = "number")]
     pub seq: i64,
     pub at: String,
@@ -250,6 +452,8 @@ pub struct ThreadSnapshot {
     pub state: ThreadState,
     pub partial_text: String,
     pub partial_thinking: String,
+    /// Live-only, from the last heartbeat of the turn in flight.
+    pub waited_seconds: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

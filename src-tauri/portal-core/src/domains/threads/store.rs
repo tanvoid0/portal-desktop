@@ -10,6 +10,7 @@ use sea_orm::{
 use super::entities::{thread, thread_event, thread_message};
 use super::types::*;
 use crate::domains::agents::entities::agent_session;
+use crate::domains::coder::types::ChatMessage;
 
 /// A client further behind than this re-snapshots instead of paging events.
 pub const MAX_CATCH_UP: i64 = 2000;
@@ -58,6 +59,23 @@ pub async fn load(db: &DatabaseConnection, id: &str) -> Result<Option<ThreadStat
     Ok(Some(state))
 }
 
+enum MsgOp {
+    Insert(thread_message::ActiveModel),
+    Truncate(i64),
+}
+
+/// The last seq a client `command_id` produced, if it was ever accepted (indexed lookup).
+pub async fn command_seq(db: &DatabaseConnection, id: &str, command_id: &str) -> Result<Option<i64>, String> {
+    let row = thread_event::Entity::find()
+        .filter(thread_event::Column::ThreadId.eq(id))
+        .filter(thread_event::Column::CommandId.eq(command_id))
+        .order_by_desc(thread_event::Column::Seq)
+        .one(db)
+        .await
+        .map_err(|e| err("command lookup", e))?;
+    Ok(row.map(|r| r.seq))
+}
+
 /// Insert `frames`, upsert the `threads` row (with `next` as its state) and append
 /// the new messages, atomically. `prev_messages` = how many message rows exist.
 pub async fn commit(
@@ -86,7 +104,20 @@ pub async fn commit(
         updated_at: Set(at),
     };
     let mut events = vec![];
-    let mut messages = vec![];
+    // Message-row ops in event order: a rewrite truncates, then its tail inserts.
+    let mut messages: Vec<MsgOp> = vec![];
+    let mut len = prev_messages;
+    let msg_row = |len: &mut usize, message: &ChatMessage, seq: i64| -> Result<MsgOp, String> {
+        let m = thread_message::ActiveModel {
+            thread_id: Set(id.to_string()),
+            idx: Set(*len as i64),
+            role: Set(message.role.clone()),
+            message_json: Set(serde_json::to_string(message).map_err(|e| err("serialize message", e))?),
+            seq: Set(seq),
+        };
+        *len += 1;
+        Ok(MsgOp::Insert(m))
+    };
     for f in frames {
         let payload = serde_json::to_value(&f.event).map_err(|e| err("serialize event", e))?;
         events.push(thread_event::ActiveModel {
@@ -98,15 +129,16 @@ pub async fn commit(
             actor: Set(f.actor.clone()),
             at: Set(f.at.clone()),
         });
-        if let ThreadEvent::MessageAppended { message } = &f.event {
-            let idx = prev_messages + messages.len();
-            messages.push(thread_message::ActiveModel {
-                thread_id: Set(id.to_string()),
-                idx: Set(idx as i64),
-                role: Set(message.role.clone()),
-                message_json: Set(serde_json::to_string(message).map_err(|e| err("serialize message", e))?),
-                seq: Set(f.seq),
-            });
+        match &f.event {
+            ThreadEvent::MessageAppended { message } => messages.push(msg_row(&mut len, message, f.seq)?),
+            ThreadEvent::MessagesRewritten { keep, tail } => {
+                len = len.min(*keep as usize);
+                messages.push(MsgOp::Truncate(len as i64));
+                for m in tail {
+                    messages.push(msg_row(&mut len, m, f.seq)?);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -127,8 +159,20 @@ pub async fn commit(
     for e in events {
         thread_event::Entity::insert(e).exec_without_returning(&txn).await.map_err(|e| err("insert event", e))?;
     }
-    for m in messages {
-        thread_message::Entity::insert(m).exec_without_returning(&txn).await.map_err(|e| err("insert message", e))?;
+    for op in messages {
+        match op {
+            MsgOp::Insert(m) => {
+                thread_message::Entity::insert(m).exec_without_returning(&txn).await.map_err(|e| err("insert message", e))?;
+            }
+            MsgOp::Truncate(from) => {
+                thread_message::Entity::delete_many()
+                    .filter(thread_message::Column::ThreadId.eq(id))
+                    .filter(thread_message::Column::Idx.gte(from))
+                    .exec(&txn)
+                    .await
+                    .map_err(|e| err("truncate messages", e))?;
+            }
+        }
     }
     txn.commit().await.map_err(|e| err("commit", e))
 }
@@ -148,11 +192,9 @@ pub async fn list(db: &DatabaseConnection) -> Result<Vec<ThreadSummary>, String>
 }
 
 pub async fn events_since(db: &DatabaseConnection, id: &str, since: i64) -> Result<ThreadEventsPage, String> {
-    let head = thread::Entity::find_by_id(id.to_string())
-        .one(db)
-        .await
-        .map_err(|e| err("load thread", e))?
-        .map_or(0, |r| r.last_seq);
+    let row = thread::Entity::find_by_id(id.to_string()).one(db).await.map_err(|e| err("load thread", e))?;
+    let head = row.as_ref().map_or(0, |r| r.last_seq);
+    let provider = row.map(|r| r.provider).unwrap_or_default();
     if since > head || head - since > MAX_CATCH_UP {
         return Ok(ThreadEventsPage { events: vec![], head_seq: head, reset: true });
     }
@@ -168,6 +210,7 @@ pub async fn events_since(db: &DatabaseConnection, id: &str, since: i64) -> Resu
         .map(|r| {
             Ok(ThreadEventFrame {
                 thread_id: r.thread_id,
+                provider: provider.clone(),
                 seq: r.seq,
                 at: r.at,
                 actor: r.actor,
