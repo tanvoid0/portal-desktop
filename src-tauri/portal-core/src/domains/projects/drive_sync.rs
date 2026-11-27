@@ -521,11 +521,13 @@ fn fsck(copy: &Path, source: &Path) -> Result<(), String> {
     tips(copy)?;
     let mut problems = fsck_problems(copy)?;
     // A dangling symref (`origin/HEAD` after a branch rename) loses nothing,
-    // as long as the source has it too.
+    // as long as the source has it too. Likewise the empty tree, which git
+    // never has to store.
     if !problems.is_empty() {
         let theirs = fsck_problems(source)?;
         let nowhere = format!("invalid sha1 pointer {}", "0".repeat(40));
-        problems.retain(|l| !(l.contains(&nowhere) && theirs.contains(l)));
+        let empty_tree = "missing tree 4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+        problems.retain(|l| !((l.contains(&nowhere) || l == empty_tree) && theirs.contains(l)));
     }
     match problems.first() {
         None => Ok(()),

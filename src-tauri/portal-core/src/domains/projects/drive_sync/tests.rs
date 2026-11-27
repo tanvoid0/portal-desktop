@@ -569,6 +569,26 @@ fn gc_during_the_copy_is_tolerated() {
     fsck(&f.replica(), &f.local).unwrap();
 }
 
+/// A commit on the empty tree, which git never has to store: fsck calls it
+/// missing in the source too, so the copy lost nothing.
+#[test]
+fn empty_tree_missing_in_the_source_too_is_not_a_failure() {
+    let f = Fx::git();
+    let c = sh(
+        &f.local,
+        &[
+            "commit-tree",
+            "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+            "-m",
+            "empty",
+        ],
+    );
+    sh(&f.local, &["update-ref", "refs/heads/empty", &c]);
+    let r = to_drive(&f.local, f.drive.path(), "proj", false, u64::MAX).unwrap();
+    assert!(r.failures.is_empty(), "{r:?}");
+    assert_eq!(r.status.state, S::InSync, "{r:?}");
+}
+
 #[test]
 fn replica_with_a_missing_object_is_not_synced() {
     let f = Fx::git();
