@@ -9,6 +9,12 @@
   import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import ArrowRight from '~icons/fa6-solid/arrow-right';
   import RefreshCw from '~icons/fa6-solid/rotate';
+  import Bell from '~icons/fa6-solid/bell';
+  import { Badge } from '$lib/components/ui/badge';
+  import { notificationInbox } from '$lib/domains/notifications/state/notificationInbox.svelte';
+
+  const unread = $derived(notificationInbox.unread);
+  const bellLabel = $derived(unread ? `Notifications, ${unread} unread` : 'Notifications');
 
   // Browser navigation state
   let canGoBack = $state(false);
@@ -97,6 +103,29 @@
         <RefreshCw class="h-3.5 w-3.5" />
       </Button>
     </div>
-    <Breadcrumb items={$breadcrumbItems} showHome={$showHome} homeItem={$homeItem} class="flex-1" />
+    <Breadcrumb
+      items={$breadcrumbItems}
+      showHome={$showHome}
+      homeItem={$homeItem}
+      class="min-w-0 flex-1 overflow-hidden"
+    />
+    <Button
+      href="/notifications"
+      variant="ghost"
+      size="icon"
+      class="relative h-7 w-7 shrink-0"
+      title={bellLabel}
+      aria-label={bellLabel}
+    >
+      <Bell class="h-3.5 w-3.5" />
+      {#if unread}
+        <Badge
+          variant="destructive"
+          class="absolute -top-0.5 -right-1.5 h-4 min-w-4 justify-center rounded-full px-1 py-0 text-[10px] leading-none tabular-nums"
+        >
+          {unread > 99 ? '99+' : unread}
+        </Badge>
+      {/if}
+    </Button>
   </div>
 </header>

@@ -13,6 +13,10 @@ import {
 import { toastActions, type Toast } from '$lib/domains/shared/stores/toastStore';
 import { appSettings } from '$lib/domains/settings/stores/settingsStore';
 import { createLogger } from '$lib/domains/shared/services/logger';
+import {
+  notificationInbox,
+  type NotificationContext,
+} from '$lib/domains/notifications/state/notificationInbox.svelte';
 
 import { isMobileShell } from '$lib/domains/mobile/shell';
 
@@ -25,7 +29,7 @@ const log = createLogger('notify');
 // tradeoff as `notified` in lib.rs — revisit with an LRU cap if that ever matters.
 const toastByRoute = new Map<string, string>();
 
-export interface NotifyPayload {
+export interface NotifyPayload extends NotificationContext {
   title: string;
   body?: string;
   type?: Toast['type'];
@@ -38,12 +42,31 @@ export function notify(p: NotifyPayload): void {
   const focused = document.hasFocus();
   if (focused && p.route === location.pathname) return;
 
+  // History first: the toast and the banner both expire, the inbox doesn't.
+  const type = p.type ?? 'info';
+  const { title, body, route, source, runId, requestId, projectId, facts } = p;
+  notificationInbox.add({
+    title,
+    body,
+    type,
+    route,
+    source,
+    runId,
+    requestId,
+    projectId,
+    facts,
+  });
+
+  const open = () => {
+    notificationInbox.markRouteRead(p.route!);
+    goto(p.route!);
+  };
   const toastId = toastActions.show({
     title: p.title,
     description: p.body,
-    type: p.type ?? 'info',
+    type,
     duration: p.duration,
-    action: p.route ? { label: p.actionLabel ?? 'Open', onClick: () => goto(p.route!) } : undefined,
+    action: p.route ? { label: p.actionLabel ?? 'Open', onClick: open } : undefined,
   });
   if (p.route) toastByRoute.set(p.route, toastId);
 
@@ -98,6 +121,7 @@ export async function initNotify(): Promise<() => void> {
       if (dismissId) toastActions.dismiss(dismissId);
       if (extra?.route) {
         toastByRoute.delete(extra.route);
+        notificationInbox.markRouteRead(extra.route);
         goto(extra.route);
       }
     });

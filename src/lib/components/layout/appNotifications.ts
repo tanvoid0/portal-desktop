@@ -1,5 +1,6 @@
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { notify, initNotify } from '$lib/utils/notify';
+import { permissionFact, pipelineFacts } from '$lib/domains/notifications/utils/facts';
 import { agentsApi } from '$lib/domains/agents/api/agentsApi';
 import { agentRuns } from '$lib/domains/agents/state/agentRuns.svelte.js';
 import { agentTabPath } from '$lib/config/agents-tabs';
@@ -33,6 +34,10 @@ export function startAppNotifications(): () => void {
         title: 'A phone wants to pair',
         body: `${event.payload.device_name} is waiting for approval.`,
         duration: 0,
+        route: '/devices',
+        actionLabel: 'Review',
+        source: 'device',
+        facts: [{ kind: 'device', value: event.payload.device_name }],
       });
     }).then(keep);
 
@@ -47,23 +52,33 @@ export function startAppNotifications(): () => void {
   agentsApi
     .onEvent(({ run_id, event }) => {
       const route = `${agentTabPath()}?session=${run_id}`;
+      const about = { route, source: 'agent' as const, runId: run_id };
       if (event.type === 'turn_done' && !event.is_error) {
         // Errored turns are reported by the `exited` branch below instead —
         // skip here so the user doesn't see "finished" then "failed".
-        notify({ title: 'Agent finished', body: event.final_text?.slice(0, 120), route });
+        notify({
+          ...about,
+          title: 'Agent finished',
+          body: event.final_text?.slice(0, 120),
+          type: 'success',
+        });
       } else if (event.type === 'permission_request') {
         notify({
+          ...about,
           title: 'Agent needs your approval',
           body: `Wants to run ${event.tool_name}`,
-          route,
+          type: 'warning',
           duration: 0,
+          requestId: event.request_id,
+          facts: permissionFact(event.tool_name, event.tool_input),
         });
       } else if (event.type === 'exited' && event.code) {
         notify({
+          ...about,
           title: 'Agent run failed',
           body: `Exited with code ${event.code}`,
           type: 'error',
-          route,
+          facts: [{ kind: 'exit', value: String(event.code) }],
         });
       }
     })
@@ -82,8 +97,11 @@ export function startAppNotifications(): () => void {
     notify({
       title: execution.status === 'success' ? 'Pipeline run finished' : 'Pipeline run failed',
       body: execution.error,
-      type: execution.status === 'failed' ? 'error' : undefined,
+      type: execution.status === 'failed' ? 'error' : 'success',
       route: `/pipeline-runs?run=${execution.id}`,
+      source: 'pipeline',
+      projectId: execution.projectId,
+      facts: pipelineFacts(execution),
     });
   }).then(keep);
 

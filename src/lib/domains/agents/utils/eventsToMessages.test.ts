@@ -22,6 +22,21 @@ const fixture: AgentEvent[] = [
 ];
 
 describe('eventsToMessages', () => {
+  it('drops an unanswered approval when the process exits, even after a resume', () => {
+    const view = eventsToMessages([
+      {
+        type: 'permission_request',
+        request_id: 'q1',
+        tool_name: 'Bash',
+        tool_input: {},
+        suggestions: [],
+      },
+      { type: 'exited', code: 1 },
+      { type: 'session_started', session_id: 's1' },
+    ]);
+    expect(view.pending).toEqual([]);
+  });
+
   it('passes a native Bash tool call through unchanged', () => {
     const view = eventsToMessages(fixture);
     const toolCallMessage = view.messages.find((m) => m.tool_calls?.length);

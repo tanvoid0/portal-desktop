@@ -159,6 +159,9 @@ export function eventsToMessages(events: AgentEvent[]): AgentRunView {
       case 'exited':
         running = false;
         ended = true;
+        // Nothing can answer a dead process; without this a resume revives
+        // the old Accept/Reject buttons.
+        pending.length = 0;
         break;
       default:
         break;

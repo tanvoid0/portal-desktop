@@ -25,6 +25,7 @@ import { goto } from '$app/navigation';
 import * as mobileShell from '$lib/domains/mobile/shell';
 import { appSettings } from '$lib/domains/settings/stores/settingsStore';
 import { toastActions } from '$lib/domains/shared/stores/toastStore';
+import { notificationInbox } from '$lib/domains/notifications/state/notificationInbox.svelte';
 import { notify, initNotify } from './notify';
 import type { Writable } from 'svelte/store';
 
@@ -58,6 +59,16 @@ describe('notify', () => {
     vi.unstubAllGlobals();
     settingsStore.set(null);
     (mobileShell as { isMobileShell: boolean }).isMobileShell = false;
+  });
+
+  it('keeps an unread history entry and marks it read when the toast is opened', () => {
+    notificationInbox.clear();
+    notify({ title: 'hi', route: '/devices' });
+    expect(notificationInbox.unread).toBe(1);
+
+    showSpy.mock.calls[0]![0].action!.onClick();
+    expect(notificationInbox.unread).toBe(0);
+    expect(goto).toHaveBeenCalledWith('/devices');
   });
 
   it('does nothing when focused and already on the target route', () => {
