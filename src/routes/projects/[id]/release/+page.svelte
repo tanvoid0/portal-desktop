@@ -8,7 +8,8 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
+  import PageContainer from '$lib/components/shell/page-container.svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
@@ -61,21 +62,32 @@
   );
 
   // Rehearse steps are typed `{id,name}` but the backend returns dependsOn too.
-  const toPlan = (steps: { id: string; name: string; dependsOn?: string[] }[]): WorkflowPlanStep[] =>
-    steps.map((s) => ({ id: s.id, name: s.name, needs: s.dependsOn ?? [] }));
+  const toPlan = (
+    steps: { id: string; name: string; dependsOn?: string[] }[]
+  ): WorkflowPlanStep[] => steps.map((s) => ({ id: s.id, name: s.name, needs: s.dependsOn ?? [] }));
 
-  async function load() {
-    const id = Number(projectId);
+  async function load(forId: string) {
+    const id = Number(forId);
+    described = null;
     loadError = null;
+    runs = [];
+    loaded = false;
+    confirmOpen = false;
+    let next: ReleaseDescription | null = null;
+    let error: string | null = null;
     try {
-      described = await invoke<ReleaseDescription | null>('release_describe', { projectId: id });
+      next = await invoke<ReleaseDescription | null>('release_describe', { projectId: id });
     } catch (e) {
-      described = null;
-      loadError = String(e);
+      error = String(e);
     }
-    runs = described
+    const history = next
       ? await invoke<ReleaseRun[]>('release_list', { projectId: id, limit: 50 }).catch(() => [])
       : [];
+    // A late reply for the project you just left must not overwrite this one's.
+    if (forId !== projectId) return;
+    described = next;
+    loadError = error;
+    runs = history;
     loaded = true;
   }
 
@@ -83,8 +95,12 @@
   // poll the history while this page is on screen. ponytail: polling.
   async function refreshRuns() {
     if (!described || document.hidden) return;
-    runs = await invoke<ReleaseRun[]>('release_list', { projectId: Number(projectId), limit: 50 })
-      .catch(() => runs);
+    const forId = projectId;
+    const next = await invoke<ReleaseRun[]>('release_list', {
+      projectId: Number(forId),
+      limit: 50,
+    }).catch(() => null);
+    if (next && forId === projectId) runs = next;
   }
 
   function launch(mode: 'ship' | 'rehearse') {
@@ -99,8 +115,13 @@
     return () => breadcrumbActions.clearCustomBreadcrumbs();
   });
 
+  // The route component is reused across projects, so reload when the id changes.
+  $effect(() => {
+    const id = projectId;
+    untrack(() => load(id));
+  });
+
   onMount(() => {
-    load();
     const timer = setInterval(refreshRuns, 3000);
     return () => clearInterval(timer);
   });
@@ -110,8 +131,13 @@
   <title>Release - {projectName || 'Project'} - Portal Desktop</title>
 </svelte:head>
 
-<div class="mx-auto flex w-full max-w-4xl flex-col gap-4 p-4">
-  <Button variant="ghost" size="sm" class="w-fit gap-2" onclick={() => goto(`/projects/${projectId}?tab=actions`)}>
+<PageContainer variant="readable" class="flex flex-col gap-4 py-4">
+  <Button
+    variant="ghost"
+    size="sm"
+    class="w-fit gap-2"
+    onclick={() => goto(`/projects/${projectId}?tab=actions`)}
+  >
     <ArrowLeft class="h-4 w-4" /> Back to Actions
   </Button>
 
@@ -208,4 +234,4 @@
       <ShipDialog {project} release={r} {apps} mode={launchMode} bind:open={confirmOpen} />
     {/if}
   {/if}
-</div>
+</PageContainer>

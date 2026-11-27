@@ -53,8 +53,9 @@ const DEFAULT_STEP_TIMEOUT_SECS: u64 = 3600;
 /// project root (blank lines and `#` comments ignored), keyed by the step's
 /// action name — what [`pipeline_file::build_steps`] needs to fan a step out.
 /// Inline `items` need no run context and are expanded by `build_steps` directly.
-/// `strict` fails on a missing/unreadable list file (a real run); when false a
-/// missing file is skipped so the step stays a single placeholder (describe/preview).
+/// `strict` (a real run) fails on a list file that is missing, unreadable, empty or
+/// repeats an item; when false (describe/preview) the step stays a single placeholder.
+/// An empty fan-out would silently drop every `needs` pointing at the step.
 fn resolve_foreach_items(
     project_path: &str,
     file: &pipeline_file::PipelineFile,
@@ -80,7 +81,19 @@ fn resolve_foreach_items(
                     .filter(|l| !l.is_empty() && !l.starts_with('#'))
                     .map(|l| l.to_string())
                     .collect();
-                resolved.insert(step.action.clone(), items);
+                let problem = match pipeline_file::first_duplicate(&items) {
+                    Some(dup) => Some(format!("repeats item '{dup}'")),
+                    None => items.is_empty().then(|| "lists no items".to_string()),
+                };
+                match problem {
+                    None => {
+                        resolved.insert(step.action.clone(), items);
+                    }
+                    Some(p) if strict => {
+                        return Err(format!("foreach items_file {}: {p}", path.display()))
+                    }
+                    Some(_) => {}
+                }
             }
             Err(e) if strict => {
                 return Err(format!("foreach items_file {}: {e}", path.display()))
@@ -2798,5 +2811,27 @@ mod tests {
             got.push(String::from_utf8(std::mem::take(&mut buf)).unwrap());
         }
         assert_eq!(got, ["10%\r", "50%\r", "done\r", "next\n", "\n", "last"]);
+    }
+}
+
+#[cfg(test)]
+mod foreach_tests {
+    use super::*;
+
+    #[test]
+    fn empty_or_duplicated_items_file_fails_a_real_run() {
+        let file = pipeline_file::parse(
+            "actions: { a: { run: x } }\nworkflows: { w: { steps: [ { action: a, foreach: { items_file: l.txt } } ] } }",
+        )
+        .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_str().unwrap();
+        for list in ["# nothing\n\n", "gym\ngym\n"] {
+            std::fs::write(dir.path().join("l.txt"), list).unwrap();
+            assert!(resolve_foreach_items(root, &file, "w", true).is_err());
+            assert!(resolve_foreach_items(root, &file, "w", false)
+                .unwrap()
+                .is_empty());
+        }
     }
 }

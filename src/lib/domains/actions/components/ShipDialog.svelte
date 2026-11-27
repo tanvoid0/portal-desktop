@@ -2,7 +2,8 @@
   Release launcher, shared by Ship (ReleaseCard, ReleaseButton) and Rehearse
   (ReleaseCard). A scope picker chooses what runs:
     Full    — the release block's ship/rehearse workflow (apps + server).
-    Server  — the `ship-server` workflow (workflow override; no app build).
+    Server  — `release.server.ship` / `.rehearse` (workflow override); offered only
+              when the release block declares one for this mode.
     Apps    — a subset: variables.APPS="portal_gym portal_task" (space-separated;
               the pocket_portal scripts already honour $APPS — no backend change).
   `apps` is sourced from the resolved ship plan (one node per app), never hardcoded.
@@ -41,6 +42,7 @@
   let { project, release, apps = [], mode = 'ship', open = $bindable(false) }: Props = $props();
 
   const isShip = $derived(mode === 'ship');
+  const serverWorkflow = $derived(isShip ? release.server?.ship : release.server?.rehearse);
   // `release.bump` is how a pipeline file says it reads $BUMP, and which is the default.
   let bump = $state('patch');
   let scope = $state<Scope>('full');
@@ -67,11 +69,12 @@
   async function run() {
     busy = true;
     try {
-      const bumpVar = release.bump && scope !== 'server' ? { BUMP: bump } : {};
+      const bumpVar: Record<string, string> =
+        release.bump && scope !== 'server' ? { BUMP: bump } : {};
       let workflow: string | undefined;
       let variables: Record<string, string> | undefined;
       if (scope === 'server') {
-        workflow = 'ship-server';
+        workflow = serverWorkflow;
       } else if (scope === 'apps') {
         variables = { APPS: apps.filter((a) => picked.has(a)).join(' '), ...bumpVar };
       } else if (Object.keys(bumpVar).length) {
@@ -98,34 +101,37 @@
       <AlertDialogTitle>{isShip ? 'Ship' : 'Rehearse'} {project.name}?</AlertDialogTitle>
       <AlertDialogDescription>
         {#if isShip}
-          This runs for real. It can deploy servers and publish builds, and killing it
-          midway does not undo what already went out.
+          This runs for real. It can deploy servers and publish builds, and killing it midway does
+          not undo what already went out.
         {:else}
-          A dry run (<code>RELEASE_DRY_RUN=1</code>): gates and build, nothing deployed or published.
+          A dry run (<code>RELEASE_DRY_RUN=1</code>): gates and build, nothing deployed or
+          published.
         {/if}
       </AlertDialogDescription>
     </AlertDialogHeader>
 
     <div class="space-y-3 text-sm">
-      <div class="flex flex-wrap items-center gap-3">
-        <span id="scope-label">Scope</span>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
-          aria-labelledby="scope-label"
-          bind:value={
-            () => scope,
-            (v) => {
-              if (v) scope = v as Scope;
+      {#if serverWorkflow || apps.length}
+        <div class="flex flex-wrap items-center gap-3">
+          <span id="scope-label">Scope</span>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            aria-labelledby="scope-label"
+            bind:value={
+              () => scope,
+              (v) => {
+                if (v) scope = v as Scope;
+              }
             }
-          }
-        >
-          <ToggleGroupItem value="full">Full</ToggleGroupItem>
-          <ToggleGroupItem value="server">Server only</ToggleGroupItem>
-          {#if apps.length}<ToggleGroupItem value="apps">Apps…</ToggleGroupItem>{/if}
-        </ToggleGroup>
-      </div>
+          >
+            <ToggleGroupItem value="full">Full</ToggleGroupItem>
+            {#if serverWorkflow}<ToggleGroupItem value="server">Server only</ToggleGroupItem>{/if}
+            {#if apps.length}<ToggleGroupItem value="apps">Apps…</ToggleGroupItem>{/if}
+          </ToggleGroup>
+        </div>
+      {/if}
 
       {#if scope === 'apps'}
         <div class="max-h-52 space-y-1.5 overflow-y-auto rounded-md border p-3">

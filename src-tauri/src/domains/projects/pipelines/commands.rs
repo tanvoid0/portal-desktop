@@ -295,21 +295,11 @@ async fn start_release(
         .describe_release(project_id)
         .await?
         .ok_or_else(|| "This project declares no `release:` in .portal/pipeline.yml".to_string())?;
-    // An explicit `workflow` (e.g. "ship-server") overrides the release block's
-    // rehearse/ship id — the launcher's "server only" / scope picker. ship/rehearse
-    // still decide RELEASE_DRY_RUN, so a server-only rehearse is a dry run of it.
-    let workflow = match workflow_override.filter(|w| !w.is_empty()) {
-        Some(w) => w,
-        None => if ship {
-            described["release"]["ship"].as_str()
-        } else {
-            described["release"]["rehearse"].as_str()
-        }
-        .ok_or_else(|| {
-            "No `rehearse` workflow declared; a rehearsal never runs the ship workflow".to_string()
-        })?
-        .to_string(),
-    };
+    let release: crate::domains::projects::pipelines::services::pipeline_file::ReleaseSpec =
+        serde_json::from_value(described["release"].clone()).map_err(|e| e.to_string())?;
+    // `workflow` is the launcher's scope pick; only ids the release block declares
+    // for this mode are accepted. ship/rehearse also decide RELEASE_DRY_RUN.
+    let workflow = release.pick(ship, workflow_override.as_deref())?;
     // One release run per project: two ships race the version bump, and a rehearsal
     // beside a ship rewrites generated files under it. The lock makes check-then-start
     // atomic; rows left by a crash are cleared at startup (`reconcile_interrupted`).

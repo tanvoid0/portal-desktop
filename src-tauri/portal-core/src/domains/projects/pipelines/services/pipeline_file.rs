@@ -64,10 +64,10 @@ pub struct FileStep {
 
 /// Fans a step out to one node per item. Items come from an inline `items` list
 /// (known everywhere) or an `items_file` — a path, relative to the project root,
-/// of a file listing them one per line — read natively at release start. Until
-/// that run — in `release_validate` and `release_describe`, which have no project
-/// context — an `items_file` fan-out collapses to one placeholder node named
-/// after the action.
+/// of a file listing them one per line — read natively at release start and by
+/// `release_describe`. Where it is not read (`release_validate`, or a missing or
+/// empty list in a preview) the step stays one placeholder node named after the
+/// action.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ForEach {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -100,6 +100,49 @@ pub struct ReleaseSpec {
     /// Applied to every step; a step's own `env` wins.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub env: HashMap<String, String>,
+    /// "Server only" scope. Absent: the launcher does not offer it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server: Option<ScopeSpec>,
+}
+
+/// Alternative workflows for a narrower release.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ScopeSpec {
+    pub ship: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rehearse: Option<String>,
+}
+
+impl ReleaseSpec {
+    /// The workflow a release run starts. `requested` (a scope pick, reachable over
+    /// RPC) must be one this block declares for the same mode, so a rehearsal can
+    /// never be pointed at a ship workflow.
+    pub fn pick(&self, ship: bool, requested: Option<&str>) -> Result<String, String> {
+        let scoped = self.server.as_ref();
+        let (main, server) = if ship {
+            (Some(&self.ship), scoped.map(|s| &s.ship))
+        } else {
+            (
+                self.rehearse.as_ref(),
+                scoped.and_then(|s| s.rehearse.as_ref()),
+            )
+        };
+        let mode = if ship { "ship" } else { "rehearse" };
+        match requested.filter(|w| !w.is_empty()) {
+            Some(w) => [main, server]
+                .into_iter()
+                .flatten()
+                .find(|id| *id == w)
+                .cloned()
+                .ok_or_else(|| {
+                    format!("'{w}' is not a {mode} workflow declared in the `release:` block")
+                }),
+            None => main.cloned().ok_or_else(|| {
+                "No `rehearse` workflow declared; a rehearsal never runs the ship workflow"
+                    .to_string()
+            }),
+        }
+    }
 }
 
 pub fn parse(raw: &str) -> Result<PipelineFile, String> {
@@ -107,7 +150,12 @@ pub fn parse(raw: &str) -> Result<PipelineFile, String> {
     let file: PipelineFile =
         serde_yaml::from_str(raw).map_err(|e| format!("Invalid pipeline file: {e}"))?;
     if let Some(r) = &file.release {
-        for id in std::iter::once(&r.ship).chain(r.rehearse.iter()) {
+        let server = r.server.iter();
+        let server = server.flat_map(|s| std::iter::once(&s.ship).chain(s.rehearse.iter()));
+        for id in std::iter::once(&r.ship)
+            .chain(r.rehearse.iter())
+            .chain(server)
+        {
             if !file.workflows.contains_key(id) {
                 return Err(format!(
                     "release names workflow '{id}', which is not defined"
@@ -115,7 +163,25 @@ pub fn parse(raw: &str) -> Result<PipelineFile, String> {
             }
         }
     }
+    for step in file.workflows.values().flat_map(|w| &w.steps) {
+        let Some(fe) = &step.foreach else { continue };
+        if fe.items.is_empty() && fe.items_file.is_none() {
+            return Err(format!(
+                "foreach on '{}' needs a non-empty `items` or an `items_file`",
+                step.action
+            ));
+        }
+        if let Some(dup) = first_duplicate(&fe.items) {
+            return Err(format!("foreach on '{}' repeats item '{dup}'", step.action));
+        }
+    }
     Ok(file)
+}
+
+/// Items become node ids, so each must be unique.
+pub fn first_duplicate(items: &[String]) -> Option<&String> {
+    let mut seen = std::collections::HashSet::new();
+    items.iter().find(|i| !seen.insert(*i))
 }
 
 /// The file as YAML text, with the `version: 1` the frontend requires.
@@ -142,10 +208,9 @@ pub fn load(project_path: &str) -> Result<Option<PipelineFile>, String> {
 
 /// A workflow as the runner's `steps_json` shape: `{id, name, dependsOn, config}`.
 ///
-/// `resolved` supplies the item lists for `foreach` steps whose items come from a
-/// `command` (see `ForEach`); pass an empty map where there is no run context
-/// (`release_validate`, `release_describe`) and such a step collapses to one
-/// placeholder node. A `foreach` with inline `items` expands either way.
+/// `resolved` supplies the item lists for `foreach` steps whose items come from an
+/// `items_file` (see `ForEach`); pass an empty map where there is no run context
+/// (`release_validate`) and such a step collapses to one placeholder node. A `foreach` with inline `items` expands either way.
 pub fn build_steps(
     file: &PipelineFile,
     workflow_id: &str,
@@ -193,8 +258,8 @@ pub fn build_steps(
             })
         };
 
-        // A foreach step fans out when its items are known: inline `items`, or a
-        // `command` resolved for this run. Otherwise it stays one placeholder.
+        // A foreach step fans out when its items are known: inline `items`, or an
+        // `items_file` resolved for this run. Otherwise it stays one placeholder.
         let items: Option<&[String]> = step.foreach.as_ref().and_then(|fe| {
             if !fe.items.is_empty() {
                 Some(fe.items.as_slice())
@@ -274,8 +339,11 @@ workflows:
     #[test]
     fn this_repos_own_release_file_builds() {
         let file = parse(include_str!("../../../../../../../.portal/pipeline.yml")).unwrap();
-        for id in file.workflows.keys() {
+        for (id, wf) in &file.workflows {
             build_steps(&file, id, &no_items()).unwrap();
+            for need in wf.steps.iter().flat_map(|s| &s.needs) {
+                assert!(wf.steps.iter().any(|s| &s.action == need), "{id}: {need}");
+            }
         }
         // A rehearsal must never reach the real publish step.
         let rehearse = &file.workflows[&file.release.as_ref().unwrap().rehearse.clone().unwrap()];
@@ -286,6 +354,42 @@ workflows:
     fn rejects_release_naming_a_missing_workflow() {
         let bad = YML.replace("rehearse: ship-dry", "rehearse: nope");
         assert!(parse(&bad).unwrap_err().contains("nope"));
+    }
+
+    #[test]
+    fn release_override_must_be_declared_for_that_mode() {
+        let yml = YML.replace(
+            "rehearse: ship-dry,",
+            "rehearse: ship-dry, server: { ship: ship-server },",
+        ) + "  ship-server: { steps: [ { action: go } ] }\n";
+        let release = parse(&yml).unwrap().release.unwrap();
+
+        assert_eq!(release.pick(false, None).unwrap(), "ship-dry");
+        assert_eq!(release.pick(true, None).unwrap(), "ship");
+        assert_eq!(
+            release.pick(true, Some("ship-server")).unwrap(),
+            "ship-server"
+        );
+        // A rehearsal never reaches a ship workflow, by override or otherwise.
+        assert!(release.pick(false, Some("ship")).is_err());
+        assert!(release.pick(false, Some("ship-server")).is_err());
+        assert!(release.pick(true, Some("ship-dry")).is_err());
+        assert!(release.pick(true, Some("anything")).is_err());
+
+        let bad = yml.replace("ship: ship-server", "ship: nope");
+        assert!(parse(&bad).unwrap_err().contains("nope"));
+    }
+
+    #[test]
+    fn rejects_foreach_without_items_or_with_duplicates() {
+        for (foreach, why) in [
+            ("{}", "needs a non-empty"),
+            ("{ items: [] }", "needs a non-empty"),
+            ("{ items: [a, a] }", "repeats item 'a'"),
+        ] {
+            let yml = FANOUT.replace("{ items_file: apps.txt, as: APP }", foreach);
+            assert!(parse(&yml).unwrap_err().contains(why), "{foreach}");
+        }
     }
 
     const FANOUT: &str = r#"

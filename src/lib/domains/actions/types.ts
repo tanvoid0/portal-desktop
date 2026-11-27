@@ -176,6 +176,8 @@ export interface ReleaseSpec {
   rehearse?: string;
   bump?: string;
   env?: Record<string, string>;
+  /** "Server only" scope workflows; absent hides the option. */
+  server?: { ship: string; rehearse?: string };
 }
 
 /** Result of the `release_describe` command. */

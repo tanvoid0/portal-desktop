@@ -214,6 +214,7 @@ pub fn propose(root: &Path, modules: &[DetectedModule]) -> Result<Proposal, Stri
         ship: "ship".into(),
         rehearse,
         bump: None,
+        server: None,
         env: if source == "scripts" {
             HashMap::from([("PORTAL_PROGRESS".to_string(), "plain".to_string())])
         } else {
@@ -408,7 +409,7 @@ pub fn refine_prompt(
     modules: &[DetectedModule],
 ) -> (String, String) {
     let system = "You edit a Portal Desktop `.portal/pipeline.yml`. Reply with the complete YAML file only: no prose, no code fences.\n\
-Schema: `version: 1`; `release: {kind, ship, rehearse, bump, env}` where ship and rehearse name workflows; \
+Schema: `version: 1`; `release: {kind, ship, rehearse, bump, env, server: {ship, rehearse}}` where ship, rehearse and the optional server-only pair name workflows; \
 `actions: {<id>: {name, run, cwd, env, longRunning}}` where `run` is one shell command, `cwd` is relative to the project root; \
 `longRunning: true` only for a server that never exits (the run waits on it until cancelled), never for a slow build or release step; \
 `workflows: {<id>: {name, steps: [{action, needs: [action ids]}]}}`. \

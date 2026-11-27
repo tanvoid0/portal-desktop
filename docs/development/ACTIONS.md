@@ -70,9 +70,15 @@ release:
   rehearse: ship-dry # required for rehearsing; it never runs `ship`
   bump: minor # exposed as ${BUMP} / $BUMP
   env: { PORTAL_PROGRESS: plain }
+  server: # optional "Server only" scope; offered only when declared
+    ship: ship-server
+    rehearse: ship-server-dry # omit to offer it for Ship only
 actions:
   deploy: { run: npm run deploy, cwd: server }
 ```
+
+The `workflow` argument of `release_rehearse` / `release_ship` is accepted only
+when the `release:` block declares it for that mode.
 
 Project -> Actions shows a **Release** card (Rehearse / Ship). Commands, all in
 `src-tauri/src/domains/projects/pipelines/commands.rs`:
