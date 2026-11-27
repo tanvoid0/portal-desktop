@@ -173,7 +173,8 @@ export function afterApply(
   else if (ahead > 0 && behind > 0) {
     set('pull', 'attention', `diverged (${ahead} ahead, ${behind} behind) — needs manual merge`);
   }
-  if (ahead > 0) set('push', 'attention', `${ahead} commits not pushed`);
+  if (ahead > 0)
+    set('push', 'attention', `${ahead} ${ahead === 1 ? 'commit' : 'commits'} not pushed`);
   else if (ahead === 0 && steps.has('push')) set('push', 'ok', plan.push ? 'pushed' : null);
 
   return { ...project, ahead, behind, dirty, untracked, steps: [...steps.values()] };
