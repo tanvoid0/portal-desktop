@@ -190,6 +190,11 @@ pub struct CoderService {
     hub: OnceLock<Arc<ThreadHub>>,
     /// Threads known to exist in the hub (created or confirmed once per process).
     hub_ready: Mutex<std::collections::HashSet<String>>,
+    /// Threads whose latest client command came from a remote device. The effect task
+    /// runs outside the daemon's task-local scope, so the mark travels here.
+    remote_threads: std::sync::Mutex<std::collections::HashSet<String>>,
+    /// A Retry/Edit/Approve waiting for its effect's prepare step (see `hub_command`).
+    prep: std::sync::Mutex<HashMap<String, oneshot::Sender<Result<(), String>>>>,
 }
 
 impl CoderService {
@@ -219,6 +224,8 @@ impl CoderService {
             multitask_semaphore: Arc::new(Semaphore::new(DEFAULT_MAX_PARALLEL_SUBAGENTS)),
             hub: OnceLock::new(),
             hub_ready: Mutex::new(Default::default()),
+            remote_threads: Default::default(),
+            prep: Default::default(),
         };
         svc.load_from_db().await;
         svc
@@ -539,10 +546,15 @@ impl CoderService {
                     kind: thread_kind_str(t.thread_kind).into(),
                     title: t.title,
                 };
-                hub.submit(thread_id, ThreadCommand::Create(meta));
-                // The system prompt sits in the transcript, so the hub's indexes match ours.
-                let reconcile = PortalInput::Reconcile { messages: t.messages, title: None };
-                hub.submit(thread_id, ThreadCommand::Portal(reconcile));
+                let create = Envelope { cmd: ThreadCommand::Create(meta), actor: "system".into(), command_id: None };
+                let ack = hub.command(thread_id, create).await.ok()?;
+                if ack.status == AckStatus::Accepted {
+                    // The system prompt sits in the transcript, so the hub's indexes match ours.
+                    let reconcile = PortalInput::Reconcile { messages: t.messages, title: None };
+                    hub.submit(thread_id, ThreadCommand::Portal(reconcile));
+                } else if ack.code.as_deref() != Some("already_created") {
+                    return None; // not ready: the next call tries again
+                }
             }
             ready.insert(thread_id.to_string());
         }
@@ -570,7 +582,80 @@ impl CoderService {
         command_id: Option<String>,
     ) -> Result<CommandAck, String> {
         let hub = self.hub_for(thread_id).await.ok_or("thread not found")?;
-        hub.command(thread_id, Envelope { cmd, actor, command_id }).await
+        let remote = crate::domains::credentials::services::REMOTE_CALLER.try_with(|_| ()).is_ok();
+        {
+            let mut set = self.remote_threads.lock().unwrap_or_else(|e| e.into_inner());
+            if remote {
+                set.insert(thread_id.to_string());
+            } else {
+                set.remove(thread_id);
+            }
+        }
+        // Retry, Edit and Approve change the transcript the caller re-reads right after:
+        // wait (bounded) for the effect's prepare step, and hand its error back.
+        let prepared = matches!(cmd, ThreadCommand::Retry | ThreadCommand::EditMessage { .. } | ThreadCommand::Approve { .. })
+            .then(|| {
+                let (tx, rx) = oneshot::channel();
+                self.prep.lock().unwrap_or_else(|e| e.into_inner()).insert(thread_id.to_string(), tx);
+                rx
+            });
+        let ack = hub.command(thread_id, Envelope { cmd, actor, command_id }).await;
+        let Some(rx) = prepared else { return ack };
+        if !matches!(&ack, Ok(a) if a.status == AckStatus::Accepted) {
+            self.prep.lock().unwrap_or_else(|e| e.into_inner()).remove(thread_id);
+            return ack;
+        }
+        match tokio::time::timeout(std::time::Duration::from_secs(10), rx).await {
+            Ok(Ok(Err(e))) => Err(e),
+            _ => ack,
+        }
+    }
+
+    /// Why a `Send` would not start a turn right now (the hub would queue it, which the
+    /// legacy UI cannot see). `None` when the thread is idle or the hub is not attached.
+    // ponytail: S4a (#1933) switches the UI to plain Send with a visible queue; until then
+    // the legacy window gets an error it already knows how to show.
+    pub async fn busy_reason(&self, thread_id: &str) -> Option<&'static str> {
+        let hub = self.hub_for(thread_id).await?;
+        let state = hub.snapshot(thread_id).await.ok()??.state;
+        match (state.turn_open(), state.stopping, state.approvals.is_empty()) {
+            (false, ..) => None,
+            (_, true, _) => Some("busy: still stopping, try again in a moment"),
+            (_, _, false) => Some("busy: answer the pending approval first"),
+            _ => Some("busy: a turn is already running"),
+        }
+    }
+
+    fn prepared(&self, thread_id: &str, res: &Result<(), String>) {
+        if let Some(tx) = self.prep.lock().unwrap_or_else(|e| e.into_inner()).remove(thread_id) {
+            let _ = tx.send(res.clone());
+        }
+    }
+
+    /// The legacy transcript is the truth: the hub diffs it against its own.
+    async fn reconcile(&self, thread_id: &str) {
+        if let Some(t) = self.get_thread(thread_id).await {
+            self.feed(thread_id, PortalInput::Reconcile { messages: t.messages, title: Some(t.title) }).await;
+        }
+    }
+
+    /// Register the run's cancel flag before anything can ask to stop it, so a Stop
+    /// that lands before the run task starts still reaches it.
+    async fn begin_run(&self, thread_id: &str) -> Arc<AtomicBool> {
+        let cancel = Arc::new(AtomicBool::new(false));
+        let handle = RunHandle { cancel: cancel.clone() };
+        if let Some(old) = self.active_runs.lock().await.insert(thread_id.to_string(), handle) {
+            old.cancel.store(true, Ordering::SeqCst);
+        }
+        cancel
+    }
+
+    /// Drop the run's handle, unless a newer run already replaced it.
+    async fn end_run(&self, thread_id: &str, cancel: &Arc<AtomicBool>) {
+        let mut runs = self.active_runs.lock().await;
+        if runs.get(thread_id).is_some_and(|h| Arc::ptr_eq(&h.cancel, cancel)) {
+            runs.remove(thread_id);
+        }
     }
 
     fn service_arc(&self) -> Result<Arc<Self>, String> {
@@ -652,6 +737,7 @@ impl CoderService {
             Ok(Ok(result)) => result,
             _ => {
                 self.pending_commands.lock().await.remove(&key);
+                self.expire_host(thread_id, call_id).await;
                 match tools::execute(workspace_root, "run_command", args) {
                     Ok(output) => output,
                     Err(e) => format!("Error: {e}"),
@@ -672,6 +758,7 @@ impl CoderService {
             Ok(Ok(result)) => Ok(result),
             _ => {
                 self.pending_commands.lock().await.remove(&key);
+                self.expire_host(thread_id, call_id).await;
                 Err(())
             }
         }
@@ -691,10 +778,19 @@ impl CoderService {
             Ok(Ok(answer)) => answer,
             _ => {
                 self.pending_commands.lock().await.remove(&key);
+                self.expire_host(thread_id, call_id).await;
                 "Error: the user did not answer in time. Do not assume an answer; end your turn."
                     .into()
             }
         }
+    }
+
+    /// A host request nobody answered in time: resolve it in the hub too, so a late
+    /// answer is rejected there instead of accepted and dropped. The resulting
+    /// `DeliverHostResult` finds no waiter and does nothing.
+    async fn expire_host(&self, thread_id: &str, call_id: &str) {
+        let cmd = ThreadCommand::ResolveHost { call_id: call_id.into(), result: "timeout".into() };
+        self.feed_cmd(thread_id, cmd).await;
     }
 
     /// Frontend submits the captured output for a delegated run_command.
@@ -1211,6 +1307,8 @@ impl CoderService {
     }
 
     pub async fn delete_thread(&self, id: &str) -> bool {
+        // `hub.delete` is only safe with no live run.
+        self.stop(id).await;
         let removed = self.threads.lock().await.remove(id).is_some();
         if removed {
             let _ = coder_thread::Entity::delete_by_id(id.to_string())
@@ -1243,6 +1341,9 @@ impl CoderService {
             thread.updated_at = now_iso();
         }
         self.persist_thread(id).await;
+        if let Some(t) = self.get_thread(id).await {
+            self.feed_cmd(id, ThreadCommand::SetModel { model: t.model, llm_provider: t.llm_provider }).await;
+        }
         Ok(())
     }
 
@@ -1474,7 +1575,15 @@ impl CoderService {
                         None,
                     )
                     .await;
-                if let Err(e) = svc.prepare_send(&child_thread_id, prompt).await {
+                // Through the hub, so the child's user message and turn are in the log.
+                let sent = svc
+                    .hub_command(&child_thread_id, ThreadCommand::Send { text: prompt }, "system".into(), None)
+                    .await
+                    .and_then(|ack| match ack.status {
+                        AckStatus::Rejected => Err(ack.code.unwrap_or_else(|| "rejected".into())),
+                        _ => Ok(()),
+                    });
+                if let Err(e) = sent {
                     let _ = svc
                         .mark_sub_agent_status(
                             &sub_agent_id,
@@ -1483,9 +1592,7 @@ impl CoderService {
                             Some(e),
                         )
                         .await;
-                    return;
                 }
-                CoderService::spawn_run(Arc::clone(&svc), child_thread_id, AgentTurn::Send);
             });
             started.push(sub_agent);
         }
@@ -1762,25 +1869,18 @@ impl CoderService {
 
     /// Spawn the agent loop in the background. Returns immediately; progress
     /// streams via `coder://*` events.
-    pub fn spawn_run(self: Arc<Self>, thread_id: String, turn: AgentTurn) {
-        let cancel = Arc::new(AtomicBool::new(false));
-        let handle = RunHandle {
-            cancel: cancel.clone(),
-        };
+    /// `cancel` is the flag from `begin_run`.
+    pub fn spawn_run(self: Arc<Self>, thread_id: String, turn: AgentTurn, cancel: Arc<AtomicBool>) {
         let svc = Arc::clone(&self);
         let tid = thread_id.clone();
         let stopped = cancel.clone();
         // tokio::spawn drops task-locals: carry the remote-caller mark into the run so a
-        // remote-started agent cannot pop the desktop vault prompt.
-        let remote = crate::domains::credentials::services::REMOTE_CALLER.try_with(|_| ()).is_ok();
+        // remote-started agent cannot pop the desktop vault prompt. A run started by an
+        // effect has no task-local either; `hub_command` recorded the mark per thread.
+        let remote = crate::domains::credentials::services::REMOTE_CALLER.try_with(|_| ()).is_ok()
+            || self.remote_threads.lock().unwrap_or_else(|e| e.into_inner()).contains(&thread_id);
 
         let run = async move {
-            {
-                let mut runs = svc.active_runs.lock().await;
-                if let Some(old) = runs.insert(tid.clone(), handle) {
-                    old.cancel.store(true, Ordering::SeqCst);
-                }
-            }
             svc.emit(
                 "coder://running",
                 json!({ "thread_id": tid, "running": true }),
@@ -1790,10 +1890,7 @@ impl CoderService {
 
             let result = svc.advance_platform(&tid, turn, Some(cancel)).await;
 
-            {
-                let mut runs = svc.active_runs.lock().await;
-                runs.remove(&tid);
-            }
+            svc.end_run(&tid, &stopped).await;
             svc.emit(
                 "coder://running",
                 json!({ "thread_id": tid, "running": false }),
@@ -1803,6 +1900,7 @@ impl CoderService {
                 eprintln!("coder: run failed for {tid}: {e}");
                 svc.sync_sub_agent_from_thread(&tid, CoderSubAgentStatus::Failed, Some(e.clone()))
                     .await;
+                svc.reconcile(&tid).await;
                 // A stop that surfaces as an error is still a stop.
                 let input = if stopped.load(Ordering::SeqCst) {
                     PortalInput::Finished { outcome: TurnOutcome::Stopped, final_text: None }
@@ -2344,6 +2442,8 @@ impl CoderService {
                                 } else {
                                     Some(std::mem::take(&mut pending_assistant_text))
                                 };
+                                // ponytail: the hub's tool-call message lacks `reasoning` until the
+                                // done-time Reconcile; S4a carries it (live view only).
                                 self.feed_cmd(
                                     &thread_id_for_stream,
                                     ThreadCommand::Provider(AgentEvent::ToolCall {
@@ -2639,11 +2739,7 @@ impl CoderService {
             }
         }
         self.persist_thread(local_id).await;
-        // The platform's list is the truth: the hub diffs it against its own.
-        if let Some(t) = self.get_thread(local_id).await {
-            let input = PortalInput::Reconcile { messages: t.messages, title: Some(t.title) };
-            self.feed(local_id, input).await;
-        }
+        self.reconcile(local_id).await;
     }
 
     async fn finish(
@@ -2662,6 +2758,8 @@ impl CoderService {
             (_, true) => TurnOutcome::Exhausted,
             _ => TurnOutcome::Completed,
         };
+        // A stopped run never synced: mid-turn tool messages must not outlive it in the hub.
+        self.reconcile(thread_id).await;
         self.feed(thread_id, PortalInput::Finished { outcome, final_text: final_text.clone() }).await;
         self.emit(
             "coder://done",
@@ -2723,29 +2821,69 @@ impl CoderService {
 
 impl CoderService {
     /// The hub already holds the user message (and any rewrite); bring this transcript
-    /// to the same point and start the run.
+    /// to the same point and start the run. The run is registered first, so a Stop
+    /// during the prepare step still reaches it.
     async fn start_turn(&self, thread_id: &str, trigger: TurnTrigger, text: String) -> Result<(), String> {
         let svc = self.service_arc()?;
-        let turn = match trigger {
-            TurnTrigger::Retry => {
-                self.prepare_retry(thread_id).await?;
-                AgentTurn::Retry
+        let cancel = self.begin_run(thread_id).await;
+        let prepared = async {
+            Ok::<_, String>(match trigger {
+                TurnTrigger::Retry => {
+                    self.prepare_retry(thread_id).await?;
+                    AgentTurn::Retry
+                }
+                TurnTrigger::Edit => {
+                    // The hub rewrote to `[..index, edited]` and nothing has run since.
+                    let hub = self.hub.get().ok_or("thread hub not attached")?;
+                    let snap = hub.snapshot(thread_id).await?.ok_or("thread not found")?;
+                    let index = snap.messages.len().checked_sub(1).ok_or("thread has no messages")?;
+                    self.prepare_edit_message(thread_id, index, text).await?;
+                    AgentTurn::Send
+                }
+                // `Approve` is `resume_approve`'s, never a `StartTurn`.
+                _ => {
+                    svc.prepare_send(thread_id, text).await?;
+                    AgentTurn::Send
+                }
+            })
+        }
+        .await;
+        self.prepared(thread_id, &prepared.as_ref().map(|_| ()).map_err(String::clone));
+        match prepared {
+            Ok(turn) => {
+                CoderService::spawn_run(svc, thread_id.to_string(), turn, cancel);
+                Ok(())
             }
-            TurnTrigger::Edit => {
-                // The hub rewrote to `[..index, edited]` and nothing has run since.
-                let hub = self.hub.get().ok_or("thread hub not attached")?;
-                let snap = hub.snapshot(thread_id).await?.ok_or("thread not found")?;
-                let index = snap.messages.len().checked_sub(1).ok_or("thread has no messages")?;
-                self.prepare_edit_message(thread_id, index, text).await?;
-                AgentTurn::Send
+            Err(e) => {
+                self.end_run(thread_id, &cancel).await;
+                Err(e)
             }
-            // `Approve` is `ResolveApproval`'s, never a `StartTurn`.
-            _ => {
-                svc.prepare_send(thread_id, text).await?;
-                AgentTurn::Send
-            }
-        };
-        CoderService::spawn_run(svc, thread_id.to_string(), turn);
+        }
+    }
+
+    /// Record `remember`, then continue the loop with the user's answer. Also the
+    /// fallback for an approval the hub never saw (one parked before it existed).
+    pub async fn resume_approve(
+        &self,
+        thread_id: &str,
+        call_id: String,
+        approve: bool,
+        remember: bool,
+        edited_pattern: Option<String>,
+        edited_command: Option<String>,
+    ) -> Result<(), String> {
+        let svc = self.service_arc()?;
+        let cancel = self.begin_run(thread_id).await;
+        let res = self
+            .prepare_approve(thread_id, &call_id, approve, remember, edited_pattern, None, None)
+            .await;
+        self.prepared(thread_id, &res);
+        if let Err(e) = res {
+            self.end_run(thread_id, &cancel).await;
+            return Err(e);
+        }
+        let turn = AgentTurn::Approve { call_id, approve, edited_command };
+        CoderService::spawn_run(svc, thread_id.to_string(), turn, cancel);
         Ok(())
     }
 }
@@ -2756,19 +2894,11 @@ impl ThreadEffects for CoderService {
         let started = match effect {
             Effect::StartTurn { trigger, text } => self.start_turn(thread_id, trigger, text).await,
             Effect::ResolveApproval { call_id, allow, remember, edited_pattern, edited_command } => {
-                let res = self
-                    .prepare_approve(thread_id, &call_id, allow, remember, edited_pattern, None, None)
-                    .await;
-                res.and_then(|()| {
-                    let turn = AgentTurn::Approve { call_id, approve: allow, edited_command };
-                    CoderService::spawn_run(self.service_arc()?, thread_id.to_string(), turn);
-                    Ok(())
-                })
+                self.resume_approve(thread_id, call_id, allow, remember, edited_pattern, edited_command).await
             }
             // Idempotent: a repeated Stop lands here again, and `Finished` ends nothing twice.
             Effect::Cancel => {
-                // No run in flight (parked on an approval, or Stop beat the run's start):
-                // nobody else will end the turn.
+                // No run in flight (parked on an approval): nobody else will end the turn.
                 if !self.stop(thread_id).await {
                     let done = PortalInput::Finished { outcome: TurnOutcome::Stopped, final_text: None };
                     self.feed(thread_id, done).await;
@@ -2785,7 +2915,12 @@ impl ThreadEffects for CoderService {
         };
         if let Err(e) = started {
             eprintln!("coder: effect for {thread_id} failed: {e}");
-            self.feed(thread_id, PortalInput::Failed { error: e }).await;
+            // What the legacy run exit did, so its UI recovers too.
+            self.reconcile(thread_id).await;
+            self.feed(thread_id, PortalInput::Failed { error: e.clone() }).await;
+            self.sync_sub_agent_from_thread(thread_id, CoderSubAgentStatus::Failed, Some(e.clone())).await;
+            self.emit("coder://running", json!({ "thread_id": thread_id, "running": false }));
+            self.emit("coder://error", json!({ "thread_id": thread_id, "error": e }));
         }
     }
 }
@@ -3078,6 +3213,29 @@ mod hub_tests {
         assert_eq!(legacy.len(), 5);
         assert_eq!(bare(state.messages), bare(legacy));
         assert_eq!(state.status, crate::domains::threads::ThreadStatus::Idle);
+    }
+
+    /// A stopped run never syncs from the platform: the tool messages the hub took
+    /// mid-turn must not outlive it, or an Edit by index lands on the wrong message.
+    #[tokio::test]
+    async fn parity_after_stopped_turn_with_tool_call() {
+        let (svc, hub, db, id, _dir) = setup().await;
+        send(&svc, &id, "hi").await;
+        svc.prepare_send(&id, "hi".into()).await.unwrap();
+        let call = AgentEvent::ToolCall { id: "c1".into(), name: "read_file".into(), input: json!({}), parent_tool_use_id: None };
+        let result = AgentEvent::ToolResult { tool_use_id: "c1".into(), content: "x".into(), is_error: false };
+        for ev in [call, result] {
+            svc.feed_cmd(&id, ThreadCommand::Provider(ev)).await;
+        }
+        svc.finish(&id, None, false, true).await;
+        hub.snapshot(&id).await.unwrap();
+
+        let conn = db.get_connection();
+        let state = store::load(conn, &id).await.unwrap().unwrap();
+        let row = coder_thread::Entity::find_by_id(id.clone()).one(conn).await.unwrap().unwrap();
+        let legacy: Vec<ChatMessage> = serde_json::from_str(&row.messages_json).unwrap();
+        assert_eq!(bare(state.messages), bare(legacy));
+        assert_eq!(state.status, ThreadStatus::Idle);
     }
 
     /// A run that returns on a pending approval leaves the turn Waiting, and Stop with no

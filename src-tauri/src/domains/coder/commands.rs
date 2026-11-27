@@ -93,19 +93,9 @@ pub async fn coder_set_thread_kind(
     service.set_thread_kind(&thread_id, thread_kind).await
 }
 
-/// The drive commands go through the thread hub (dedup, first-wins, queue); what it
-/// decides runs back in `CoderService` as an effect. Accepted and duplicate are both a
-/// success; a rejection surfaces as its code (`busy`, `invalid`, `already_resolved`...).
-async fn via_hub(
-    service: &CoderService,
-    caller: &Caller,
-    thread_id: &str,
-    cmd: ThreadCommand,
-    command_id: Option<String>,
-) -> Result<CommandAck, String> {
-    service.hub_command(thread_id, cmd, caller.actor(), command_id).await
-}
-
+/// The drive commands go through the thread hub (dedup, first-wins); what it decides
+/// runs back in `CoderService` as an effect. Accepted and duplicate are both a success;
+/// a rejection surfaces as its code (`busy`, `invalid`, `already_resolved`...).
 fn accepted(ack: CommandAck) -> Result<(), String> {
     match ack.status {
         AckStatus::Rejected => Err(ack.code.unwrap_or_else(|| "rejected".into())),
@@ -121,8 +111,14 @@ pub async fn coder_send(
     message: String,
     command_id: Option<String>,
 ) -> Result<(), String> {
+    // The legacy UI neither shows nor drains the hub's queue, so a Send that would be
+    // queued (turn open: parked on an approval, or still stopping) is refused instead.
+    // ponytail: S4a (#1933) switches to a plain Send with a visible queue.
+    if let Some(busy) = service.busy_reason(&thread_id).await {
+        return Err(busy.into());
+    }
     let cmd = ThreadCommand::Send { text: message };
-    accepted(via_hub(&service, &caller, &thread_id, cmd, command_id).await?)
+    accepted(service.hub_command(&thread_id, cmd, caller.actor(), command_id).await?)
 }
 
 #[portal_rpc_macro::rpc(cap = "coder.exec")]
@@ -132,7 +128,7 @@ pub async fn coder_retry(
     thread_id: String,
     command_id: Option<String>,
 ) -> Result<(), String> {
-    accepted(via_hub(&service, &caller, &thread_id, ThreadCommand::Retry, command_id).await?)
+    accepted(service.hub_command(&thread_id, ThreadCommand::Retry, caller.actor(), command_id).await?)
 }
 
 #[portal_rpc_macro::rpc(cap = "coder.exec")]
@@ -145,7 +141,7 @@ pub async fn coder_edit_message(
     command_id: Option<String>,
 ) -> Result<(), String> {
     let cmd = ThreadCommand::EditMessage { index: message_index, text: content };
-    accepted(via_hub(&service, &caller, &thread_id, cmd, command_id).await?)
+    accepted(service.hub_command(&thread_id, cmd, caller.actor(), command_id).await?)
 }
 
 #[portal_rpc_macro::rpc(cap = "coder.exec")]
@@ -157,19 +153,24 @@ pub async fn coder_approve(
     approve: bool,
     remember: Option<bool>,
     edited_pattern: Option<String>,
-    // The open call already carries its tool and arguments; kept so callers still type-check.
-    _remember_tool: Option<String>,
-    _remember_args: Option<serde_json::Value>,
     command_id: Option<String>,
 ) -> Result<(), String> {
+    let remember = remember.unwrap_or(false);
     let cmd = ThreadCommand::Approve {
-        call_id,
+        call_id: call_id.clone(),
         allow: approve,
-        remember: remember.unwrap_or(false),
-        edited_pattern,
+        remember,
+        edited_pattern: edited_pattern.clone(),
         edited_command: None,
     };
-    accepted(via_hub(&service, &caller, &thread_id, cmd, command_id).await?)
+    let ack = service.hub_command(&thread_id, cmd, caller.actor(), command_id).await?;
+    if ack.code.as_deref() == Some("not_found") {
+        // An approval from before the hub existed: the old direct path.
+        return service
+            .resume_approve(&thread_id, call_id, approve, remember, edited_pattern, None)
+            .await;
+    }
+    accepted(ack)
 }
 
 #[portal_rpc_macro::rpc(cap = "coder")]
@@ -179,10 +180,10 @@ pub async fn coder_stop(
     thread_id: String,
     command_id: Option<String>,
 ) -> Result<bool, String> {
-    let ack = via_hub(&service, &caller, &thread_id, ThreadCommand::Stop, command_id).await?;
-    match ack.code.as_deref() {
-        Some("not_running") => Ok(false),
-        _ => accepted(ack).map(|()| true),
+    match service.hub_command(&thread_id, ThreadCommand::Stop, caller.actor(), command_id).await {
+        Ok(ack) if ack.status != AckStatus::Rejected => Ok(true),
+        // The hub saw no open turn (a run it was never told about): stop it directly.
+        _ => Ok(service.stop(&thread_id).await),
     }
 }
 
@@ -434,8 +435,9 @@ pub async fn coder_git_push(
     super::git_push::git_push(&workspace_root)
 }
 
-/// A host result goes through the hub (first answer wins). A call the hub never heard of
-/// (a run from before it existed) is delivered straight to the waiting oneshot.
+/// A host result goes through the hub (first answer wins). Anything else the hub says
+/// (unknown call, commit failure) still delivers straight to the waiting oneshot: the
+/// run would otherwise time out and execute the command a second time.
 async fn resolve_host(
     caller: &Caller,
     service: &CoderService,
@@ -445,10 +447,10 @@ async fn resolve_host(
     command_id: Option<String>,
 ) -> Result<(), String> {
     let cmd = ThreadCommand::ResolveHost { call_id: call_id.clone(), result: result.clone().into() };
-    let ack = via_hub(service, caller, &thread_id, cmd, command_id).await?;
-    match ack.code.as_deref() {
-        Some("not_found") => service.submit_command_result(thread_id, call_id, result).await,
-        _ => accepted(ack),
+    match service.hub_command(&thread_id, cmd, caller.actor(), command_id).await {
+        Ok(ack) if ack.status != AckStatus::Rejected => Ok(()),
+        Ok(ack) if ack.code.as_deref() == Some("already_resolved") => accepted(ack),
+        _ => service.submit_command_result(thread_id, call_id, result).await,
     }
 }
 
