@@ -44,10 +44,10 @@ actions:
     run: pnpm gen:types
   publish:
     name: Bump, tag and push
-    run: node scripts/prepare-release.mjs --commit --push
+    run: node scripts/prepare-release.mjs --push
   publish-dry:
     name: Bump, tag and push (dry run)
-    run: node scripts/prepare-release.mjs --commit --push --dry-run
+    run: node scripts/prepare-release.mjs
 
 workflows:
   ship:
