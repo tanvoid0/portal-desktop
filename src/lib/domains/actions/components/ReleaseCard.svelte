@@ -43,8 +43,29 @@
   let described = $state<ReleaseDescription | null>(null);
   let loadError = $state<string | null>(null);
   let runs = $state<ReleaseRun[]>([]);
-  let busy = $state(false);
   let confirmOpen = $state(false);
+  let launchMode = $state<'ship' | 'rehearse'>('ship');
+
+  // The apps the launcher can ship as a subset, from the resolved ship plan: each
+  // `apps-build` fan-out node has id `<action>:<app>`. One source of truth
+  // (scripts/release-apps.txt) — never hardcoded here.
+  const apps = $derived(
+    described
+      ? [
+          ...new Set(
+            described.ship.steps
+              .map((s) => s.id)
+              .filter((id) => id.includes(':'))
+              .map((id) => id.slice(id.indexOf(':') + 1))
+          ),
+        ]
+      : []
+  );
+
+  function launch(mode: 'ship' | 'rehearse') {
+    launchMode = mode;
+    confirmOpen = true;
+  }
 
   let proposal = $state<Proposal | null>(null);
   let proposeError = $state<string | null>(null);
@@ -140,18 +161,8 @@
     editError = 'Could not read .portal/pipeline.yml';
   }
 
-  // Shipping lives in ShipDialog, shared with the project header's Release button.
-  async function rehearse() {
-    busy = true;
-    try {
-      const run = await invoke<{ id: string }>('release_rehearse', { projectId });
-      goto(`/projects/${project.id}/pipelines/run/${run.id}`);
-    } catch (e) {
-      toast.error(String(e));
-    } finally {
-      busy = false;
-    }
-  }
+  // Rehearsing and shipping both go through ShipDialog (scope picker), shared with
+  // the project header's Release button.
 
   // Runs can start outside this card (daemon, another window), and there is no
   // pipeline event to listen for — so re-read the run list while the card is on screen.
@@ -238,17 +249,25 @@
       </CardDescription>
     </CardHeader>
     <CardContent class="space-y-3">
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <Button
           variant="outline"
           size="sm"
-          disabled={busy || !described.rehearse}
-          onclick={rehearse}
+          disabled={!described.rehearse}
+          onclick={() => launch('rehearse')}
         >
-          <FlaskConical class="mr-2 h-4 w-4" /> Rehearse
+          <FlaskConical class="mr-2 h-4 w-4" /> Rehearse…
         </Button>
-        <Button size="sm" disabled={busy} onclick={() => (confirmOpen = true)}>
+        <Button size="sm" onclick={() => launch('ship')}>
           <Rocket class="mr-2 h-4 w-4" /> Ship…
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          class="text-muted-foreground"
+          onclick={() => goto(`/projects/${project.id}/release`)}
+        >
+          Details
         </Button>
       </div>
       {#each runs as run (run.id)}
@@ -328,5 +347,5 @@
     </CardContent>
   </Card>
 
-  <ShipDialog {project} release={r} bind:open={confirmOpen} />
+  <ShipDialog {project} release={r} {apps} mode={launchMode} bind:open={confirmOpen} />
 {/if}

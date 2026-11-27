@@ -286,6 +286,7 @@ pub async fn release_list(
 async fn start_release(
     project_id: i32,
     ship: bool,
+    workflow_override: Option<String>,
     mut variables: std::collections::HashMap<String, String>,
     events: &Events,
     service: &ExecutionService,
@@ -294,15 +295,21 @@ async fn start_release(
         .describe_release(project_id)
         .await?
         .ok_or_else(|| "This project declares no `release:` in .portal/pipeline.yml".to_string())?;
-    let workflow = if ship {
-        described["release"]["ship"].as_str()
-    } else {
-        described["release"]["rehearse"].as_str()
-    }
-    .ok_or_else(|| {
-        "No `rehearse` workflow declared; a rehearsal never runs the ship workflow".to_string()
-    })?
-    .to_string();
+    // An explicit `workflow` (e.g. "ship-server") overrides the release block's
+    // rehearse/ship id — the launcher's "server only" / scope picker. ship/rehearse
+    // still decide RELEASE_DRY_RUN, so a server-only rehearse is a dry run of it.
+    let workflow = match workflow_override.filter(|w| !w.is_empty()) {
+        Some(w) => w,
+        None => if ship {
+            described["release"]["ship"].as_str()
+        } else {
+            described["release"]["rehearse"].as_str()
+        }
+        .ok_or_else(|| {
+            "No `rehearse` workflow declared; a rehearsal never runs the ship workflow".to_string()
+        })?
+        .to_string(),
+    };
     // One release run per project: two ships race the version bump, and a rehearsal
     // beside a ship rewrites generated files under it. The lock makes check-then-start
     // atomic; rows left by a crash are cleared at startup (`reconcile_interrupted`).
@@ -339,6 +346,7 @@ async fn start_release(
 #[portal_rpc_macro::rpc(cap = "terminal.exec")]
 pub async fn release_rehearse(
     project_id: i32,
+    workflow: Option<String>,
     variables: Option<std::collections::HashMap<String, String>>,
     events: State<'_, Events>,
     service: State<'_, Arc<ExecutionService>>,
@@ -346,6 +354,7 @@ pub async fn release_rehearse(
     start_release(
         project_id,
         false,
+        workflow,
         variables.unwrap_or_default(),
         &events,
         &service,
@@ -359,6 +368,7 @@ pub async fn release_rehearse(
 #[portal_rpc_macro::rpc(local_only)]
 pub async fn release_ship(
     project_id: i32,
+    workflow: Option<String>,
     variables: Option<std::collections::HashMap<String, String>>,
     events: State<'_, Events>,
     service: State<'_, Arc<ExecutionService>>,
@@ -366,6 +376,7 @@ pub async fn release_ship(
     start_release(
         project_id,
         true,
+        workflow,
         variables.unwrap_or_default(),
         &events,
         &service,

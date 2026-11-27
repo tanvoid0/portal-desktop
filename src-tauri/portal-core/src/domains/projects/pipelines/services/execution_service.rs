@@ -49,6 +49,48 @@ const LOG_FLUSH_EVERY: Duration = Duration::from_millis(250);
 /// ponytail: blanket 1h ceiling; set a step's `timeout` to raise it for a slow build.
 const DEFAULT_STEP_TIMEOUT_SECS: u64 = 3600;
 
+/// Read each `foreach: { items_file }` list for a workflow, relative to the
+/// project root (blank lines and `#` comments ignored), keyed by the step's
+/// action name — what [`pipeline_file::build_steps`] needs to fan a step out.
+/// Inline `items` need no run context and are expanded by `build_steps` directly.
+/// `strict` fails on a missing/unreadable list file (a real run); when false a
+/// missing file is skipped so the step stays a single placeholder (describe/preview).
+fn resolve_foreach_items(
+    project_path: &str,
+    file: &pipeline_file::PipelineFile,
+    workflow_id: &str,
+    strict: bool,
+) -> Result<HashMap<String, Vec<String>>, String> {
+    let mut resolved: HashMap<String, Vec<String>> = HashMap::new();
+    let Some(wf) = file.workflows.get(workflow_id) else {
+        return Ok(resolved);
+    };
+    for step in &wf.steps {
+        let Some(fe) = &step.foreach else { continue };
+        if !fe.items.is_empty() {
+            continue;
+        }
+        let Some(rel) = &fe.items_file else { continue };
+        let path = Path::new(project_path).join(rel);
+        match std::fs::read_to_string(&path) {
+            Ok(text) => {
+                let items: Vec<String> = text
+                    .lines()
+                    .map(|l| l.trim())
+                    .filter(|l| !l.is_empty() && !l.starts_with('#'))
+                    .map(|l| l.to_string())
+                    .collect();
+                resolved.insert(step.action.clone(), items);
+            }
+            Err(e) if strict => {
+                return Err(format!("foreach items_file {}: {e}", path.display()))
+            }
+            Err(_) => {}
+        }
+    }
+    Ok(resolved)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionRequestData {
     pub pipeline_id: String,
@@ -1263,29 +1305,9 @@ impl ExecutionService {
             variables.entry("BUMP".to_string()).or_insert(bump);
         }
 
-        // Resolve `foreach: { items_file }` lists now — read natively, no shell,
-        // relative to the project root. Inline `items` need no run and are
-        // expanded by build_steps directly. Blank lines and `#` comments ignored.
-        let mut resolved: HashMap<String, Vec<String>> = HashMap::new();
-        if let Some(wf) = file.workflows.get(workflow_id) {
-            for step in &wf.steps {
-                let Some(fe) = &step.foreach else { continue };
-                if !fe.items.is_empty() {
-                    continue;
-                }
-                let Some(rel) = &fe.items_file else { continue };
-                let path = Path::new(&project.path).join(rel);
-                let text = std::fs::read_to_string(&path)
-                    .map_err(|e| format!("foreach items_file {}: {e}", path.display()))?;
-                let items: Vec<String> = text
-                    .lines()
-                    .map(|l| l.trim())
-                    .filter(|l| !l.is_empty() && !l.starts_with('#'))
-                    .map(|l| l.to_string())
-                    .collect();
-                resolved.insert(step.action.clone(), items);
-            }
-        }
+        // Resolve `foreach: { items_file }` lists now — read natively, no shell.
+        // A missing list file is a hard error on a real run (strict).
+        let resolved = resolve_foreach_items(&project.path, &file, workflow_id, true)?;
 
         let mut steps = pipeline_file::build_steps(&file, workflow_id, &resolved)?;
         for step in &mut steps {
@@ -1367,9 +1389,11 @@ impl ExecutionService {
             return Ok(None);
         };
         let plan = |id: &str| -> Result<Value, String> {
-            // No run context here: `foreach: { command }` steps collapse to a
-            // single placeholder node (inline `items` still expand).
-            let steps = pipeline_file::build_steps(&file, id, &HashMap::new())?;
+            // Resolve `items_file` fan-outs so the plan shows one node per app
+            // (the launcher sources its app subset from these). Lenient: a missing
+            // list file leaves that step a single placeholder rather than failing.
+            let resolved = resolve_foreach_items(&project.path, &file, id, false)?;
+            let steps = pipeline_file::build_steps(&file, id, &resolved)?;
             Ok(json!({ "id": id, "steps": steps.iter().map(|s| json!({
                 "id": s["id"], "name": s["name"], "dependsOn": s["dependsOn"],
                 "command": s["config"]["command"], "cwd": s["config"]["cwd"],
