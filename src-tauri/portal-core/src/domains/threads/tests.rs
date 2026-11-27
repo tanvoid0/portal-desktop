@@ -311,6 +311,13 @@ async fn drive_portal_turn(hub: &Arc<ThreadHub>, id: &str) {
     let ack = cmd(hub, id, ThreadCommand::ResolveHost { call_id: "h1".into(), result: json!("late") }, "local", Some("c6")).await;
     assert_eq!(ack.resolved_by.as_deref(), Some("device:phone"));
     cmd(hub, id, ThreadCommand::SetModel { model: Some("m".into()), llm_provider: Some("p".into()) }, "local", None).await;
+    let sub_agent = serde_json::from_value(json!({
+        "id": "sa1", "coordinatorThreadId": id, "childThreadId": "c1", "title": "t", "workspaceRoot": "/w",
+        "branch": "b", "status": "running", "createdAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z",
+    }))
+    .unwrap();
+    cmd(hub, id, ThreadCommand::SubAgentUpdated { sub_agent }, "system", None).await;
+    cmd(hub, id, ThreadCommand::Stop, "local", None).await;
     cmd(hub, id, ThreadCommand::ChangeRecorded { change_id: "ch".into(), path: "a.rs".into(), status: "pending".into() }, "system", None).await;
     let finish = ThreadCommand::Portal(PortalInput::Finished { outcome: TurnOutcome::Completed, final_text: None });
     cmd(hub, id, finish.clone(), "system", None).await;

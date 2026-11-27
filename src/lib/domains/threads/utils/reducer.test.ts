@@ -46,6 +46,15 @@ describe.each([
   });
 });
 
+it('portal fixture covers stop_requested and sub_agent_updated', () => {
+  const { events } = portalTurn as unknown as Fixture;
+  const kinds = events.map((e) => e.event.type);
+  expect(kinds).toContain('stop_requested');
+  expect(kinds).toContain('sub_agent_updated');
+  expect(fold(events.slice(0, kinds.indexOf('stop_requested') + 1)).stopping).toBe(true);
+  expect(fold(events).subAgents).toHaveLength(1);
+});
+
 const base = (over: Partial<ThreadView> = {}): ThreadView => ({
   ...emptyView(),
   seq: 5,
@@ -81,9 +90,10 @@ describe('applyDelta', () => {
     expect(applyDelta(base(), delta({ offset: 6, text: 'x' }))).toBeNull();
   });
 
-  it('asks for a re-snapshot when the seq differs', () => {
-    expect(applyDelta(base(), delta({ seq: 4, offset: 5, text: 'x' }))).toBeNull();
-    expect(applyDelta(base(), delta({ seq: 6, offset: 5, text: 'x' }))).toBeNull();
+  it('drops a chunk behind the cursor, re-snapshots one ahead of it', () => {
+    const v = base();
+    expect(applyDelta(v, delta({ seq: 4, offset: 5, text: 'x' }))).toBe(v);
+    expect(applyDelta(v, delta({ seq: 6, offset: 5, text: 'x' }))).toBeNull();
   });
 
   it('counts offsets in UTF-16 units', () => {

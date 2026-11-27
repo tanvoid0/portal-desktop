@@ -7,7 +7,7 @@
  * `visibilitychange`. Design: docs/development/CODER_THREAD_LOG_DESIGN.md section 4.
  */
 import { threadApi, type ThreadHeartbeatFrame } from '../api/threadApi';
-import { applyDelta, applyEvent, fromSnapshot, type ThreadView } from '../utils/reducer';
+import { applyDelta, applyEvent, emptyView, fromSnapshot, type ThreadView } from '../utils/reducer';
 import type { ThreadDeltaFrame, ThreadEventFrame } from '../generated';
 import { queryClient } from '$lib/domains/shared/query/queryClient';
 import { queryKeys } from '$lib/domains/shared/query/keys';
@@ -41,7 +41,14 @@ class ThreadStore {
     else {
       s = { refs: 1, ready: false, buffer: [], snapping: null, catching: false };
       this.subs.set(id, s);
-      void this.listen().then(() => this.resnapshot(id));
+      const mine = s;
+      this.listen().then(
+        () => this.resnapshot(id),
+        (e) => {
+          console.error('threads: listen failed', e);
+          if (this.subs.get(id) === mine) this.subs.delete(id);
+        }
+      );
     }
     return () => {
       const cur = this.subs.get(id);
@@ -56,13 +63,19 @@ class ThreadStore {
   // threads are dropped at `subs.get`. Tear down when the last thread closes if that ever costs.
   private listen(): Promise<void> {
     this.listening ??= (async () => {
-      await Promise.all([
+      const results = await Promise.allSettled([
         threadApi.onEvent((event) => this.feed(event.thread_id, { event })),
         threadApi.onDelta((delta) => this.feed(delta.thread_id, { delta })),
         threadApi.onHeartbeat((hb) => this.heartbeat(hb)),
         threadApi.onLagged(() => this.catchUpAll()),
         threadApi.onConnection((connected) => connected && this.catchUpAll()),
       ]);
+      const failed = results.find((r) => r.status === 'rejected');
+      if (failed) {
+        // Drop the ones that did register, or a retry would double them.
+        for (const r of results) if (r.status === 'fulfilled') r.value();
+        throw (failed as PromiseRejectedResult).reason;
+      }
       if (typeof document !== 'undefined') {
         document.addEventListener('visibilitychange', () => {
           if (document.visibilityState === 'visible') this.catchUpAll();
@@ -75,8 +88,9 @@ class ThreadStore {
     return this.listening;
   }
 
-  private set(id: string, v: ThreadView) {
-    if (this.subs.has(id)) this.views = { ...this.views, [id]: v };
+  /** Writes only into the subscription `s` that started the work, not a newer one under the same id. */
+  private set(id: string, s: Sub, v: ThreadView) {
+    if (this.subs.get(id) === s) this.views = { ...this.views, [id]: v };
   }
 
   private feed(id: string, item: Item) {
@@ -87,25 +101,25 @@ class ThreadStore {
   }
 
   private handle(id: string, s: Sub, item: Item) {
-    const v = this.views[id];
-    if (!v) return;
+    const v = this.views[id] ?? emptyView(); // no snapshot yet (failed, or the thread is not created): fold from 0
     if ('event' in item) {
       const n = applyEvent(v, item.event);
       if (n === null) {
         s.buffer.push(item);
         void this.catchUp(id);
-      } else if (n !== v) this.set(id, n);
+      } else if (n !== v) this.set(id, s, n);
     } else {
       const n = applyDelta(v, item.delta);
       if (n === null) void this.resnapshot(id);
-      else if (n !== v) this.set(id, n);
+      else if (n !== v) this.set(id, s, n);
     }
   }
 
   private heartbeat(hb: ThreadHeartbeatFrame) {
     const s = this.subs.get(hb.thread_id);
     const v = this.views[hb.thread_id];
-    if (s?.ready && v) this.set(hb.thread_id, { ...v, waitingSeconds: hb.waited_seconds });
+    if (s?.ready && v && hb.seq === v.seq)
+      this.set(hb.thread_id, s, { ...v, waitingSeconds: hb.waited_seconds });
   }
 
   /** Re-feeds the buffer; what is still a gap lands back in it. */
@@ -123,7 +137,7 @@ class ThreadStore {
     s.snapping ??= (async () => {
       try {
         const snap = await threadApi.snapshot(id);
-        if (snap) this.set(id, fromSnapshot(snap)); // buffered frames <= snap.seq drop in `applyEvent`
+        if (snap) this.set(id, s, fromSnapshot(snap)); // buffered frames <= snap.seq drop in `applyEvent`
       } catch (e) {
         console.error('threads: snapshot failed', id, e);
       } finally {
@@ -137,11 +151,12 @@ class ThreadStore {
 
   private async catchUp(id: string): Promise<void> {
     const s = this.subs.get(id);
-    const v = this.views[id];
-    if (!s || !v || s.catching || s.snapping) return;
+    if (!s || s.catching || s.snapping) return;
     s.catching = true;
     try {
-      const page = await threadApi.eventsSince(id, v.seq);
+      const page = await threadApi.eventsSince(id, (this.views[id] ?? emptyView()).seq);
+      // A snapshot started meanwhile owns the buffer and will overwrite the view; stand down.
+      if (s.snapping || this.subs.get(id) !== s) return;
       if (page.reset) return await this.resnapshot(id);
       for (const event of page.events) this.handle(id, s, { event });
       this.replay(id, s);

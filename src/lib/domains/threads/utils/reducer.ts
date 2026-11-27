@@ -223,17 +223,23 @@ export function applyEvent(v: ThreadView, f: ThreadEventFrame): ThreadView | nul
       n.approvals = [];
       clearStream(n);
       break;
+    default: {
+      const unhandled: never = e;
+      throw new Error(`unhandled thread event ${JSON.stringify(unhandled)}`);
+    }
   }
   return withRetry(n);
 }
 
 /**
  * Folds one live streaming chunk. `null` = re-snapshot: the chunk starts past our
- * partial, or names another seq. A chunk at `seq == cursor` that overlaps what we
+ * partial, or is ahead of the cursor. A chunk behind the cursor is always already in the
+ * partial or wiped by a clearing event, so it is dropped. A chunk at `seq == cursor` that overlaps what we
  * hold (the flush just before a snapshot is already in its partial) adds only its tail.
  */
 export function applyDelta(v: ThreadView, d: ThreadDeltaFrame): ThreadView | null {
-  if (d.seq !== v.seq) return null;
+  if (d.seq < v.seq) return v;
+  if (d.seq > v.seq) return null;
   const thinking = d.thinking !== '';
   const have = thinking ? v.streamingThinking : v.streamingText;
   const chunk = thinking ? d.thinking : d.text;
