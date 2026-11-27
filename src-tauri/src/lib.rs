@@ -328,6 +328,21 @@ pub fn run() {
                 Ok(_) => {}
                 Err(e) => log_warn!("Agents", "Failed to reconcile stale sessions: {}", e),
             }
+            // Legacy threads -> thread log, then close turns a dead process left
+            // open. After the settle above, before any service can submit.
+            match tauri::async_runtime::block_on(domains::threads::legacy_import::run(
+                db_manager_arc.get_connection(),
+            )) {
+                Ok(r) if r != Default::default() => log_info!(
+                    "Threads",
+                    "Imported {} legacy threads, prepended history to {}, closed {} open turns",
+                    r.imported,
+                    r.prepended,
+                    r.reconciled
+                ),
+                Ok(_) => {}
+                Err(e) => log_warn!("Threads", "Legacy thread import failed: {}", e),
+            }
             // Surface Claude Code sessions Portal didn't start (terminal,
             // desktop app) from ~/.claude/projects; 30s poll, mtime-gated.
             {
