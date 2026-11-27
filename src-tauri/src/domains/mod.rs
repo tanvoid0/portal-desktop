@@ -33,5 +33,6 @@ pub mod settings;
 pub mod tasks;
 pub mod sync;
 pub mod terminal;
+pub mod threads;
 pub mod uninstaller;
 pub mod updates;

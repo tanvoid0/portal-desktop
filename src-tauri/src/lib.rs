@@ -343,6 +343,9 @@ pub fn run() {
                     }
                 });
             }
+            let thread_hub = domains::threads::ThreadHub::new(db_manager_arc.clone(), sink.clone());
+            agents_service.attach_thread_hub(thread_hub.clone());
+            app.manage(thread_hub);
             app.manage(agents_service);
 
             // Initialize pipeline services
@@ -1029,6 +1032,9 @@ pub fn run() {
             domains::agents::agents_analytics,
             domains::agents::agents_get_session,
             domains::agents::agents_delete_session,
+            domains::threads::coder_thread_list,
+            domains::threads::coder_thread_snapshot,
+            domains::threads::coder_thread_events_since,
         ])
         .build(context)
         .expect("error while building tauri application")

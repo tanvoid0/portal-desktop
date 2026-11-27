@@ -458,7 +458,12 @@ fn classify(
 ///   holders of the weaker `terminal` cap.
 /// - `pipeline-execution-update`/`pipeline-step-log` are emitted without the
 ///   `domain://` form, so they're matched by prefix.
+/// - `coder://thread-*` (every provider's thread log) follows
+///   `crate::rpc::THREAD_READ_CAP`, the same cap as the thread read RPCs.
 fn event_cap(event: &str) -> Option<&'static str> {
+    if event.starts_with("coder://thread-") {
+        return Some(crate::rpc::THREAD_READ_CAP);
+    }
     if event.starts_with("terminal") || event.starts_with("shell-integration") {
         return Some("terminal.exec");
     }
@@ -647,8 +652,10 @@ async fn rpc(
 fn caller_for(trust: &Trust) -> crate::rpc::Caller {
     match trust {
         Trust::Local => crate::rpc::Caller::local(),
-        Trust::Remote { caps, .. } => crate::rpc::Caller::remote(caps.clone()),
-        Trust::Anon => crate::rpc::Caller::remote(vec![]),
+        Trust::Remote { device_id, caps } => {
+            crate::rpc::Caller::remote(Some(device_id.clone()), caps.clone())
+        }
+        Trust::Anon => crate::rpc::Caller::remote(None, vec![]),
     }
 }
 
@@ -983,6 +990,8 @@ mod tests {
     #[test]
     fn events_are_filtered_by_capability_fail_closed() {
         assert_eq!(event_cap("coder://change"), Some("coder"));
+        assert_eq!(event_cap("coder://thread-event"), Some(crate::rpc::THREAD_READ_CAP));
+        assert_eq!(event_cap("coder://thread-delta"), Some(crate::rpc::THREAD_READ_CAP));
         assert_eq!(event_cap("terminal-output"), Some("terminal.exec"));
         assert_eq!(event_cap("shell-integration-event"), Some("terminal.exec"));
         assert_eq!(event_cap("k8s://pods"), None);
@@ -1220,6 +1229,163 @@ mod tests {
     #[test]
     fn caller_for_anon_fails_closed() {
         assert!(caller_for(&Trust::Anon).require("coder").is_err());
+    }
+
+    #[test]
+    fn caller_for_carries_the_device_into_actor() {
+        let remote = caller_for(&Trust::Remote {
+            device_id: "dev-1".into(),
+            caps: vec!["coder".into()],
+        });
+        assert_eq!(remote.device(), Some("dev-1"));
+        assert_eq!(remote.actor(), "device:dev-1");
+        let local = caller_for(&Trust::Local);
+        assert_eq!((local.device(), local.actor().as_str()), (None, "local"));
+        let anon = caller_for(&Trust::Anon);
+        assert_eq!((anon.device(), anon.actor().as_str()), (None, "remote"));
+    }
+
+    /// A `/events` client that stops reading while more than a channel's worth
+    /// of frames go by gets `events://lagged` (skipped > 0) and keeps
+    /// receiving; calling the thread hub's `events_since` from the last seq it
+    /// holds contiguously then closes the gap, ending equal to a client that
+    /// kept up. Frames are real hub frames, ~64 KiB each, so the stalled
+    /// socket's send blocks the pump once the TCP buffers fill — that, not a
+    /// slow reader alone, is what lags it.
+    #[tokio::test]
+    async fn a_slow_events_client_catches_up_through_events_since() {
+        use futures_util::StreamExt;
+        use portal_core::database::DatabaseManager;
+        use portal_core::domains::agents::entities::agent_session;
+        use portal_core::domains::agents::AgentEvent;
+        use portal_core::domains::threads::{ThreadCommand, ThreadHub};
+        use sea_orm::{ActiveValue::Set, EntityTrait};
+        use std::collections::BTreeMap;
+
+        const ID: &str = "run-1";
+        const PAIRS: usize = 200;
+        let (tx, _rx) = broadcast::channel(4);
+        let sink = Arc::new(WsSink::new(tx.clone()));
+
+        let dir = tempfile::tempdir().unwrap();
+        let db = Arc::new(DatabaseManager::new(dir.path().to_path_buf()).await.unwrap());
+        agent_session::Entity::insert(agent_session::ActiveModel {
+            id: Set(ID.into()),
+            backend_id: Set("claude-code".into()),
+            model: Set(Some("opus".into())),
+            cwd: Set("/w".into()),
+            status: Set("running".into()),
+            started_at: Set("2026-01-01T00:00:00Z".into()),
+            ended_at: Set(None),
+            exit_code: Set(None),
+            title: Set(None),
+            task_id: Set(None),
+            backend_session_id: Set(None),
+        })
+        .exec(db.get_connection())
+        .await
+        .unwrap();
+        let hub = ThreadHub::new(db, sink);
+
+        let app = Router::new()
+            .route("/events", get(events))
+            .layer(Extension(Trust::Local))
+            .with_state(AppState::new(tx.clone(), None, 0));
+        let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
+            .await
+            .unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app.into_make_service()).await;
+        });
+        let connect = || tokio_tungstenite::connect_async(format!("ws://{addr}/events"));
+        let (mut fast, _) = connect().await.unwrap();
+        let (mut slow, _) = connect().await.unwrap();
+        // The pumps subscribe from the upgrade task: wait for both (plus `_rx`).
+        while tx.receiver_count() < 3 {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+
+        // Reads until it holds the thread-event with seq `head` (0 = not known yet),
+        // under one overall timeout: `(thread-event payloads by seq, lagged skipped)`.
+        // The newest frame cannot be lapped, so a lagged socket still ends holding it.
+        async fn drain(
+            ws: &mut (impl futures_util::Stream<Item = Result<WsMessage, WsError>> + Unpin),
+            head: &std::sync::atomic::AtomicI64,
+        ) -> (BTreeMap<i64, Value>, u64) {
+            let (mut frames, mut skipped) = (BTreeMap::new(), 0);
+            let _ = tokio::time::timeout(Duration::from_secs(30), async {
+                loop {
+                    let h = head.load(std::sync::atomic::Ordering::SeqCst);
+                    if h > 0 && frames.contains_key(&h) {
+                        break;
+                    }
+                    let t = match tokio::time::timeout(Duration::from_millis(100), ws.next()).await {
+                        Ok(Some(Ok(WsMessage::Text(t)))) => t,
+                        Ok(_) => break, // closed
+                        Err(_) => continue, // idle: re-check `head`
+                    };
+                    let v: Value = serde_json::from_str(t.as_str()).unwrap();
+                    match v["event"].as_str().unwrap() {
+                        "events://lagged" => skipped += v["payload"]["skipped"].as_u64().unwrap(),
+                        "coder://thread-event" => {
+                            frames.insert(v["payload"]["seq"].as_i64().unwrap(), v["payload"].clone());
+                        }
+                        _ => {}
+                    }
+                }
+            })
+            .await;
+            (frames, skipped)
+        }
+
+        let head_seq = Arc::new(std::sync::atomic::AtomicI64::new(0));
+        let fast_reader = {
+            let head_seq = head_seq.clone();
+            tokio::spawn(async move { drain(&mut fast, &head_seq).await })
+        };
+        let pad = "x".repeat(64 * 1024);
+        // Paced, so the fast client's pump keeps up; `slow` is never read.
+        for i in 0..PAIRS {
+            let id = format!("t{i}");
+            let call = AgentEvent::ToolCall {
+                id: id.clone(),
+                name: "Bash".into(),
+                input: json!({ "command": "ls" }),
+                parent_tool_use_id: None,
+            };
+            let result = AgentEvent::ToolResult {
+                tool_use_id: id,
+                content: pad.clone(),
+                is_error: false,
+            };
+            hub.submit(ID, ThreadCommand::Provider(call));
+            hub.submit(ID, ThreadCommand::Provider(result));
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+
+        // Through the actor queue: every commit (and its frames) is out once this returns.
+        let head = hub.snapshot(ID).await.unwrap().unwrap().seq;
+        head_seq.store(head, std::sync::atomic::Ordering::SeqCst);
+        assert!(head >= 2 * PAIRS as i64);
+
+        let (fast_frames, fast_skipped) = fast_reader.await.unwrap();
+        assert_eq!(fast_skipped, 0);
+        assert_eq!(fast_frames.keys().copied().collect::<Vec<_>>(), (1..=head).collect::<Vec<_>>());
+
+        let (mut got, skipped) = drain(&mut slow, &head_seq).await;
+        assert!(skipped > 0, "slow client was never told it lagged");
+        assert!(got.len() < fast_frames.len());
+
+        // Catch up from the last seq it holds with nothing missing before it.
+        let cursor = (1..).take_while(|s| got.contains_key(s)).last().unwrap_or(0);
+        let page = hub.events_since(ID, cursor).await.unwrap();
+        assert!(!page.reset);
+        assert_eq!(page.head_seq, head);
+        for frame in page.events {
+            got.entry(frame.seq).or_insert(serde_json::to_value(&frame).unwrap());
+        }
+        assert_eq!(got, fast_frames);
     }
 
     /// The hole this closes: `coder_write_file` names its own workspace root,

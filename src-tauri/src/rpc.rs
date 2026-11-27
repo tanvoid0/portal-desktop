@@ -33,6 +33,8 @@ type Call = for<'a> fn(
 #[derive(Clone)]
 pub struct Caller {
     caps: Option<Vec<String>>,
+    /// The paired device behind a remote call; `None` for local and `Anon`.
+    device: Option<String>,
     /// Set by the first `require()` that fails, so the daemon can read back
     /// which capability a command's own `DispatchError::Failed` was actually
     /// about (vs. some unrelated error) — `Arc` so the clone a `#[rpc]`
@@ -47,15 +49,32 @@ impl Caller {
     pub(crate) fn local() -> Self {
         Self {
             caps: None,
+            device: None,
             denied: Arc::new(OnceLock::new()),
         }
     }
 
-    /// A remote peer, scoped to `caps`.
-    pub(crate) fn remote(caps: Vec<String>) -> Self {
+    /// A remote peer, scoped to `caps`; `device` is its pairing id, if any.
+    pub(crate) fn remote(device: Option<String>, caps: Vec<String>) -> Self {
         Self {
             caps: Some(caps),
+            device,
             denied: Arc::new(OnceLock::new()),
+        }
+    }
+
+    #[allow(dead_code)] // first callers: S2a command envelopes
+    pub fn device(&self) -> Option<&str> {
+        self.device.as_deref()
+    }
+
+    /// Who to credit in a log: `local`, `device:<id>`, or `remote` (no id).
+    #[allow(dead_code)] // first callers: S2a command envelopes
+    pub fn actor(&self) -> String {
+        match (&self.caps, &self.device) {
+            (None, _) => "local".into(),
+            (Some(_), Some(id)) => format!("device:{id}"),
+            (Some(_), None) => "remote".into(),
         }
     }
 
@@ -161,6 +180,19 @@ pub const SENSITIVE_CAPS: &[&str] = &[
     "github.write",
     "n8n.run",
 ];
+
+/// The one cap that guards every provider's thread transcript reads
+/// (`coder_thread_list` / `_snapshot` / `_events_since`) and the `coder://thread-*`
+/// frames (`daemon::event_cap`). The commands carry `#[rpc(cap = "coder")]` (the macro
+/// takes only a literal) and then `caller.require(THREAD_READ_CAP)`. Moving thread reads
+/// to a new cap means this line, that cap's entry in `SENSITIVE_CAPS` if it is opt-in,
+/// and the three `#[rpc(cap = "coder")]` literals in `src/domains/threads/commands.rs`
+/// (a cap no command carries can never be granted, and the exact cap-set test in this
+/// file says so). The daemon follows this constant on its own.
+/// Owner decision 2026-11-27: the default-granted `coder`, so every paired
+/// device reads every provider's transcripts, CLI ones included
+/// (`docs/development/CODER_THREAD_LOG_DESIGN.md` §4).
+pub const THREAD_READ_CAP: &str = "coder";
 
 /// Why a call could not be made, as opposed to a call that ran and failed.
 #[derive(Debug)]
@@ -379,8 +411,8 @@ mod tests {
         assert_eq!(capability("update_project"), Some("projects"));
 
         let default_remote =
-            || Caller::remote(DEFAULT_CAPS.iter().map(|c| c.to_string()).collect());
-        let exec_remote = Caller::remote(vec!["projects".into(), "terminal.exec".into()]);
+            || Caller::remote(None, DEFAULT_CAPS.iter().map(|c| c.to_string()).collect());
+        let exec_remote = Caller::remote(None, vec!["projects".into(), "terminal.exec".into()]);
         // path, build_command, start_command, test_command, output_directory
         for i in 0..5 {
             let mut f: [Option<String>; 5] = Default::default();
@@ -594,7 +626,7 @@ b",
 
     #[test]
     fn remote_caller_is_refused_a_cap_it_lacks_and_records_which_one() {
-        let caller = Caller::remote(vec!["coder".to_string()]);
+        let caller = Caller::remote(None, vec!["coder".to_string()]);
         let err = caller.require("agents.exec");
         assert!(err.is_err());
         assert_eq!(caller.denied(), Some("agents.exec"));
@@ -602,14 +634,14 @@ b",
 
     #[test]
     fn remote_caller_holding_the_cap_is_allowed() {
-        let caller = Caller::remote(vec!["coder".to_string(), "agents.exec".to_string()]);
+        let caller = Caller::remote(None, vec!["coder".to_string(), "agents.exec".to_string()]);
         assert!(caller.require("agents.exec").is_ok());
         assert_eq!(caller.denied(), None);
     }
 
     #[test]
     fn denied_is_visible_through_a_clone() {
-        let caller = Caller::remote(vec!["coder".to_string()]);
+        let caller = Caller::remote(None, vec!["coder".to_string()]);
         let clone = caller.clone();
         assert!(clone.require("agents.exec").is_err());
         assert_eq!(caller.denied(), Some("agents.exec"));

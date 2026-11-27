@@ -9,7 +9,7 @@ use super::diff::Hunk;
 /// A single chat message in a thread transcript. This mirrors the OpenAI
 /// chat-completions message shape so it can be sent to the platform `/v1`
 /// proxy verbatim.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct ChatMessage {
     /// `system` | `user` | `assistant` | `tool`.
@@ -160,7 +160,7 @@ pub fn with_message_timestamps(
 }
 
 /// An OpenAI-format tool call emitted by the model.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct ToolCall {
     pub id: String,
@@ -173,7 +173,7 @@ fn default_tool_type() -> String {
     "function".into()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct FunctionCall {
     pub name: String,
@@ -248,7 +248,7 @@ pub enum CoderThreadKind {
 
 /// A tool call awaiting a human decision because the current permission mode +
 /// allowlist did not auto-grant it.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct PendingApproval {
     pub call_id: String,

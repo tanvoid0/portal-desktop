@@ -20,6 +20,7 @@ use tokio::sync::{mpsc, Mutex, Semaphore};
 use ts_rs::TS;
 
 use crate::database::DatabaseManager;
+use crate::domains::threads::{ThreadCommand, ThreadHub};
 use crate::events::{EventSink, EventSinkExt};
 
 use super::backend::{AgentBackend, BackendModel, RunControl, StartParams};
@@ -251,6 +252,8 @@ pub struct AgentRunService {
     semaphore: Arc<Semaphore>,
     sink: Mutex<Option<Arc<dyn EventSink>>>,
     db: Arc<DatabaseManager>,
+    /// Observes every pumped event; set once at startup via `attach_thread_hub`.
+    thread_hub: std::sync::OnceLock<Arc<ThreadHub>>,
 }
 
 impl AgentRunService {
@@ -261,6 +264,25 @@ impl AgentRunService {
             semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_RUNS)),
             sink: Mutex::new(None),
             db,
+            thread_hub: std::sync::OnceLock::new(),
+        }
+    }
+
+    pub fn attach_thread_hub(&self, hub: Arc<ThreadHub>) {
+        let _ = self.thread_hub.set(hub);
+    }
+
+    /// The backend never echoes the user's turn, so the thread log is told here.
+    fn observe_user(&self, run_id: &str, text: &str) {
+        if let Some(hub) = self.thread_hub.get() {
+            hub.submit(
+                run_id,
+                ThreadCommand::Provider(AgentEvent::Message {
+                    role: "user".into(),
+                    text: text.to_string(),
+                    parent_tool_use_id: None,
+                }),
+            );
         }
     }
 
@@ -333,6 +355,7 @@ impl AgentRunService {
         if has_prompt {
             self.persist_message(&run_id, 0, "user", &params.prompt, None)
                 .await;
+            self.observe_user(&run_id, &params.prompt);
         }
 
         self.spawn_pump(run_id.clone(), rx, permit);
@@ -408,6 +431,7 @@ impl AgentRunService {
         }
         self.persist_message(session_id, seq, "user", &text, None)
             .await;
+        self.observe_user(session_id, &text);
 
         self.spawn_pump(session_id.to_string(), rx, permit);
         Ok(session_id.to_string())
@@ -491,6 +515,9 @@ impl AgentRunService {
                     .unwrap_or(0);
                 drop(runs);
                 svc.emit(&rid, seq, &event).await;
+                if let Some(hub) = svc.thread_hub.get() {
+                    hub.submit(&rid, ThreadCommand::Provider(event.clone()));
+                }
 
                 // `TextDelta`/`ThinkingDelta` are superseded by the `Message`
                 // event that follows once the turn finishes — persisting
@@ -546,6 +573,8 @@ impl AgentRunService {
             let seq = entry.next_seq;
             entry.next_seq += 1;
             entry.control.send_user(text.clone()).await?;
+            // Inside the lock so it orders before the reply's events.
+            self.observe_user(run_id, &text);
             seq
         };
         self.persist_message(run_id, seq, "user", &text, None).await;
@@ -879,6 +908,10 @@ impl AgentRunService {
             .ok_or("session not found")?;
         if row.status == "running" {
             return Err("cannot delete a session that is currently running".to_string());
+        }
+        // Thread first: if this fails the session row survives, so a retry can reach it.
+        if let Some(hub) = self.thread_hub.get() {
+            hub.delete(session_id).await?;
         }
         agent_session::Entity::delete_by_id(session_id.to_string())
             .exec(conn)

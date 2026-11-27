@@ -26,6 +26,7 @@ pub mod shared;
 pub mod sync;
 pub mod tasks;
 pub mod terminal;
+pub mod threads;
 pub mod uninstaller;
 
 // Future domains will be added here:
