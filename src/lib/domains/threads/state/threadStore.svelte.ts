@@ -105,10 +105,7 @@ class ThreadStore {
     if (!v) {
       // No snapshot yet (it failed, or the thread is not created). Never fold from empty: an
       // imported thread has a projection at seq 0 with no events. A live frame retries the snapshot.
-      if ('event' in item) {
-        s.buffer.push(item);
-        if (!s.snapping) void this.resnapshot(id);
-      }
+      if ('event' in item && !s.snapping) void this.resnapshot(id);
       return;
     }
     if ('event' in item) {
@@ -144,15 +141,24 @@ class ThreadStore {
     if (!s) return Promise.resolve();
     s.ready = false;
     s.snapping ??= (async () => {
+      let missing = false; // the hub answered "no such thread", as opposed to an error
       try {
         const snap = await threadApi.snapshot(id);
+        missing = !snap;
         if (snap) this.set(id, s, fromSnapshot(snap)); // buffered frames <= snap.seq drop in `applyEvent`
       } catch (e) {
         console.error('threads: snapshot failed', id, e);
       } finally {
         s.snapping = null;
         s.ready = true;
-        if (this.views[id]) this.replay(id, s); // no view: keep the buffer for the next snapshot
+        if (this.views[id]) this.replay(id, s);
+        else {
+          // The next snapshot is requested after these frames arrived, so it covers them. A
+          // `created` that raced a "not found" answer gets one retry.
+          const raced = s.buffer.some((i) => 'event' in i);
+          s.buffer = [];
+          if (missing && raced) void this.resnapshot(id);
+        }
       }
     })();
     return s.snapping;
