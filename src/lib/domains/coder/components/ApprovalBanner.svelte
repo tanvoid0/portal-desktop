@@ -33,7 +33,7 @@
   // including the agents backend's native Claude Code CLI tool names
   // (`Bash`, `Write`, `Edit`, …). `pending.summary` (already computed by
   // `summarizePermission()` for exactly that case — see
-  // `agents/utils/eventsToMessages.ts`) is the fallback, not the primary
+  // `src-tauri/portal-core/src/domains/threads/decide.rs`) is the fallback, not the primary
   // source, so coder's own richer per-tool details keep taking priority. See
   // QA-126.
   const display = $derived.by(() => {

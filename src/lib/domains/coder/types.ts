@@ -60,19 +60,6 @@ export function summaryToThread(summary: CoderThreadSummary): CoderThread {
   };
 }
 
-export interface RunCommandEvent {
-  thread_id: string;
-  call_id: string;
-  command: string;
-  terminal_id?: string | null;
-  workspace_root: string;
-}
-
-export interface ListTerminalsEvent {
-  thread_id: string;
-  call_id: string;
-}
-
 export interface ThreadTitleEvent {
   thread_id: string;
   title: string;

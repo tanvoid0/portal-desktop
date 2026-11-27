@@ -21,7 +21,7 @@ import type {
   ThreadTitleEvent,
 } from '../types.js';
 import { summaryToThread } from '../types.js';
-import type { ContextUsage, ProviderType } from '$lib/domains/ai/types/index.js';
+import type { ContextUsage, LlmUsage, ProviderType } from '$lib/domains/ai/types/index.js';
 import {
   fallbackTitleFromMessage,
   isPlaceholderTitle,
@@ -63,6 +63,8 @@ export type SubAgentNotificationHandler = (event: SubAgentNotificationEvent) => 
 export interface ThreadRuntime {
   /** Context window gauge, fetched (it is not in the log). */
   contextUsage: ContextUsage | null;
+  /** Last LLM step's tokens and cost; only the legacy event carries it. */
+  llmUsage: LlmUsage | null;
   draftInput: string;
   subAgents: CoderSubAgent[];
   multitaskMode: boolean;
@@ -75,6 +77,7 @@ export interface ThreadRuntime {
 function emptyRuntime(): ThreadRuntime {
   return {
     contextUsage: null,
+    llmUsage: null,
     draftInput: '',
     subAgents: [],
     multitaskMode: false,
@@ -207,6 +210,13 @@ class CoderSessionState {
     await this.refreshThreads();
 
     void this.initProviderDefaults();
+
+    await coderService.onContextUsage(({ thread_id, context_usage, llm_usage }) => {
+      const rt = this.runtimeFor(thread_id);
+      rt.contextUsage = context_usage;
+      if (llm_usage) rt.llmUsage = llm_usage;
+      this.touchRuntime();
+    });
 
     await coderService.onTitle(({ thread_id, title }) => {
       this.applyThreadTitle(thread_id, title);

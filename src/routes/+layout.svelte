@@ -30,6 +30,13 @@
   onMount(() => {
     if (!isMobileShell) {
       let stop = () => {};
+      // The desktop answers the agent's terminal requests from app start, not only once Coder opens.
+      void Promise.all([
+        import('$lib/domains/coder/services/hostResponder'),
+        import('$lib/domains/coder/state/coderSession.svelte.js'),
+      ]).then(([{ startHostResponder }, { coderSession }]) =>
+        startHostResponder(() => (coderSession.terminalOpen = true))
+      );
       void initDeepLinks((r) => goto(r)).then((u) => (stop = u));
       return () => stop();
     }

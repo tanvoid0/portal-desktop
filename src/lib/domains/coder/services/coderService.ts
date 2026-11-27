@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
+import { generateId } from '$lib/domains/shared/utils';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import type { ContextUsage } from '$lib/domains/ai/types/index.js';
+import type { ContextUsage, LlmUsage } from '$lib/domains/ai/types/index.js';
 import type {
   ChatMessage,
   CoderDoneEvent,
@@ -81,12 +82,12 @@ export class CoderService {
 
   /** Send a user message and start a background run. */
   send(threadId: string, message: string): Promise<void> {
-    return invoke<void>('coder_send', { threadId, message, commandId: crypto.randomUUID() });
+    return invoke<void>('coder_send', { threadId, message, commandId: generateId() });
   }
 
   /** Resume a failed run from the current thread state. */
   retry(threadId: string): Promise<void> {
-    return invoke<void>('coder_retry', { threadId, commandId: crypto.randomUUID() });
+    return invoke<void>('coder_retry', { threadId, commandId: generateId() });
   }
 
   /** Edit a user message and rerun the agent from that point. */
@@ -95,7 +96,7 @@ export class CoderService {
       threadId,
       messageIndex,
       content,
-      commandId: crypto.randomUUID(),
+      commandId: generateId(),
     });
   }
 
@@ -113,13 +114,13 @@ export class CoderService {
       approve,
       remember,
       editedPattern: editedPattern ?? null,
-      commandId: crypto.randomUUID(),
+      commandId: generateId(),
     });
   }
 
   /** Cancel an in-flight run for a thread. */
   stop(threadId: string): Promise<boolean> {
-    return invoke<boolean>('coder_stop', { threadId, commandId: crypto.randomUUID() });
+    return invoke<boolean>('coder_stop', { threadId, commandId: generateId() });
   }
 
   getMode(): Promise<CoderAgentMode> {
@@ -243,6 +244,17 @@ export class CoderService {
     return invoke<string>('coder_git_push', { workspaceRoot });
   }
 
+  /** Context window usage (and the last LLM step's tokens/cost) updated for a thread. */
+  onContextUsage(
+    cb: (p: { thread_id: string; context_usage: ContextUsage; llm_usage?: LlmUsage | null }) => void
+  ): Promise<UnlistenFn> {
+    return listen<{
+      thread_id: string;
+      context_usage: ContextUsage;
+      llm_usage?: LlmUsage | null;
+    }>('coder://context-usage', (e) => cb(e.payload));
+  }
+
   /** The run finished. */
   onDone(cb: (p: CoderDoneEvent) => void): Promise<UnlistenFn> {
     return listen<CoderDoneEvent>('coder://done', (e) => cb(e.payload));
@@ -258,7 +270,7 @@ export class CoderService {
       threadId,
       callId,
       result,
-      commandId: crypto.randomUUID(),
+      commandId: generateId(),
     });
   }
 
@@ -267,7 +279,7 @@ export class CoderService {
       threadId,
       callId,
       listJson,
-      commandId: crypto.randomUUID(),
+      commandId: generateId(),
     });
   }
 

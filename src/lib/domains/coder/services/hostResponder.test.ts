@@ -8,8 +8,9 @@ vi.mock('../state/coderTerminalStore.svelte.js', () => ({ coderTerminalStore: {}
 vi.mock('../state/coderWorkspaceStore.svelte.js', () => ({ coderWorkspaceStore: {} }));
 vi.mock('$lib/domains/threads/api/threadApi', () => ({ threadApi: {} }));
 vi.mock('$lib/domains/mobile/browserShim', () => ({ isBrowserClient: false }));
+vi.mock('$lib/domains/mobile/shell', () => ({ isMobileShell: false }));
 
-import { hostCallOf } from './hostResponder';
+import { canAnswerHost, hostCallOf } from './hostResponder';
 
 const frame = (event: ThreadEventFrame['event']): ThreadEventFrame => ({
   thread_id: 't1',
@@ -28,8 +29,8 @@ describe('hostCallOf', () => {
     payload: { command: 'ls', workspace_root: '/w', terminal_id: null },
   });
 
-  it('routes run_command and list_terminals in the desktop webview', () => {
-    expect(hostCallOf(run, true)).toMatchObject({
+  it('routes run_command and list_terminals ', () => {
+    expect(hostCallOf(run)).toMatchObject({
       kind: 'run_command',
       callId: 'c1',
       command: 'ls',
@@ -40,17 +41,23 @@ describe('hostCallOf', () => {
       kind: 'list_terminals',
       payload: {},
     });
-    expect(hostCallOf(list, true)).toEqual({
+    expect(hostCallOf(list)).toEqual({
       kind: 'list_terminals',
       threadId: 't1',
       callId: 'c2',
     });
   });
 
-  it('answers nothing elsewhere, and ignores other requests and events', () => {
-    expect(hostCallOf(run, false)).toBeNull();
+  it('only the desktop webview answers: not a browser client, not the Android shell', () => {
+    expect(canAnswerHost(true, false, false)).toBe(true);
+    expect(canAnswerHost(true, true, false)).toBe(false);
+    expect(canAnswerHost(true, false, true)).toBe(false);
+    expect(canAnswerHost(false, false, false)).toBe(false);
+  });
+
+  it('ignores other requests and events', () => {
     const ask = frame({ type: 'host_requested', call_id: 'c3', kind: 'ask_user', payload: {} });
-    expect(hostCallOf(ask, true)).toBeNull();
-    expect(hostCallOf(frame({ type: 'stop_requested' }), true)).toBeNull();
+    expect(hostCallOf(ask)).toBeNull();
+    expect(hostCallOf(frame({ type: 'stop_requested' }))).toBeNull();
   });
 });

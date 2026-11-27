@@ -130,6 +130,7 @@
             showGitChanges={p.showGitChanges}
             pendingChangeCount={p.pendingChangeCount}
             contextUsage={caps.contextUsage ? p.contextUsage : null}
+            llmUsage={caps.contextUsage ? p.llmUsage : null}
             class="px-0 pb-0"
           />
         </PageContainer>
@@ -206,6 +207,7 @@
       pendingChangeCount={p.pendingChangeCount}
       changesRevision={p.changesRevision}
       contextUsage={caps.contextUsage ? p.contextUsage : null}
+      llmUsage={caps.contextUsage ? p.llmUsage : null}
       class="pt-0"
     />
   </div>

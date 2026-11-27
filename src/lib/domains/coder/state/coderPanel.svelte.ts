@@ -51,8 +51,9 @@ export class CoderPanelState {
     return coderSession.activeRuntime;
   });
   thread = $derived(coderSession.thread);
-  /** True from the click until the hub's first frame lands, so the empty hero does not flash. */
+  /** True from the click until the RPC returned and the thread's view is in, so the empty hero does not flash. */
   sending = $state(false);
+  private sendReturned = false;
   private stamped: { id: string | null; list: ChatMessage[] } = { id: null, list: [] };
   messages = $derived.by(() => {
     const raw = this.view?.messages ?? [];
@@ -73,12 +74,20 @@ export class CoderPanelState {
   waitingSeconds = $derived(this.view?.waitingSeconds ?? 0);
   error = $derived(this.view?.error ?? null);
   showRetry = $derived(!!this.thread && !!this.view?.canRetry);
-  /** Who decided the latest approval, when it was not this computer. */
+  /** Who decided an approval of the current turn, when it was another device. */
   decidedNote = $derived.by(() => {
-    const r = this.view?.recentlyResolved.at(-1);
-    return r && r.by !== 'local'
-      ? `${r.allow ? 'Approved' : 'Denied'} by ${actorLabel(r.by)}`
-      : null;
+    const msgs = this.view?.messages ?? [];
+    const turn = msgs.slice(msgs.map((m) => m.role).lastIndexOf('user') + 1);
+    const calls = new Set(
+      turn
+        .flatMap((m) => m.tool_calls ?? [])
+        .filter((c) => c.function.name !== 'ask_user')
+        .map((c) => c.id)
+    );
+    const r = [...(this.view?.recentlyResolved ?? [])]
+      .reverse()
+      .find((r) => calls.has(r.call_id) && r.by !== 'local' && r.by !== 'system');
+    return r ? `${r.allow ? 'Approved' : 'Denied'} by ${actorLabel(r.by)}` : null;
   });
   pendingChangeCount = $derived(coderSession.changes.filter((c) => c.status === 'pending').length);
   composerDisabled = $derived(!!this.pending || this.platformBlocked);
@@ -92,6 +101,7 @@ export class CoderPanelState {
     coderSession.workspaceRoot.split(/[/\\]/).filter(Boolean).pop() ?? coderSession.workspaceRoot
   );
   contextUsage = $derived(this.rt.contextUsage);
+  llmUsage = $derived(this.rt.llmUsage);
   /** The hub's queue behind the open turn; read-only (no remove command yet). */
   queuedMessages = $derived((this.view?.queue ?? []).map((q) => q.text));
   subAgents = $derived(this.rt.subAgents);
@@ -129,10 +139,11 @@ export class CoderPanelState {
     queryFn: () => threadApi.list(),
     refetchInterval: 5000, // ponytail: poll; the store only follows the subscribed thread
   }));
+  /** Running Portal threads; CLI agent runs belong to the agents page. */
+  private portalRunning = () =>
+    (this.threadList.data ?? []).filter((s) => s.provider === 'portal' && s.status === 'running');
   runningThreadIds = $derived.by(() => {
-    const ids = new Set(
-      (this.threadList.data ?? []).filter((s) => s.status === 'running').map((s) => s.id)
-    );
+    const ids = new Set(this.portalRunning().map((s) => s.id));
     const status = this.view?.status;
     if (this.activeThreadId && status) {
       if (status === 'running') ids.add(this.activeThreadId);
@@ -195,6 +206,10 @@ export class CoderPanelState {
     $effect(() => {
       const id = coderSession.activeThreadId;
       if (id) return threadStore.subscribe(id);
+    });
+
+    $effect(() => {
+      if (this.sending && this.sendReturned && this.view) this.sending = false;
     });
 
     // A turn closing refreshes the thread row and the context gauge.
@@ -295,7 +310,7 @@ export class CoderPanelState {
   /** On page load, follow the most recent running session so the UI matches background work. */
   private async attachToRunningThread(): Promise<string | null> {
     const running = (await threadApi.list())
-      .filter((s) => s.status === 'running')
+      .filter((s) => s.provider === 'portal' && s.status === 'running')
       .sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0];
     if (!running) return null;
     await coderSession.selectThread(running.id);
@@ -411,6 +426,7 @@ export class CoderPanelState {
     const text = this.takeInput();
     if (text === null) return;
     this.sending = true;
+    this.sendReturned = false;
     try {
       await coderSession.send(text);
       if (coderSession.activeThreadId) this.syncUrl(coderSession.activeThreadId);
@@ -418,8 +434,10 @@ export class CoderPanelState {
       // Nothing was sent (`busy`, a failed write): give the draft back.
       if (!this.input) this.input = text;
       toast.error(errorText(e));
-    } finally {
       this.sending = false;
+    } finally {
+      this.sendReturned = true;
+      if (this.view) this.sending = false;
     }
   };
 

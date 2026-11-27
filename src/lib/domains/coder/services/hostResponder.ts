@@ -7,6 +7,7 @@ import type { UnlistenFn } from '@tauri-apps/api/event';
 import { threadApi } from '$lib/domains/threads/api/threadApi';
 import type { ThreadEventFrame } from '$lib/domains/threads/generated';
 import { isBrowserClient } from '$lib/domains/mobile/browserShim';
+import { isMobileShell } from '$lib/domains/mobile/shell';
 import { isTauriEnvironment } from '$lib/utils/tauri';
 import type { ChatMessage } from '../types.js';
 import { coderService } from './coderService.js';
@@ -26,28 +27,38 @@ export type HostCall =
     }
   | { kind: 'list_terminals'; threadId: string; callId: string };
 
-/** Which host request a frame carries, or null (not one, or not ours to answer). */
-export function hostCallOf(f: ThreadEventFrame, desktop: boolean): HostCall | null {
-  const e = f.event;
-  if (!desktop || e.type !== 'host_requested') return null;
-  if (e.kind === 'list_terminals') {
-    return { kind: 'list_terminals', threadId: f.thread_id, callId: e.call_id };
-  }
-  if (e.kind !== 'run_command') return null;
-  const p = (e.payload ?? {}) as {
+/** The host request behind a `host_requested` event, or null (`ask_user` is answered on its card). */
+export function hostCall(
+  threadId: string,
+  callId: string,
+  kind: string,
+  payload: unknown
+): HostCall | null {
+  if (kind === 'list_terminals') return { kind, threadId, callId };
+  if (kind !== 'run_command') return null;
+  const p = (payload ?? {}) as {
     command?: string;
     workspace_root?: string;
     terminal_id?: string | null;
   };
   return {
-    kind: 'run_command',
-    threadId: f.thread_id,
-    callId: e.call_id,
+    kind,
+    threadId,
+    callId,
     command: String(p.command ?? ''),
     workspaceRoot: String(p.workspace_root ?? ''),
     terminalId: p.terminal_id,
   };
 }
+
+export function hostCallOf(f: ThreadEventFrame): HostCall | null {
+  const e = f.event;
+  return e.type === 'host_requested' ? hostCall(f.thread_id, e.call_id, e.kind, e.payload) : null;
+}
+
+/** Only the hub's own desktop webview: not a browser client, and not the Android shell (a real Tauri runtime). */
+export const canAnswerHost = (tauri: boolean, browserClient: boolean, mobileShell: boolean) =>
+  tauri && !browserClient && !mobileShell;
 
 /** Calls this window ran itself: their tool result is already in the terminal. */
 const delegated = new Set<string>();
@@ -79,7 +90,12 @@ export function mirrorToolResult(threadId: string, messages: ChatMessage[], m: C
   );
 }
 
+/** A call is answered once, whether it came live or from a snapshot. */
+const answered = new Set<string>();
+
 async function answer(call: HostCall, openTerminal: () => void) {
+  if (answered.has(call.callId)) return;
+  answered.add(call.callId);
   if (call.kind === 'list_terminals') {
     const list = coderTerminalStore.listForAgent(call.threadId);
     await coderService.submitTerminalList(call.threadId, call.callId, JSON.stringify(list));
@@ -98,16 +114,33 @@ async function answer(call: HostCall, openTerminal: () => void) {
   await coderService.submitCommandResult(call.threadId, call.callId, result);
 }
 
+/** Open requests of running Portal threads: a reload or a late start missed their frames. */
+async function answerOpen(openTerminal: () => void) {
+  const open = (await threadApi.list()).filter(
+    (t) => t.provider === 'portal' && (t.status === 'running' || t.status === 'waiting')
+  );
+  for (const t of open) {
+    const snap = await threadApi.snapshot(t.id);
+    for (const h of snap?.state.host_requests ?? []) {
+      const call = hostCall(t.id, h.call_id, h.kind, h.payload);
+      if (call)
+        void answer(call, openTerminal).catch((e) => console.error('coder: host answer failed', e));
+    }
+  }
+}
+
 /** Idempotent per app lifetime; `openTerminal` shows the session terminal before a command runs. */
 let started: Promise<UnlistenFn | null> | null = null;
 export function startHostResponder(openTerminal: () => void): Promise<UnlistenFn | null> {
   started ??= (async () => {
-    if (!isTauriEnvironment() || isBrowserClient) return null;
-    return threadApi.onEvent((f) => {
-      const call = hostCallOf(f, true);
+    if (!canAnswerHost(isTauriEnvironment(), isBrowserClient, isMobileShell)) return null;
+    const un = await threadApi.onEvent((f) => {
+      const call = hostCallOf(f);
       if (call)
         void answer(call, openTerminal).catch((e) => console.error('coder: host answer failed', e));
     });
+    answerOpen(openTerminal).catch((e) => console.error('coder: open host requests failed', e));
+    return un;
   })();
   return started;
 }
