@@ -644,12 +644,12 @@ impl CoderService {
         if !state.turn_open() {
             return Ok(());
         }
-        if !state.stopping {
-            if state.status != crate::domains::threads::ThreadStatus::Waiting {
-                return Err("busy: a turn is already running".into());
-            }
-            self.hub_command(thread_id, ThreadCommand::Stop, actor.into(), None).await?;
+        if !state.stopping && state.status != crate::domains::threads::ThreadStatus::Waiting {
+            return Err("busy: a turn is already running".into());
         }
+        // Also when already stopping: a repeated Stop re-fires a Cancel that may have been
+        // lost. Its ack does not matter (the turn may close meanwhile); the poll decides.
+        let _ = self.hub_command(thread_id, ThreadCommand::Stop, actor.into(), None).await;
         for _ in 0..150 {
             if !self.hub_state(thread_id).await.is_some_and(|s| s.turn_open()) {
                 return Ok(());
