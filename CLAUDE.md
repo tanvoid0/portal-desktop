@@ -137,6 +137,20 @@ These are the source of truth — this file summarizes them:
 
 The **installed release's** daemon on loopback port 18420 is the one shared task-board backend for every project on this machine — not a per-session instance. Every session/agent must talk to that single running Portal, never assume it owns one. To bring it up, run `pnpm portal:ensure` (idempotent, lock-protected, safe to call from multiple sessions at once): it launches the installed release (`%LOCALAPPDATA%\Portal Desktop\portal_desktop.exe`, or `PORTAL_EXE`), never a build from this repo. `tauri-plugin-single-instance` is the hard backstop: one release process and one dev process at most.
 
+## Keep the Portal MCP in sync
+
+The `portal` MCP (`mcp__plugin_crew_portal__*`) is a thin client of this app's `/rpc/<command>` surface (`#[portal_rpc_macro::rpc]` commands). Source: `D:\projects\production\ai\plugins\crew\mcp\portal.js` (outside this repo). Agents only see what it exposes, so drift here silently breaks or blinds them.
+
+**In the same task, update the MCP when you:**
+
+- **Add a feature** an agent could usefully drive or read (a new domain, command, or `#[rpc]`): add a tool or extend one in `portal.js`. Skip vault/credential, terminal, and interactive-only flows unless there's a clear reason. Say in the task notes if you deliberately leave it out.
+- **Change an existing RPC** the MCP calls: rename or remove a command, change params or the return shape, or change a status/enum value. Grep `portal.js` for `rpc('<command>'` and fix every caller. Rename = break.
+- **Change task semantics:** the `tags` conventions (`note`, `session:<id>`), the title length cap, project linking (`resource_type`/`resource_id`), or status values. `portal.js` encodes these.
+
+**Then ship it:** the installed plugin is a snapshot. Bump the version in `.claude-plugin/plugin.json`, run `claude plugin update crew@<marketplace>`, restart. Verify with one real tool call against the running release daemon (18420), not just a syntax check. A dev build (18421) is not what the MCP talks to.
+
+Mention the MCP change (or "no MCP impact") in the task's closing note.
+
 ## Dev and release never share data
 
 Debug builds (`pnpm tauri:dev`, `cargo build`) run as `com.tanvoid0.portal-desktop.dev` — decided by `app_paths::DEV` (`cfg!(debug_assertions)`), not by a script, so nothing can forget it:
