@@ -9,7 +9,7 @@
     getToolResultStatus,
   } from '../utils/toolCallDisplay.js';
   import { normalizeTool } from '../utils/toolKinds.js';
-  import { toolBodies } from './tools/index.js';
+  import { toolBodies, toolIcons } from './tools/index.js';
 
   interface Props {
     call: ToolCall;
@@ -66,6 +66,7 @@
 
   const expandable = $derived(Object.keys(rawArgs).length > 0 || result != null);
   const Body = $derived(toolBodies[normalized.kind]);
+  const Icon = $derived(toolIcons[normalized.kind]);
 </script>
 
 <div class={nested ? '' : 'py-0.5'}>
@@ -83,6 +84,8 @@
     {:else}
       <span class="inline-block h-3 w-3 shrink-0" aria-hidden="true"></span>
     {/if}
+
+    <Icon class="h-3 w-3 shrink-0" aria-hidden="true" />
 
     <span class="flex min-w-0 flex-1 items-baseline gap-1.5 text-xs leading-snug">
       <span class="shrink-0 text-muted-foreground">{line.verb}</span>

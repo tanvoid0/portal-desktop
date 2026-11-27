@@ -58,7 +58,7 @@
       >
         {@render children()}
       </div>
-      <ToastContainer />
+      <ToastContainer class="z-60" />
     {/if}
   {:else}
     <AppShell {children} />

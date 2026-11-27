@@ -51,3 +51,14 @@ describe('coderUi.resolveProjectFromList (QA-134)', () => {
     expect(store.get(KEY)).toBe(STALE);
   });
 });
+
+describe('coderUi.openWorkspace (QA-193)', () => {
+  it('keeps a non-project folder opened on purpose, with no project attached', () => {
+    coderUi.setActiveProject(PROJECTS[0].path, '1');
+    coderUi.openWorkspace('D:\\code');
+    coderUi.initFromStorage();
+    coderUi.resolveProjectFromList(PROJECTS);
+    expect(coderUi.activeProjectPath).toBe('D:\\code');
+    expect(coderUi.activeProjectId).toBeNull();
+  });
+});

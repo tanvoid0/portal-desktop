@@ -19,8 +19,9 @@
   import Hand from '~icons/fa6-solid/hand';
   import { openCoderSession } from '$lib/domains/coder/utils/launch';
   import { toast } from '$lib/utils/toast';
+  import { homeDir } from '@tauri-apps/api/path';
   import { syncAll, type SyncRow } from '../state/syncAll.svelte';
-  import { commonDir } from '../utils/commonDir';
+  import { commonDir, isTooBroad } from '../utils/commonDir';
   import type { SyncStep } from '../generated/SyncStep';
   import type { SyncStepResult } from '../generated/SyncStepResult';
   import type { SyncStepStatus } from '../generated/SyncStepStatus';
@@ -110,9 +111,11 @@
   }
 
   // One session rooted above every stuck repo, working through them in turn.
-  function resolveAll() {
+  async function resolveAll() {
     const root = commonDir(stuck.map((r) => r.path!));
-    if (!root) {
+    // No home folder to compare against means no shared workspace either.
+    const home = await homeDir().catch(() => null);
+    if (!root || home === null || isTooBroad(root, home)) {
       toast.error('These projects share no parent folder. Resolve them one by one.');
       return;
     }
@@ -165,7 +168,11 @@
           type="single"
           variant="outline"
           size="sm"
-          bind:value={filter}
+          bind:value={
+            () => filter,
+            // Clicking the active item would clear a single toggle group.
+            (v) => v && (filter = v)
+          }
           aria-label="Filter projects"
         >
           <ToggleGroupItem value="attention">Needs attention</ToggleGroupItem>
@@ -182,10 +189,19 @@
         {@const rs = results(row)}
         <li class="space-y-1 rounded-md border p-2 text-sm">
           <div class="flex items-center justify-between gap-2">
-            <a href="/projects/{row.id}" class="font-medium hover:underline">{row.name}</a>
+            <a
+              href="/projects/{row.id}"
+              class="min-w-0 truncate font-medium hover:underline"
+              title={row.name}>{row.name}</a
+            >
             {#if row.path && problems(rs).length}
               {@const path = row.path}
-              <Button variant="outline" size="sm" onclick={() => resolve(row, path)}>
+              <Button
+                variant="outline"
+                size="sm"
+                class="shrink-0"
+                onclick={() => resolve(row, path)}
+              >
                 Resolve with AI
               </Button>
             {/if}
@@ -194,7 +210,7 @@
             {#each rs as s (s.step)}{@render stepBadge(s)}{/each}
           </div>
           {#each rs.filter((s) => s.status !== 'ok' && s.detail) as s (s.step)}
-            <p class="text-xs text-muted-foreground">{s.step}: {s.detail}</p>
+            <p class="text-xs wrap-anywhere text-muted-foreground">{s.step}: {s.detail}</p>
           {/each}
         </li>
       {:else}

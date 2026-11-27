@@ -18,7 +18,7 @@ export interface OpenCoderSessionOptions {
  */
 export function openCoderSession(opts: OpenCoderSessionOptions = {}): void {
   const { workspaceRoot, projectId = null, prompt } = opts;
-  if (workspaceRoot) coderUi.setActiveProject(workspaceRoot, projectId);
+  if (workspaceRoot) coderUi.openWorkspace(workspaceRoot, projectId);
   coderSession.newSession();
   if (workspaceRoot) coderSession.workspaceRoot = workspaceRoot;
   coderSession.pendingPrompt = prompt ?? null;

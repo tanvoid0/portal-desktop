@@ -77,6 +77,23 @@ export class CoderUiState {
     }
   }
 
+  /** A folder opened on purpose this run. Unlike a stale saved path, it need not be a project. */
+  private openedPath: string | null = null;
+
+  openWorkspace(path: string, projectId?: string | null): void {
+    // setActiveProject keeps the old id, which belongs to a different folder.
+    if (!projectId) {
+      this.activeProjectId = null;
+      try {
+        localStorage.removeItem(this.projectIdKey);
+      } catch {
+        // ignore
+      }
+    }
+    this.openedPath = path;
+    this.setActiveProject(path, projectId);
+  }
+
   resolveProjectFromList(projects: Array<{ id: string; path: string }>): void {
     if (!this.activeProjectPath) return;
     const match = projects.find((p) => p.path === this.activeProjectPath);
@@ -84,7 +101,7 @@ export class CoderUiState {
       this.activeProjectId = match.id;
       if (this.linkProjectUi) projectUi.setActiveProject(match.id);
       this.persistProject(match.path, match.id);
-    } else if (projects.length > 0) {
+    } else if (projects.length > 0 && this.activeProjectPath !== this.openedPath) {
       // A saved path that is no project here (a /media/... Linux path on Windows) must not seed
       // the workspace: drop it so the caller falls back to projects[0]. An empty list means the
       // projects have not loaded yet, which must not wipe a valid saved choice.

@@ -77,7 +77,10 @@
         ? () =>
             onLaunchWorkspace
               ? onLaunchWorkspace(thread)
-              : openCoderSession({ workspaceRoot: thread.workspace_root })
+              : openCoderSession({
+                  workspaceRoot: thread.workspace_root,
+                  projectId: thread.project_id?.toString(),
+                })
         : undefined,
     onDelete,
   })}

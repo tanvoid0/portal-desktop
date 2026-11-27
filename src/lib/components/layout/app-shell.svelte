@@ -254,7 +254,7 @@
   </SidebarProvider>
 
   <!-- Toast Container -->
-  <ToastContainer />
+  <ToastContainer class="z-60" />
 
   <!-- Global confirmation dialog -->
   <ConfirmDialog />
