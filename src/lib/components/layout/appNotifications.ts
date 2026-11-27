@@ -61,6 +61,8 @@ export function startAppNotifications(): () => void {
     if (toastId) toastActions.dismiss(toastId);
     openApprovals.delete(key);
   };
+  // Threads whose failure is already toasted, so the exit that follows stays quiet.
+  const failed = new Set<string>();
   threadApi
     .onEvent((f) => {
       const e = f.event;
@@ -68,13 +70,15 @@ export function startAppNotifications(): () => void {
       const route = portal
         ? `${PORTAL_ENGINE_TAB.url}?id=${f.thread_id}`
         : `${agentTabPath(f.provider)}?session=${f.thread_id}`;
+      if (e.type === 'turn_started') failed.delete(f.thread_id);
       if (e.type === 'turn_ended' || e.type === 'process_exited') {
         for (const key of [...openApprovals.keys()])
           if (key.startsWith(`${f.thread_id}:`)) close(key);
         if (portal) return;
         const about = { route, source: 'agent' as const, runId: f.thread_id };
-        // Errored turns are reported by `process_exited` instead — skip here so the user
-        // doesn't see "finished" then "failed".
+        // A turn can fail with the process still alive (an error result, a resume that
+        // never started), so the failed turn is reported here; a crash mid-turn ends it
+        // `interrupted` and is reported by its exit code.
         if (e.type === 'turn_ended' && e.outcome === 'completed')
           notify({
             ...about,
@@ -82,14 +86,24 @@ export function startAppNotifications(): () => void {
             body: e.final_text?.slice(0, 120),
             type: 'success',
           });
-        else if (e.type === 'process_exited' && e.code)
+        else if (e.type === 'turn_ended' && e.outcome === 'error') {
+          failed.add(f.thread_id);
           notify({
             ...about,
             title: 'Agent run failed',
-            body: `Exited with code ${e.code}`,
+            body: e.error?.slice(0, 120),
             type: 'error',
-            facts: [{ kind: 'exit', value: String(e.code) }],
           });
+        } else if (e.type === 'process_exited') {
+          if (!failed.delete(f.thread_id) && e.code)
+            notify({
+              ...about,
+              title: 'Agent run failed',
+              body: `Exited with code ${e.code}`,
+              type: 'error',
+              facts: [{ kind: 'exit', value: String(e.code) }],
+            });
+        }
         return;
       }
       if (e.type !== 'approval_requested' && e.type !== 'approval_resolved') return;
