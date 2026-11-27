@@ -344,6 +344,10 @@ impl AgentRunService {
         actor: &str,
         command_id: Option<String>,
     ) -> Result<String, String> {
+        // A Codex run with no prompt opens a turn nothing ever closes.
+        if params.prompt.trim().is_empty() {
+            return Err("prompt is empty".into());
+        }
         let backend = self
             .find_backend(backend_id)
             .ok_or_else(|| format!("unknown backend '{backend_id}'"))?;
@@ -421,6 +425,9 @@ impl AgentRunService {
         text: String,
         by: Option<(&str, Option<String>)>,
     ) -> Result<String, String> {
+        if text.trim().is_empty() {
+            return Err("prompt is empty".into());
+        }
         let conn = self.db.get_connection();
         // Two clients resuming at once would start two CLIs on one session.
         let _starting = StartGuard::new(&self.starting, session_id)?;
@@ -672,19 +679,14 @@ impl AgentRunService {
     // each call below just forwards a quick stdin write/HTTP-decision, so
     // holding it for the await is cheap. Split per-run if a slow backend ever
     // makes that untrue.
-    /// `by` as in `resume_session`. Recorded only once the backend took the text, and under
-    /// the `runs` lock: the pump needs it to submit reply events, so the user's turn
-    /// lands in the log first. (The hub actor never takes `runs`, so this cannot deadlock.)
-    async fn send_live(&self, run_id: &str, text: String, by: Option<(&str, Option<String>)>) -> Result<(), String> {
+    /// The turn is already in the log (the `StartTurn` effect); this only delivers it.
+    async fn send_live(&self, run_id: &str, text: String) -> Result<(), String> {
         let seq = {
             let mut runs = self.runs.lock().await;
             let entry = runs.get_mut(run_id).ok_or("run not found")?;
             let seq = entry.next_seq;
             entry.next_seq += 1;
             entry.control.send_user(text.clone()).await?;
-            if let Some((actor, command_id)) = by {
-                self.record_user(run_id, &text, actor, command_id).await;
-            }
             seq
         };
         self.persist_message(run_id, seq, "user", &text, None).await;
@@ -1211,7 +1213,7 @@ impl ThreadEffects for Arc<AgentRunService> {
         let starts_turn = matches!(effect, Effect::StartTurn { .. });
         let result = match effect {
             // The turn is already in the log; deliver it, resuming a finished run.
-            Effect::StartTurn { text, .. } if self.is_live(thread_id).await => self.send_live(thread_id, text, None).await,
+            Effect::StartTurn { text, .. } if self.is_live(thread_id).await => self.send_live(thread_id, text).await,
             // A Stop landing while this is still starting the process finds no run and is
             // lost; a second Stop works once the entry is inserted.
             Effect::StartTurn { text, .. } => self.resume_session(thread_id, text, None).await.map(|_| ()),
@@ -1514,7 +1516,6 @@ mod tests {
     async fn live_send_goes_once_and_queued_can_be_removed() {
         let (svc, hub, calls, _dir) = hub_service().await;
         svc.send_user("run-1", "a".into(), "local", None).await.unwrap();
-        until(|| calls.lock().unwrap().sent == ["a"]).await;
         svc.send_user("run-1", "b".into(), "local", None).await.unwrap();
         let snap = hub.snapshot("run-1").await.unwrap().unwrap();
         assert_eq!(snap.state.queue.len(), 1);
@@ -1526,7 +1527,28 @@ mod tests {
         feed(&hub, vec![AgentEvent::TurnDone { final_text: None, is_error: false }]);
         let snap = hub.snapshot("run-1").await.unwrap().unwrap();
         assert!(snap.state.queue.is_empty());
-        assert_eq!(calls.lock().unwrap().sent, ["a"], "the removed message never started");
+        let texts: Vec<_> = snap.messages.iter().map(|m| m.content.clone().unwrap_or_default()).collect();
+        assert_eq!(texts, ["a"], "the removed message never started");
+        let _ = calls;
+    }
+
+    /// An empty prompt would open a turn nothing closes (Codex emits no TurnDone for it).
+    #[tokio::test]
+    async fn empty_prompt_is_refused() {
+        let (svc, _hub, _calls, _dir) = hub_service().await;
+        let err = svc.resume_session("run-1", "  ".into(), None).await.unwrap_err();
+        assert!(err.contains("empty"), "{err}");
+        let params = StartParams {
+            cwd: ".".into(),
+            model: None,
+            prompt: "".into(),
+            resume_session_id: None,
+            task_id: None,
+            permission_mode: "manual".into(),
+            isolate_settings: false,
+        };
+        let err = svc.start_run("claude-code", params, "local", None).await.unwrap_err();
+        assert!(err.contains("empty"), "{err}");
     }
 
     /// A run whose channel closes with no `Exited` is announced as exited once, and a run

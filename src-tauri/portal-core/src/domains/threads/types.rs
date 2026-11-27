@@ -181,6 +181,10 @@ pub struct HostRequest {
 pub struct QueuedMessage {
     pub queue_id: String,
     pub text: String,
+    /// Who sent it, so the drained turn runs with that sender's trust (local or remote).
+    #[serde(default)]
+    #[ts(skip)]
+    pub actor: String,
 }
 
 /// An approval or host request that already has an answer, and who gave it.
@@ -299,7 +303,8 @@ pub enum ThreadCommand {
 /// registered `ThreadEffects` maps it onto the Coder service or an agent backend.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Effect {
-    StartTurn { trigger: TurnTrigger, text: String },
+    /// `actor` is whoever sent the message (for a drained one, its original sender).
+    StartTurn { trigger: TurnTrigger, text: String, actor: String },
     Cancel,
     ResolveApproval {
         call_id: String,

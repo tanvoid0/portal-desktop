@@ -184,6 +184,7 @@ pub fn react(state: &ThreadState, cmd: &ThreadCommand, frames: &[ThreadEventFram
             .map(|trigger| Effect::StartTurn {
                 trigger,
                 text: state.messages.last().and_then(|m| m.content.clone()).unwrap_or_default(),
+                actor: frames.first().map(|f| f.actor.clone()).unwrap_or_default(),
             })
             .into_iter()
             .collect(),

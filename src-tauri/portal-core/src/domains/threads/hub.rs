@@ -326,6 +326,8 @@ impl Actor {
         self.flush_delta(); // pending deltas precede this commit's frames
         let base = self.state.last_seq;
         let prev_messages = self.state.messages.len();
+        // The queue head leaves with this commit; its sender is who the drained turn is for.
+        let drained_sender = self.state.queue.first().map(|q| q.actor.clone()).filter(|a| !a.is_empty());
         let frames: Vec<ThreadEventFrame> = events
             .into_iter()
             .enumerate()
@@ -371,7 +373,15 @@ impl Actor {
         for f in &frames {
             self.sink.emit(EVENT_FRAME, f);
         }
-        self.dispatch(react(&self.state, &env.cmd, &frames));
+        let mut effects = react(&self.state, &env.cmd, &frames);
+        if let (Some(sender), ThreadCommand::DrainQueue) = (drained_sender, &env.cmd) {
+            for e in &mut effects {
+                if let Effect::StartTurn { actor, .. } = e {
+                    *actor = sender.clone();
+                }
+            }
+        }
+        self.dispatch(effects);
         // A completed turn with a queue behind it drains before the loop reads the next
         // message, so a client `Send` cannot overtake the queued ones.
         let completed = frames.iter().any(|f| matches!(f.event, ThreadEvent::TurnEnded { outcome: TurnOutcome::Completed, .. }));

@@ -1932,6 +1932,11 @@ impl CoderService {
                 svc.feed(&tid, input).await;
                 svc.emit("coder://error", json!({ "thread_id": tid, "error": e }));
             } else {
+                // A Stop that landed after the run parked on an approval ends the turn here:
+                // nothing else will, and the UI hides Stop while it is stopping.
+                if stopped.load(Ordering::SeqCst) {
+                    svc.feed(&tid, PortalInput::Finished { outcome: TurnOutcome::Stopped, final_text: None }).await;
+                }
                 let cancelled = {
                     let sub_agents = svc.sub_agents.lock().await;
                     sub_agents
@@ -2914,7 +2919,19 @@ impl CoderService {
 impl ThreadEffects for CoderService {
     async fn run(&self, thread_id: &str, effect: Effect) {
         let started = match effect {
-            Effect::StartTurn { trigger, text } => self.start_turn(thread_id, trigger, text).await,
+            Effect::StartTurn { trigger, text, actor } => {
+                // A queued message runs with its own sender's mark, not the last command's:
+                // a phone's message must not pop the desktop vault prompt, nor the reverse.
+                if trigger == TurnTrigger::Queue {
+                    let mut set = self.remote_threads.lock().unwrap_or_else(|e| e.into_inner());
+                    if actor == "local" {
+                        set.remove(thread_id);
+                    } else {
+                        set.insert(thread_id.to_string());
+                    }
+                }
+                self.start_turn(thread_id, trigger, text).await
+            }
             Effect::ResolveApproval { call_id, allow, remember, edited_pattern, edited_command } => {
                 self.resume_approve(thread_id, call_id, allow, remember, edited_pattern, edited_command).await
             }
@@ -3258,6 +3275,17 @@ mod hub_tests {
         let legacy: Vec<ChatMessage> = serde_json::from_str(&row.messages_json).unwrap();
         assert_eq!(bare(state.messages), bare(legacy));
         assert_eq!(state.status, ThreadStatus::Idle);
+    }
+
+    /// A drained message sets the thread's remote mark from its own sender.
+    #[tokio::test]
+    async fn queued_turn_takes_its_senders_remote_mark() {
+        let (svc, _hub, _db, id, _dir) = setup().await;
+        for (actor, remote) in [("device:phone", true), ("local", false)] {
+            let fx = Effect::StartTurn { trigger: TurnTrigger::Queue, text: "x".into(), actor: actor.into() };
+            svc.run(&id, fx).await;
+            assert_eq!(svc.remote_threads.lock().unwrap().contains(&id), remote, "{actor}");
+        }
     }
 
     /// `coder_send` is a plain Send: queued behind an open turn, started when it completes.

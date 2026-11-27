@@ -69,7 +69,7 @@ pub fn apply(s: &mut ThreadState, e: &ThreadEvent, actor: &str) {
             resolved(s, call_id, true, actor);
         }
         E::Enqueued { queue_id, text } => {
-            s.queue.push(QueuedMessage { queue_id: queue_id.clone(), text: text.clone() });
+            s.queue.push(QueuedMessage { queue_id: queue_id.clone(), text: text.clone(), actor: actor.into() });
         }
         E::Dequeued { queue_id, .. } => s.queue.retain(|q| &q.queue_id != queue_id),
         E::TitleSet { title } => s.meta.title = title.clone(),

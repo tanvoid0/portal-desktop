@@ -236,7 +236,24 @@ async fn queue_survives_restart() {
     assert!(snap.state.queue.is_empty());
     assert_eq!(snap.messages.last().unwrap().content.as_deref(), Some("later"));
     assert_eq!(snap.state.status, ThreadStatus::Running);
-    assert_eq!(effects(&rec).await, [Effect::StartTurn { trigger: TurnTrigger::Queue, text: "later".into() }]);
+    assert_eq!(effects(&rec).await, [Effect::StartTurn { trigger: TurnTrigger::Queue, text: "later".into(), actor: "local".into() }]);
+}
+
+/// A drained message runs for its own sender, not for whoever sent the last command.
+#[tokio::test]
+async fn drained_message_keeps_its_sender() {
+    let (hub, _db, _sink, _dir) = setup().await;
+    let rec = record(&hub);
+    feed(&hub, vec![td("busy")]);
+    cmd(&hub, ID, send("later"), "device:phone", None).await;
+    cmd(&hub, ID, ThreadCommand::SetModel { model: Some("m".into()), llm_provider: None }, "local", None).await;
+    hub.submit(ID, ThreadCommand::Provider(A::TurnDone { final_text: None, is_error: false }));
+    hub.snapshot(ID).await.unwrap(); // the drain lands behind this one
+    hub.snapshot(ID).await.unwrap();
+    assert_eq!(
+        effects(&rec).await,
+        [Effect::StartTurn { trigger: TurnTrigger::Queue, text: "later".into(), actor: "device:phone".into() }]
+    );
 }
 
 #[tokio::test]
