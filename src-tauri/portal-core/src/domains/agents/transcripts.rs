@@ -149,21 +149,60 @@ fn age(path: &Path) -> Option<Duration> {
     meta.created().or_else(|_| meta.modified()).ok()?.elapsed().ok()
 }
 
+/// The "imported" marker (see the module doc).
+pub fn is_imported(row: &agent_session::Model) -> bool {
+    row.backend_id == BACKEND_ID && row.backend_session_id.as_deref() == Some(row.id.as_str())
+}
+
+/// How many leading turns were written no later than `until`. A turn with no readable
+/// timestamp does not cut.
+fn turns_until(turns: &[ParsedTurn], until: DateTime<Utc>) -> usize {
+    turns
+        .iter()
+        .take_while(|t| {
+            let at = t.at.as_deref().and_then(|a| DateTime::parse_from_rfc3339(a).ok());
+            at.is_none_or(|a| a <= until)
+        })
+        .count()
+}
+
+/// `turns_until` over `sid`'s transcript on disk; `None` if it can't be read.
+pub async fn session_turns_until(sid: &str, until: DateTime<Utc>) -> Option<i64> {
+    let root = claude_projects_dir()?;
+    let sid = sid.to_string();
+    tokio::task::spawn_blocking(move || {
+        let (_, path, _) = scan(&root).into_iter().filter(|f| f.0 == sid).max_by_key(|f| f.2)?;
+        let file = std::fs::File::open(path).ok()?;
+        Some(turns_until(&parse_transcript(BufReader::new(file)).turns, until) as i64)
+    })
+    .await
+    .ok()?
+}
+
 /// One sweep. Returns the ids of the sessions that were (re)imported, for the caller
 /// to refresh their threads.
 pub async fn sync_claude_transcripts(db: &DatabaseManager) -> Result<Vec<String>, String> {
     let Some(root) = claude_projects_dir() else {
         return Ok(Vec::new());
     };
-    sync_from(db, &root, SETTLE).await
+    sync_from(db, &root, SETTLE, None).await
 }
 
-async fn sync_from(db: &DatabaseManager, root: &Path, settle: Duration) -> Result<Vec<String>, String> {
+/// The sweep for one session only, ahead of a resume.
+pub async fn sync_claude_session(db: &DatabaseManager, sid: &str) -> Result<(), String> {
+    let Some(root) = claude_projects_dir() else {
+        return Ok(());
+    };
+    sync_from(db, &root, SETTLE, Some(sid)).await.map(|_| ())
+}
+
+async fn sync_from(db: &DatabaseManager, root: &Path, settle: Duration, only: Option<&str>) -> Result<Vec<String>, String> {
     let conn = db.get_connection();
     let root = root.to_path_buf();
     let mut files = tokio::task::spawn_blocking(move || scan(&root))
         .await
         .map_err(|e| e.to_string())?;
+    files.retain(|f| only.is_none_or(|sid| f.0 == sid));
     // A resumed/forked session can leave the same sessionId file in more than
     // one project dir; keep the newest so the id inserts once per sweep.
     files.sort_by(|a, b| a.0.cmp(&b.0).then(b.2.cmp(&a.2)));
@@ -318,8 +357,9 @@ mod tests {
             std::fs::create_dir(root.path().join(proj)).unwrap();
             std::fs::write(root.path().join(proj).join("sid1.jsonl"), line).unwrap();
         }
-        assert_eq!(sync_from(&db, root.path(), Duration::ZERO).await.unwrap(), ["sid1"]);
-        assert!(sync_from(&db, root.path(), Duration::ZERO).await.unwrap().is_empty()); // unchanged
+        assert!(sync_from(&db, root.path(), Duration::ZERO, Some("other")).await.unwrap().is_empty());
+        assert_eq!(sync_from(&db, root.path(), Duration::ZERO, Some("sid1")).await.unwrap(), ["sid1"]);
+        assert!(sync_from(&db, root.path(), Duration::ZERO, None).await.unwrap().is_empty()); // unchanged
         let rows = agent_session::Entity::find().all(db.get_connection()).await.unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].backend_session_id.as_deref(), Some("sid1"));
@@ -327,9 +367,16 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(50));
         let grown = format!("{line}\n{}", r#"{"type":"assistant","message":{"content":[{"type":"text","text":"yo"}]}}"#);
         std::fs::write(root.path().join("a").join("sid1.jsonl"), grown).unwrap();
-        assert_eq!(sync_from(&db, root.path(), Duration::ZERO).await.unwrap(), ["sid1"]);
+        // A Portal run's events go with the replaced row, which `legacy_import` relies on.
+        db.get_connection()
+            .execute_unprepared("INSERT INTO agent_events (id, session_id, seq, event_json, created_at) VALUES ('e', 'sid1', 1, '{}', 'now')")
+            .await
+            .unwrap();
+        assert_eq!(sync_from(&db, root.path(), Duration::ZERO, None).await.unwrap(), ["sid1"]);
         let msgs = agent_message::Entity::find().all(db.get_connection()).await.unwrap();
         assert_eq!(msgs.len(), 2);
+        let events = db.get_connection().query_all(Statement::from_string(DbBackend::Sqlite, "SELECT id FROM agent_events")).await.unwrap();
+        assert!(events.is_empty());
 
         // Portal is running it: the sync leaves it alone even though the file moved.
         let mut am: agent_session::ActiveModel = rows[0].clone().into();
@@ -337,7 +384,7 @@ mod tests {
         am.ended_at = Set(None);
         am.update(db.get_connection()).await.unwrap();
         std::fs::write(root.path().join("a").join("sid1.jsonl"), line).unwrap();
-        assert!(sync_from(&db, root.path(), Duration::ZERO).await.unwrap().is_empty());
+        assert!(sync_from(&db, root.path(), Duration::ZERO, None).await.unwrap().is_empty());
         assert_eq!(agent_message::Entity::find().all(db.get_connection()).await.unwrap().len(), 2);
 
         // Flipped to running after the sweep loaded it: store itself leaves it alone.
@@ -357,8 +404,24 @@ mod tests {
         let line = r#"{"type":"user","cwd":"D:\\p","message":{"content":"hi"}}"#;
         std::fs::write(root.path().join("p").join("fork.jsonl"), line).unwrap();
         let hour = Duration::from_secs(3600);
-        assert!(sync_from(&db, root.path(), hour).await.unwrap().is_empty());
-        assert_eq!(sync_from(&db, root.path(), Duration::ZERO).await.unwrap(), ["fork"]);
+        assert!(sync_from(&db, root.path(), hour, None).await.unwrap().is_empty());
+        assert_eq!(sync_from(&db, root.path(), Duration::ZERO, None).await.unwrap(), ["fork"]);
+    }
+
+    #[test]
+    fn turns_until_cuts_at_the_timestamp() {
+        let turn = |at: Option<&str>| ParsedTurn { role: "user".into(), text: "t".into(), at: at.map(Into::into) };
+        let turns = [
+            turn(Some("2026-11-11T00:00:00.000Z")),
+            turn(None),
+            turn(Some("2026-11-11T00:00:01.500Z")),
+            turn(Some("2026-11-11T00:00:02.000Z")),
+            turn(None),
+        ];
+        let at = |s: &str| DateTime::parse_from_rfc3339(s).unwrap().with_timezone(&Utc);
+        assert_eq!(turns_until(&turns, at("2026-11-11T00:00:01.500+00:00")), 3);
+        assert_eq!(turns_until(&turns, at("2026-11-10T00:00:00Z")), 0);
+        assert_eq!(turns_until(&turns, at("2026-11-12T00:00:00Z")), 5);
     }
 
     /// Forked resumes (#1976) and deleted sessions (#2019) are not imported.
@@ -372,7 +435,7 @@ mod tests {
         std::fs::create_dir(&proj).unwrap();
         let line = r#"{"type":"user","cwd":"D:\\p","timestamp":"2026-11-11T00:00:00Z","message":{"content":"hi"}}"#;
         let write = |sid: &str| std::fs::write(proj.join(format!("{sid}.jsonl")), line).unwrap();
-        let sweep = || async { sync_from(&db, root.path(), Duration::ZERO).await.unwrap() };
+        let sweep = || async { sync_from(&db, root.path(), Duration::ZERO, None).await.unwrap() };
 
         write("live");
         assert_eq!(sweep().await, ["live"]);

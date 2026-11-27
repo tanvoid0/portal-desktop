@@ -11,7 +11,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use super::apply::apply;
 use super::decide::{decide, react};
-use super::legacy_import;
+use super::legacy_import::{self, Resync};
 use super::store;
 use super::types::*;
 use crate::database::DatabaseManager;
@@ -37,6 +37,8 @@ enum Msg {
     Snapshot(oneshot::Sender<Option<ThreadSnapshot>>),
     /// Re-fold the session's agent rows into its thread (see `legacy_import::resync`).
     Resync(oneshot::Sender<Result<bool, String>>),
+    /// Set `ThreadState::transcript_turns`.
+    MarkTranscript(Option<i64>, oneshot::Sender<Result<(), String>>),
 }
 
 pub struct ThreadHub {
@@ -95,10 +97,19 @@ impl ThreadHub {
     }
 
     /// After the transcript sync rewrote a session's rows: the actor refreshes the thread
-    /// from them, so it stays the only writer. Never touches a thread the hub has written to.
+    /// from them, so it stays the only writer. A thread the hub has written to is never
+    /// rewritten; an imported session's new turns are appended to it as events.
     pub async fn resync_session(self: &Arc<Self>, thread_id: &str) -> Result<bool, String> {
         let (tx, rx) = oneshot::channel();
         self.send(thread_id, Msg::Resync(tx));
+        rx.await.map_err(|_| "threads: actor stopped".to_string())?
+    }
+
+    /// How many transcript turns the thread already holds; `None` = unknown, so the next
+    /// resync takes everything there as held. A thread that does not exist is left alone.
+    pub async fn mark_transcript(self: &Arc<Self>, thread_id: &str, turns: Option<i64>) -> Result<(), String> {
+        let (tx, rx) = oneshot::channel();
+        self.send(thread_id, Msg::MarkTranscript(turns, tx));
         rx.await.map_err(|_| "threads: actor stopped".to_string())?
     }
 
@@ -221,14 +232,10 @@ async fn actor_loop(hub: Arc<ThreadHub>, id: String, mut rx: mpsc::UnboundedRece
                 let _ = reply.send(a.snapshot().await);
             }
             Ok(Some(Msg::Resync(reply))) => {
-                let done = legacy_import::resync(a.db.get_connection(), &a.id).await;
-                if matches!(done, Ok(true)) {
-                    a.trusted = false; // the projection changed under the cached state
-                    a.last_load = None;
-                    a.ensure_trusted().await;
-                    a.sink.emit(RESET_FRAME, serde_json::json!({ "thread_id": a.id }));
-                }
-                let _ = reply.send(done);
+                let _ = reply.send(a.resync().await);
+            }
+            Ok(Some(Msg::MarkTranscript(turns, reply))) => {
+                let _ = reply.send(a.mark_transcript(turns).await);
             }
             Ok(None) => break,
             Err(_) if a.pending.is_some() => {}
@@ -310,6 +317,55 @@ impl Actor {
         ack
     }
 
+    async fn resync(&mut self) -> Result<bool, String> {
+        if !self.ensure_trusted().await {
+            return Err("threads: state unavailable".into());
+        }
+        match legacy_import::resync(self.db.get_connection(), &self.id, self.state.transcript_turns).await? {
+            Resync::Unchanged => Ok(false),
+            Resync::Rewritten => {
+                self.trusted = false; // the projection changed under the cached state
+                self.last_load = None;
+                self.ensure_trusted().await;
+                self.sink.emit(RESET_FRAME, serde_json::json!({ "thread_id": self.id }));
+                Ok(true)
+            }
+            Resync::Tail { messages, turns } if messages.is_empty() => {
+                self.mark_transcript(Some(turns)).await.map(|()| false)
+            }
+            Resync::Tail { messages, turns } => {
+                let count = messages.len();
+                let cmd = ThreadCommand::Transcript { messages, turns };
+                let ack = self.run(Envelope { cmd, actor: "system".into(), command_id: None }).await;
+                match ack.code.as_deref() {
+                    None => Ok(true),
+                    // From a resume whose turn is already open, these are then lost to the
+                    // thread: its end mark passes them. Holding the old mark instead would
+                    // append that run's own turns again if the app quit mid-run.
+                    Some("busy") => {
+                        eprintln!("threads: {}: {count} transcript turns not appended, a turn is open", self.id);
+                        Ok(false)
+                    }
+                    Some(code) => Err(format!("threads: transcript append rejected: {code}")),
+                }
+            }
+        }
+    }
+
+    async fn mark_transcript(&mut self, turns: Option<i64>) -> Result<(), String> {
+        if !self.ensure_trusted().await {
+            return Err("threads: state unavailable".into());
+        }
+        if !self.state.created() || self.state.transcript_turns == turns {
+            return Ok(());
+        }
+        let mut next = self.state.clone();
+        next.transcript_turns = turns;
+        store::save_state(self.db.get_connection(), &self.id, &next).await?;
+        self.state = next;
+        Ok(())
+    }
+
     /// dedup -> decide -> apply in place -> one transaction -> emit -> effects. A failed
     /// commit leaves the state untrusted until it is reloaded.
     async fn run(&mut self, env: Envelope) -> CommandAck {
@@ -368,6 +424,10 @@ impl Actor {
             })
             .collect();
         self.state.last_seq = base + frames.len() as i64;
+        // Same commit as the appended messages, so a crash cannot append them twice.
+        if let ThreadCommand::Transcript { turns, .. } = &env.cmd {
+            self.state.transcript_turns = Some(*turns);
+        }
         if let Err(e) = store::commit(self.db.get_connection(), &self.id, prev_messages, &self.state, &frames).await {
             eprintln!("{e}");
             // The transaction rolled back, so the database still holds the pre-command

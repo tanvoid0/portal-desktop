@@ -23,6 +23,7 @@ use super::hub::ThreadHub;
 use super::store;
 use super::types::*;
 use crate::domains::agents::entities::{agent_event, agent_message, agent_session};
+use crate::domains::agents::transcripts::is_imported;
 use crate::domains::agents::AgentEvent;
 use crate::domains::coder::entities::coder_thread;
 use crate::domains::coder::types::ChatMessage;
@@ -120,16 +121,47 @@ async fn import(db: &DatabaseConnection, report: &mut Report) -> Result<(), Stri
     Ok(())
 }
 
+/// What `resync` did, or leaves the actor to do.
+pub(super) enum Resync {
+    Unchanged,
+    /// The projection was written whole, without events.
+    Rewritten,
+    /// A thread the hub has written to: transcript turns it does not hold (none when it
+    /// only needs a first mark), and how many it holds after them.
+    Tail { messages: Vec<ChatMessage>, turns: i64 },
+}
+
+async fn load_session(db: &impl ConnectionTrait, id: &str) -> Result<Option<agent_session::Model>, String> {
+    agent_session::Entity::find_by_id(id.to_string()).one(db).await.map_err(|e| err("load session", e))
+}
+
+/// True when the agent rows are the transcript sweep's own, so `agent_messages.seq` is the
+/// turn index: an imported session, exited, with no events (a Portal run adds some, and
+/// the next sweep drops them with the row it replaces). Call it in the transaction that
+/// read the rows, so it describes those rows.
+async fn from_transcript(db: &impl ConnectionTrait, id: &str) -> Result<bool, String> {
+    if !load_session(db, id).await?.is_some_and(|s| s.status == "exited" && is_imported(&s)) {
+        return Ok(false);
+    }
+    let events = agent_event::Entity::find()
+        .filter(agent_event::Column::SessionId.eq(id))
+        .count(db)
+        .await
+        .map_err(|e| err("count events", e))?;
+    Ok(events == 0)
+}
+
 /// Refresh one session's thread after the transcript sync rewrote its rows: the same
 /// fold as startup, so a fresh import and a later sync agree. A thread the hub has
-/// already written to (`last_seq > 0`) is left alone, and so is a running session.
-/// Runs inside the thread's actor (`ThreadHub::resync_session`). True when written.
-pub(super) async fn resync(db: &DatabaseConnection, id: &str) -> Result<bool, String> {
-    let Some(s) = agent_session::Entity::find_by_id(id.to_string()).one(db).await.map_err(|e| err("load session", e))? else {
-        return Ok(false);
+/// already written to (`last_seq > 0`) only gains the turns past `mark`, as events; with
+/// no mark the rows are taken as held, so history is never duplicated. A running session
+/// is left alone. Runs inside the thread's actor (`ThreadHub::resync_session`).
+pub(super) async fn resync(db: &DatabaseConnection, id: &str, mark: Option<i64>) -> Result<Resync, String> {
+    let Some(s) = load_session(db, id).await? else {
+        return Ok(Resync::Unchanged);
     };
     if s.status == "running" {
-        return Ok(false);
+        return Ok(Resync::Unchanged);
     }
     let stamp = s.ended_at.clone().unwrap_or_else(|| s.started_at.clone());
     let known = thread::Entity::find_by_id(id.to_string())
@@ -137,19 +169,64 @@ pub(super) async fn resync(db: &DatabaseConnection, id: &str) -> Result<bool, St
         .await
         .map_err(|e| err("load thread", e))?
         .map(|t| Known { last_seq: t.last_seq, created_at: t.created_at, updated_at: t.updated_at });
-    if !matches!(action(known.as_ref(), &stamp, |_| false), Action::Import) {
-        return Ok(false);
+    if known.as_ref().is_some_and(|k| k.last_seq > 0) {
+        return transcript_tail(db, id, mark).await;
     }
-    let log = session_log(db, id, None).await?;
+    if !matches!(action(known.as_ref(), &stamp, |_| false), Action::Import) {
+        return Ok(Resync::Unchanged);
+    }
+    // One snapshot, so the mark counts exactly the rows that are folded.
+    let txn = db.begin().await.map_err(|e| err("begin", e))?;
+    let log = session_log(&txn, id, None).await?;
+    let turns = agent_message::Entity::find()
+        .filter(agent_message::Column::SessionId.eq(id))
+        .count(&txn)
+        .await
+        .map_err(|e| err("count messages", e))?;
+    let pristine = from_transcript(&txn, id).await?;
     // A resume may have flipped the row and saved its prompt since the read above; the
     // hub records that prompt itself, so folding it in here would duplicate it.
-    let still_idle = agent_session::Entity::find_by_id(id.to_string()).one(db).await.map_err(|e| err("reload session", e))?;
-    if still_idle.is_none_or(|s| s.status == "running") {
-        return Ok(false);
+    if load_session(&txn, id).await?.is_none_or(|s| s.status == "running") {
+        return Ok(Resync::Unchanged);
     }
-    let state = fold_session(db, id, log).await?;
+    txn.commit().await.map_err(|e| err("commit", e))?;
+    let mut state = fold_session(db, id, log).await?;
+    state.transcript_turns = pristine.then_some(turns as i64);
     let msgs = state.messages.clone();
-    write_whole(db, id, state, msgs, &s.started_at, &stamp).await.map(|()| true)
+    write_whole(db, id, state, msgs, &s.started_at, &stamp).await.map(|()| Resync::Rewritten)
+}
+
+async fn transcript_tail(db: &DatabaseConnection, id: &str, mark: Option<i64>) -> Result<Resync, String> {
+    // One snapshot: a sweep replace between these reads would pass a Portal run's rows.
+    let txn = db.begin().await.map_err(|e| err("begin", e))?;
+    let rows = agent_message::Entity::find()
+        .filter(agent_message::Column::SessionId.eq(id))
+        .filter(agent_message::Column::Seq.gte(mark.unwrap_or(0)))
+        .order_by_asc(agent_message::Column::Seq)
+        .all(&txn)
+        .await
+        .map_err(|e| err("load messages", e))?;
+    if !from_transcript(&txn, id).await? {
+        return Ok(Resync::Unchanged);
+    }
+    txn.commit().await.map_err(|e| err("commit", e))?;
+    let Some(turns) = rows.last().map(|r| r.seq + 1) else {
+        return Ok(Resync::Unchanged);
+    };
+    let messages = match mark {
+        None => vec![],
+        Some(_) => rows
+            .into_iter()
+            .map(|r| ChatMessage {
+                role: r.role,
+                content: Some(r.text),
+                tool_calls: None,
+                tool_call_id: None,
+                timestamp: Some(r.created_at),
+            })
+            .collect(),
+    };
+    Ok(Resync::Tail { messages, turns })
 }
 
 async fn import_portal(db: &DatabaseConnection, row: &coder_thread::Model) -> Result<(), String> {
@@ -236,7 +313,7 @@ async fn prepend_session(db: &DatabaseConnection, id: &str, created_at: &str) ->
 
 /// Events plus message rows with no event at their seq (user turns, imported
 /// transcripts), seq-ordered; `before` keeps only what was persisted earlier.
-async fn session_log(db: &DatabaseConnection, id: &str, before: Option<&String>) -> Result<Vec<(AgentEvent, String)>, String> {
+async fn session_log(db: &impl ConnectionTrait, id: &str, before: Option<&String>) -> Result<Vec<(AgentEvent, String)>, String> {
     let events = agent_event::Entity::find()
         .filter(agent_event::Column::SessionId.eq(id))
         .order_by_asc(agent_event::Column::Seq)
@@ -755,6 +832,87 @@ mod tests {
         am.ended_at = Set(Some("2026-01-03T00:00:00Z".into()));
         am.update(db).await.unwrap();
         assert!(!hub.resync_session("t3").await.unwrap());
+        assert_eq!(dump(db).await, before);
+    }
+
+    /// An imported session the hub has written to takes later terminal turns as events.
+    #[tokio::test]
+    async fn resync_appends_the_transcript_tail() {
+        let dir = tempfile::tempdir().unwrap();
+        let dbm = Arc::new(DatabaseManager::new(dir.path().to_path_buf()).await.unwrap());
+        let db = dbm.get_connection();
+        let hub = ThreadHub::new(dbm.clone(), Arc::new(NoopSink));
+        let set = |status: &'static str| async move {
+            let mut am: agent_session::ActiveModel = agent_session::Entity::find_by_id("i1").one(db).await.unwrap().unwrap().into();
+            am.status = Set(status.into());
+            am.backend_session_id = Set(Some("i1".into()));
+            am.update(db).await.unwrap();
+        };
+        let state = || async { store::load(db, "i1").await.unwrap().unwrap() };
+
+        session(db, "i1", "claude-code").await;
+        set("exited").await;
+        message(db, "i1", 0, "user", "q", OLD).await;
+        message(db, "i1", 1, "assistant", "a", OLD).await;
+        assert!(hub.resync_session("i1").await.unwrap());
+        assert_eq!(state().await.transcript_turns, Some(2));
+        // The hub writes to it.
+        hub.submit("i1", ThreadCommand::Provider(msg("assistant", "live")));
+        hub.submit("i1", ThreadCommand::Provider(AgentEvent::TurnDone { final_text: None, is_error: false }));
+        hub.snapshot("i1").await.unwrap().unwrap();
+        hub.mark_transcript("i1", Some(2)).await.unwrap();
+        let head = state().await.last_seq;
+
+        // A terminal adds two turns.
+        message(db, "i1", 2, "user", "q2", OLD).await;
+        message(db, "i1", 3, "assistant", "a2", OLD).await;
+        assert!(hub.resync_session("i1").await.unwrap());
+        let appended: Vec<ChatMessage> = hub
+            .events_since("i1", head)
+            .await
+            .unwrap()
+            .events
+            .into_iter()
+            .map(|f| match f.event {
+                ThreadEvent::MessageAppended { message } => message,
+                other => panic!("not a message: {other:?}"),
+            })
+            .collect();
+        assert_eq!(appended.iter().map(|m| (m.role.as_str(), m.content.as_deref().unwrap())).collect::<Vec<_>>(), [("user", "q2"), ("assistant", "a2")]);
+        let s = state().await;
+        assert_eq!(appended[..], s.messages[s.messages.len() - 2..]);
+        assert_eq!((s.transcript_turns, s.status), (Some(4), ThreadStatus::Idle));
+        // The mark is on disk: neither this actor nor a restarted one appends again.
+        let before = dump(db).await;
+        assert!(!hub.resync_session("i1").await.unwrap());
+        assert!(!ThreadHub::new(dbm.clone(), Arc::new(NoopSink)).resync_session("i1").await.unwrap());
+        assert_eq!(dump(db).await, before);
+
+        // A turn is open: nothing is appended and the mark stays.
+        message(db, "i1", 4, "user", "q3", OLD).await;
+        hub.submit("i1", ThreadCommand::Provider(msg("user", "open")));
+        hub.snapshot("i1").await.unwrap().unwrap();
+        let before = dump(db).await;
+        assert!(!hub.resync_session("i1").await.unwrap());
+        assert_eq!(dump(db).await, before);
+        hub.submit("i1", ThreadCommand::Provider(AgentEvent::TurnDone { final_text: None, is_error: false }));
+        hub.snapshot("i1").await.unwrap().unwrap();
+
+        // No mark: take what is there as held, append nothing.
+        hub.mark_transcript("i1", None).await.unwrap();
+        let (seq, len) = (state().await.last_seq, state().await.messages.len());
+        assert!(!hub.resync_session("i1").await.unwrap());
+        let s = state().await;
+        assert_eq!((s.transcript_turns, s.last_seq, s.messages.len()), (Some(5), seq, len));
+
+        // Running, or rows a Portal run wrote (it has events): nothing changes.
+        message(db, "i1", 5, "user", "q4", OLD).await;
+        let before = dump(db).await;
+        set("running").await;
+        assert!(!hub.resync_session("i1").await.unwrap());
+        set("exited").await;
+        event(db, "i1", 6, OLD, msg("assistant", "portal")).await;
+        assert!(!hub.resync_session("i1").await.unwrap());
         assert_eq!(dump(db).await, before);
     }
 }

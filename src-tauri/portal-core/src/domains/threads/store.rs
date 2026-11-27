@@ -3,8 +3,8 @@
 
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
-    ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, TransactionTrait,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
+    QueryFilter, QueryOrder, TransactionTrait,
 };
 
 use super::entities::{thread, thread_event, thread_message};
@@ -175,6 +175,13 @@ pub async fn commit(
         }
     }
     txn.commit().await.map_err(|e| err("commit", e))
+}
+
+/// Rewrite only the state blob, for bookkeeping no event carries.
+pub async fn save_state(db: &DatabaseConnection, id: &str, state: &ThreadState) -> Result<(), String> {
+    let state_json = serde_json::to_string(state).map_err(|e| err("serialize state", e))?;
+    let row = thread::ActiveModel { id: Set(id.to_string()), state_json: Set(state_json), ..Default::default() };
+    row.update(db).await.map(|_| ()).map_err(|e| err("write state", e))
 }
 
 pub async fn summary(db: &DatabaseConnection, id: &str) -> Result<Option<ThreadSummary>, String> {

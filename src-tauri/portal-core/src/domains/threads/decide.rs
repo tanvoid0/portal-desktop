@@ -103,6 +103,11 @@ pub fn decide(state: &ThreadState, cmd: &ThreadCommand, ctx: &Ctx) -> Result<Vec
             ],
             _ => vec![],
         }),
+        // After an open turn's prompt they would land out of order.
+        C::Transcript { .. } if state.turn_open() => Err(Reject::Busy),
+        C::Transcript { messages, .. } => {
+            Ok(messages.iter().map(|m| E::MessageAppended { message: m.clone() }).collect())
+        }
     }
 }
 

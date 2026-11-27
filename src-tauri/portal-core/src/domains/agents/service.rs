@@ -27,6 +27,7 @@ use super::backend::{AgentBackend, BackendModel, RunControl, StartParams};
 use super::claude_code::ClaudeCodeBackend;
 use super::entities::{agent_event, agent_message, agent_session};
 use super::events::AgentEvent;
+use super::transcripts;
 
 /// Late-attach history depth per run — a live view, not the transcript (that
 /// lives in the DB now, see `get_session_detail`).
@@ -441,6 +442,22 @@ impl AgentRunService {
             .await
             .map_err(|e| e.to_string())?;
 
+        // Turns a terminal added since the last sweep land before the new prompt. The sync
+        // replaces the row, hence the reload.
+        let imported = transcripts::is_imported(&row);
+        let (row, backend_session_id) = match self.thread_hub.get() {
+            Some(hub) if imported => {
+                if let Err(e) = transcripts::sync_claude_session(&self.db, session_id).await {
+                    eprintln!("agents: transcript sync before resume failed: {e}");
+                }
+                if let Err(e) = hub.resync_session(session_id).await {
+                    eprintln!("agents: thread resync before resume failed: {e}");
+                }
+                self.resumable(session_id).await?
+            }
+            _ => (row, backend_session_id),
+        };
+
         let params = StartParams {
             cwd: row.cwd.clone(),
             model: row.model.clone(),
@@ -476,6 +493,12 @@ impl AgentRunService {
                 return Err(e);
             }
         };
+
+        // Unknown until the run ends: if the app dies first, a stale mark would append this
+        // run's own turns a second time.
+        if imported {
+            self.mark_transcript(session_id, None).await;
+        }
 
         let seq = self.next_persisted_seq(session_id).await;
         self.runs.lock().await.insert(
@@ -1171,12 +1194,26 @@ impl AgentRunService {
                 return;
             }
         };
+        let now = chrono::Utc::now();
+        // Before the row leaves `running`, so no resync can run against an old mark.
+        if transcripts::is_imported(&existing) {
+            let turns = transcripts::session_turns_until(run_id, now).await;
+            self.mark_transcript(run_id, turns).await;
+        }
         let mut am: agent_session::ActiveModel = existing.into();
         am.status = Set(status.to_string());
-        am.ended_at = Set(Some(now_iso()));
+        am.ended_at = Set(Some(now.to_rfc3339()));
         am.exit_code = Set(code);
         if let Err(e) = am.update(conn).await {
             eprintln!("agents: persist session end failed: {e}");
+        }
+    }
+
+    async fn mark_transcript(&self, run_id: &str, turns: Option<i64>) {
+        if let Some(hub) = self.thread_hub.get() {
+            if let Err(e) = hub.mark_transcript(run_id, turns).await {
+                eprintln!("agents: mark transcript failed: {e}");
+            }
         }
     }
 

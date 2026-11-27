@@ -235,6 +235,11 @@ pub struct ThreadState {
     pub backend_session_id: Option<String>,
     #[ts(type = "number")]
     pub last_seq: i64,
+    /// The first N turns of an imported session's transcript are already in this thread
+    /// (`legacy_import::resync`). Written beside events, not by one, so a replay lacks it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(skip)]
+    pub transcript_turns: Option<i64>,
 }
 
 impl ThreadState {
@@ -297,6 +302,9 @@ pub enum ThreadCommand {
     SubAgentUpdated { sub_agent: CoderSubAgent },
     /// The actor's own, after a turn completes with a queue behind it.
     DrainQueue,
+    /// The actor's own, on a resync: turns a terminal added to an imported session, and the
+    /// new `transcript_turns`. History, so no turn opens or ends and no effect runs.
+    Transcript { messages: Vec<ChatMessage>, turns: i64 },
 }
 
 /// What a committed command asks the provider side to do. Provider-neutral; the
