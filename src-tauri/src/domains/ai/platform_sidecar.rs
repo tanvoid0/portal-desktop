@@ -1,11 +1,11 @@
 //! Host side of owning `agent-platformd`: spawn the child with portal-core's
-//! environment, drain its output into portal's log, and kill it on exit. The
+//! environment, send its output to a log file, and kill it on exit. The
 //! decision of *whether* to spawn is `platform_admin::start_platform`.
 
 use crate::{log_info, log_warn};
 use portal_core::domains::ai::platform_daemon as daemon;
 use portal_core::process_ext::NoWindowExt;
-use std::io::{BufRead, BufReader, Read};
+use std::fs::File;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 
@@ -23,16 +23,25 @@ pub fn init() {
     }
 }
 
-/// Not draining a piped child blocks it once the OS buffer fills.
-fn drain<R: Read + Send + 'static>(stream: R) {
-    std::thread::spawn(move || {
-        for line in BufReader::new(stream).lines().map_while(Result::ok) {
-            log_info!("agent-platformd", "{}", line);
+/// A file, never a pipe: a daemon orphaned by a hard crash of portal would
+/// panic on every log line once the pipe's reader is gone, and then answers
+/// nothing.
+// ponytail: truncated at each spawn, no rotation within one run.
+fn output(path: &std::path::Path) -> (Stdio, Stdio) {
+    // Emptied, then appended to: an orphan on an old port may still hold the file.
+    let both = File::create(path)
+        .and_then(|_| File::options().append(true).open(path))
+        .and_then(|f| Ok((f.try_clone()?, f)));
+    match both {
+        Ok((out, err)) => (out.into(), err.into()),
+        Err(e) => {
+            log_warn!("agent-platformd", "no log file: {}", e.kind());
+            (Stdio::null(), Stdio::null())
         }
-    });
+    }
 }
 
-pub fn spawn() -> Result<u32, String> {
+pub fn spawn(port: u16) -> Result<u32, String> {
     let exe = daemon::daemon_exe().ok_or_else(|| {
         "agent-platformd was not found (bundled sidecar, AGENT_PLATFORM_DAEMON_EXE, or a local agent-platform build)"
             .to_string()
@@ -42,23 +51,19 @@ pub fn spawn() -> Result<u32, String> {
     let key = daemon::load_or_create_key(&dir)
         .map_err(|e| format!("Could not read or create the master key: {}", e.kind()))?;
     // ponytail: a Postgres DSN is not configurable from portal yet, so SQLite.
-    let env = daemon::daemon_env(&dir, &key, daemon::PORT, "");
+    let env = daemon::daemon_env(&dir, &key, port, "");
+    let log = dir.join("agent-platformd.log");
+    let (out, err) = output(&log);
 
-    let mut child = Command::new(&exe)
+    let child = Command::new(&exe)
         .envs(env)
         .no_window()
         .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stdout(out)
+        .stderr(err)
         .spawn()
         .map_err(|e| format!("Could not start {}: {}", exe.display(), e.kind()))?;
     let pid = child.id();
-    if let Some(out) = child.stdout.take() {
-        drain(out);
-    }
-    if let Some(err) = child.stderr.take() {
-        drain(err);
-    }
     // ponytail: no Windows job object, so a hard crash of portal orphans the
     // daemon (the next launch attaches to it). Add one if that bites.
     if let Some(mut old) = CHILD.lock().unwrap().replace(child) {
@@ -67,9 +72,11 @@ pub fn spawn() -> Result<u32, String> {
     }
     log_info!(
         "agent-platformd",
-        "started pid {} from {}",
+        "started pid {} from {} on port {}, output in {}",
         pid,
-        exe.display()
+        exe.display(),
+        port,
+        log.display()
     );
     Ok(pid)
 }

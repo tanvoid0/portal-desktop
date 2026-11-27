@@ -25,6 +25,7 @@ use sea_orm::{
     QuerySelect, Set,
 };
 use std::collections::HashSet;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, OnceLock};
 use tauri::State;
 
@@ -292,11 +293,16 @@ pub async fn ai_platform_health(
     settings_service: State<'_, Arc<AISettingsService>>,
     ai_service: State<'_, Arc<AIService>>,
 ) -> Result<PlatformHealth, String> {
+    static RELOAD_PENDING: AtomicBool = AtomicBool::new(false);
     let health = platform_admin::platform_health(&settings_service).await;
-    if !platform_admin::self_pair(&settings_service, &health).await {
+    let paired = platform_admin::self_pair(&settings_service, &health).await;
+    let reload = reload_platform_provider(&settings_service, &ai_service);
+    if let Err(e) = platform_admin::reload_until_ok(&RELOAD_PENDING, paired, reload).await {
+        log_error!("AI", "Provider reload after pairing failed: {}", e);
+    }
+    if !paired {
         return Ok(health);
     }
-    reload_platform_provider(&settings_service, &ai_service).await?;
     Ok(platform_admin::platform_health(&settings_service).await)
 }
 

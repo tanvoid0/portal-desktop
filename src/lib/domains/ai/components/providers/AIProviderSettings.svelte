@@ -20,6 +20,7 @@
   import { Separator } from '$lib/components/ui/separator';
   import { AIProviderSettingsState } from '../../state/aiProviderSettings.svelte.js';
   import PlatformHealthBar from './PlatformHealthBar.svelte';
+  import { aiPlatform } from '../../state/aiPlatform.svelte.js';
   import PlatformPairForm from './PlatformPairForm.svelte';
   import CatalogModelPicker from './CatalogModelPicker.svelte';
   import Brain from '~icons/fa6-solid/brain';
@@ -35,6 +36,25 @@
 
   const st = new AIProviderSettingsState();
   const providerType = st.providerType;
+
+  // Port of the local base URL; null when the base URL points elsewhere.
+  const localPort = $derived.by(() => {
+    const base = st.providerConfig?.base_url?.trim();
+    if (!base) return 18410;
+    const m = /^http:\/\/(?:127\.0\.0\.1|localhost):(\d+)\/?$/.exec(base);
+    const port = Number(m?.[1]);
+    return port > 0 && port <= 65535 ? port : null;
+  });
+
+  async function setPort(e: Event & { currentTarget: HTMLInputElement }) {
+    const port = Number(e.currentTarget.value);
+    if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+      e.currentTarget.value = String(localPort ?? '');
+      return;
+    }
+    await st.updateConfig({ base_url: `http://127.0.0.1:${port}` });
+    await aiPlatform.start();
+  }
 
   onMount(st.init);
 </script>
@@ -143,6 +163,24 @@
             oninput={(e: Event & { currentTarget: HTMLInputElement }) =>
               st.updateConfig({ base_url: e.currentTarget.value || null })}
           />
+        </div>
+
+        <div class="space-y-2">
+          <Label for="platform-port">Local port</Label>
+          <Input
+            id="platform-port"
+            inputmode="numeric"
+            maxlength={5}
+            class="w-32"
+            disabled={localPort === null}
+            value={localPort ?? ''}
+            onchange={setPort}
+          />
+          <p class="text-xs text-muted-foreground">
+            {localPort === null
+              ? 'The base URL is not on this machine, so Portal does not start a server for it.'
+              : 'Portal starts its bundled server on this port, or attaches to yours. Change it if another program holds the port.'}
+          </p>
         </div>
 
         <div class="space-y-2">

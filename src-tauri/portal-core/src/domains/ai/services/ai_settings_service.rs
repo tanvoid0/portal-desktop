@@ -1,3 +1,4 @@
+use crate::domains::ai::platform_daemon::write_atomic;
 use crate::domains::ai::providers::{ProviderConfig, ProviderType};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -52,10 +53,13 @@ impl AISettingsService {
         let legacy_keys = ["Ollama", "Gemini", "OpenAI", "Anthropic"];
         let mut migrated_model: Option<String> = None;
         let mut migrated_enabled = false;
+        // A plain read must not rewrite the file; only a migration does.
+        let mut migrated = false;
 
         if let Some(Value::Object(providers_obj)) = json.get_mut("providers") {
             for key in legacy_keys {
                 if let Some(legacy) = providers_obj.remove(key) {
+                    migrated = true;
                     if let Some(obj) = legacy.as_object() {
                         if migrated_model.is_none() {
                             migrated_model = obj
@@ -70,10 +74,14 @@ impl AISettingsService {
                     }
                 }
             }
+            let before = providers_obj.len();
             providers_obj.retain(|key, _| key == "AgentPlatform");
+            migrated |= providers_obj.len() != before;
         }
 
         if let Some(obj) = json.as_object_mut() {
+            migrated |=
+                obj.get("default_provider").and_then(Value::as_str) != Some("AgentPlatform");
             obj.insert(
                 "default_provider".to_string(),
                 Value::String("AgentPlatform".to_string()),
@@ -84,6 +92,7 @@ impl AISettingsService {
             .map_err(|e| format!("Failed to parse AI settings: {}", e))?;
 
         if !settings.providers.contains_key("AgentPlatform") {
+            migrated = true;
             settings.providers.insert(
                 "AgentPlatform".to_string(),
                 ProviderConfig::default_for_type(ProviderType::AgentPlatform),
@@ -100,7 +109,9 @@ impl AISettingsService {
         }
 
         settings.default_provider = Some("AgentPlatform".to_string());
-        self.save_settings(&settings)?;
+        if migrated {
+            self.save_settings(&settings)?;
+        }
         Ok(settings)
     }
 
@@ -111,7 +122,7 @@ impl AISettingsService {
         }
         let content = serde_json::to_string_pretty(settings)
             .map_err(|e| format!("Failed to serialize AI settings: {}", e))?;
-        fs::write(&self.settings_path, content)
+        write_atomic(&self.settings_path, &content)
             .map_err(|e| format!("Failed to write AI settings file: {}", e))?;
         Ok(())
     }
@@ -167,5 +178,75 @@ impl AISettingsService {
 
     pub fn delete_provider_config(&self, _provider_type: ProviderType) -> Result<(), String> {
         Err("Cannot delete the agent-platform provider".to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn service(dir: &tempfile::TempDir) -> AISettingsService {
+        AISettingsService {
+            settings_path: dir.path().join("ai-settings.json"),
+        }
+    }
+
+    #[test]
+    fn reading_does_not_rewrite_but_migrating_does() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = service(&dir);
+        // Compact form: any rewrite would pretty-print it.
+        let compact = serde_json::to_string(&AISettings::default()).unwrap();
+        fs::write(&s.settings_path, &compact).unwrap();
+        s.load_settings().unwrap();
+        assert_eq!(fs::read_to_string(&s.settings_path).unwrap(), compact);
+
+        fs::write(
+            &s.settings_path,
+            r#"{"providers":{"Ollama":{"model":"m"}}}"#,
+        )
+        .unwrap();
+        s.load_settings().unwrap();
+        let saved = fs::read_to_string(&s.settings_path).unwrap();
+        assert!(!saved.contains("Ollama"), "{saved}");
+    }
+
+    #[test]
+    fn reads_never_see_a_half_written_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = service(&dir);
+        s.save_settings(&AISettings::default()).unwrap();
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                for _ in 0..200 {
+                    // Windows may refuse a replace while a reader holds the file;
+                    // the old contents stay, which is all this test cares about.
+                    let _ = s.save_settings(&AISettings::default());
+                }
+            });
+            for _ in 0..500 {
+                if let Err(e) = s.load_settings() {
+                    assert!(!e.contains("parse"), "{e}");
+                }
+            }
+        });
+    }
+
+    #[test]
+    fn saving_replaces_an_existing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = service(&dir);
+        s.save_settings(&AISettings::default()).unwrap();
+        let mut next = AISettings::default();
+        next.default_provider = None;
+        s.save_settings(&next).unwrap();
+        assert!(fs::read_to_string(&s.settings_path)
+            .unwrap()
+            .contains("\"default_provider\": null"));
+        assert_eq!(
+            fs::read_dir(dir.path()).unwrap().count(),
+            1,
+            "temp left behind"
+        );
     }
 }

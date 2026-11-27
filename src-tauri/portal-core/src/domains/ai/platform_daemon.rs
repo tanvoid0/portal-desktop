@@ -12,7 +12,16 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-pub const PORT: u16 = 18410;
+/// Port of a plain-http loopback base URL with an explicit port: the only
+/// addresses portal starts a daemon on, or sends the install key to unasked.
+pub fn local_port(base: &str) -> Option<u16> {
+    let rest = base.trim().strip_prefix("http://")?.trim_end_matches('/');
+    let (host, port) = rest.rsplit_once(':')?;
+    if host != "127.0.0.1" && host != "localhost" {
+        return None;
+    }
+    port.parse().ok().filter(|p| *p != 0)
+}
 
 /// Agent-platform's own `APP_DIR`: reusing it verbatim is what adopts the
 /// user's existing database, key, workspaces and tokens.
@@ -68,9 +77,11 @@ pub fn data_dir() -> PathBuf {
 }
 
 /// Replace a file in one step (write beside, fsync, rename): a half-written key
-/// reads as a valid-looking wrong one and locks us out of our own data.
-fn write_atomic(path: &Path, contents: &str) -> std::io::Result<()> {
-    let tmp = path.with_extension("tmp");
+/// reads as a valid-looking wrong one and locks us out of our own data. Readers
+/// never see a truncated file either.
+pub(crate) fn write_atomic(path: &Path, contents: &str) -> std::io::Result<()> {
+    // Unique per call: two writers sharing a temp file could publish a half-written one.
+    let tmp = path.with_extension(format!("{}.tmp", uuid::Uuid::new_v4()));
     {
         let mut f = std::fs::File::create(&tmp)?;
         f.write_all(contents.as_bytes())?;
@@ -220,6 +231,23 @@ mod tests {
         // Empty file is regenerated, not adopted.
         std::fs::write(dir.path().join("master.key"), "").unwrap();
         assert_eq!(load_or_create_key(dir.path()).unwrap().len(), 64);
+    }
+
+    #[test]
+    fn only_loopback_http_with_a_port_is_local() {
+        assert_eq!(local_port("http://127.0.0.1:18410"), Some(18410));
+        assert_eq!(local_port("http://localhost:19000/"), Some(19000));
+        for other in [
+            "http://192.168.1.5:18410",
+            "https://127.0.0.1:18410",
+            "http://127.0.0.1",
+            "http://127.0.0.1:0",
+            "http://127.0.0.1:99999",
+            "http://127.0.0.1:1@evil.test:80",
+            "http://evil.test/127.0.0.1:18410",
+        ] {
+            assert_eq!(local_port(other), None, "{other}");
+        }
     }
 
     #[test]
