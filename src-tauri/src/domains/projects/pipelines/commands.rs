@@ -422,8 +422,10 @@ pub async fn release_propose(
 pub async fn release_validate(yaml: String) -> Result<(), String> {
     use crate::domains::projects::pipelines::services::pipeline_file as pf;
     let file = pf::parse(&yaml)?;
+    // No run context: a `foreach: { command }` step collapses to one placeholder.
+    let no_items = std::collections::HashMap::new();
     for id in file.workflows.keys() {
-        pf::build_steps(&file, id)?;
+        pf::build_steps(&file, id, &no_items)?;
     }
     Ok(())
 }

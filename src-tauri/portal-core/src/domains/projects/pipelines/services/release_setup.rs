@@ -47,6 +47,7 @@ fn steps(ids: &[String], after: &[String]) -> Vec<FileStep> {
         .map(|id| FileStep {
             action: id.clone(),
             needs: after.to_vec(),
+            foreach: None,
         })
         .collect()
 }
@@ -166,6 +167,7 @@ pub fn propose(root: &Path, modules: &[DetectedModule]) -> Result<Proposal, Stri
         ship.push(FileStep {
             action: "release".into(),
             needs: gates.clone(),
+            foreach: None,
         });
         ship_steps = ship;
         rehearse_steps = dry.map(|d| {
@@ -175,6 +177,7 @@ pub fn propose(root: &Path, modules: &[DetectedModule]) -> Result<Proposal, Stri
             s.push(FileStep {
                 action: "release-dry".into(),
                 needs: gates.clone(),
+                foreach: None,
             });
             s
         });

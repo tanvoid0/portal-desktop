@@ -1262,7 +1262,32 @@ impl ExecutionService {
         if let Some(bump) = file.release.as_ref().and_then(|r| r.bump.clone()) {
             variables.entry("BUMP".to_string()).or_insert(bump);
         }
-        let mut steps = pipeline_file::build_steps(&file, workflow_id)?;
+
+        // Resolve `foreach: { items_file }` lists now — read natively, no shell,
+        // relative to the project root. Inline `items` need no run and are
+        // expanded by build_steps directly. Blank lines and `#` comments ignored.
+        let mut resolved: HashMap<String, Vec<String>> = HashMap::new();
+        if let Some(wf) = file.workflows.get(workflow_id) {
+            for step in &wf.steps {
+                let Some(fe) = &step.foreach else { continue };
+                if !fe.items.is_empty() {
+                    continue;
+                }
+                let Some(rel) = &fe.items_file else { continue };
+                let path = Path::new(&project.path).join(rel);
+                let text = std::fs::read_to_string(&path)
+                    .map_err(|e| format!("foreach items_file {}: {e}", path.display()))?;
+                let items: Vec<String> = text
+                    .lines()
+                    .map(|l| l.trim())
+                    .filter(|l| !l.is_empty() && !l.starts_with('#'))
+                    .map(|l| l.to_string())
+                    .collect();
+                resolved.insert(step.action.clone(), items);
+            }
+        }
+
+        let mut steps = pipeline_file::build_steps(&file, workflow_id, &resolved)?;
         for step in &mut steps {
             if let Some(env) = step["config"]["env"].as_object_mut() {
                 for (k, v) in &variables {
@@ -1342,7 +1367,9 @@ impl ExecutionService {
             return Ok(None);
         };
         let plan = |id: &str| -> Result<Value, String> {
-            let steps = pipeline_file::build_steps(&file, id)?;
+            // No run context here: `foreach: { command }` steps collapse to a
+            // single placeholder node (inline `items` still expand).
+            let steps = pipeline_file::build_steps(&file, id, &HashMap::new())?;
             Ok(json!({ "id": id, "steps": steps.iter().map(|s| json!({
                 "id": s["id"], "name": s["name"], "dependsOn": s["dependsOn"],
                 "command": s["config"]["command"], "cwd": s["config"]["cwd"],
