@@ -26,6 +26,7 @@ use crate::domains::agents::entities::{agent_event, agent_message, agent_session
 use crate::domains::agents::AgentEvent;
 use crate::domains::coder::entities::coder_thread;
 use crate::domains::coder::types::ChatMessage;
+use crate::log_warn;
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Report {
@@ -46,7 +47,7 @@ fn err(what: &str, e: impl std::fmt::Display) -> String {
 pub async fn run(db: &DatabaseConnection, hub: &Arc<ThreadHub>) -> Result<Report, String> {
     let mut report = Report::default();
     if let Err(e) = import(db, &mut report).await {
-        eprintln!("{e}");
+        log_warn!("Threads", "{e}");
     }
     report.reconciled = reconcile(db, hub).await?;
     Ok(report)
@@ -94,7 +95,7 @@ async fn import(db: &DatabaseConnection, report: &mut Report) -> Result<(), Stri
         if matches!(action(known.get(&row.id), &row.updated_at, |_| false), Action::Import) {
             match import_portal(db, &row).await {
                 Ok(()) => report.imported += 1,
-                Err(e) => eprintln!("{e} (coder thread {})", row.id),
+                Err(e) => log_warn!("Threads", "{e} (coder thread {})", row.id),
             }
         }
     }
@@ -113,7 +114,7 @@ async fn import(db: &DatabaseConnection, report: &mut Report) -> Result<(), Stri
             Ok(true) if known.is_none_or(|k| k.last_seq == 0) => report.imported += 1,
             Ok(true) => report.prepended += 1,
             Ok(false) => {}
-            Err(e) => eprintln!("{e} (agent session {})", s.id),
+            Err(e) => log_warn!("Threads", "{e} (agent session {})", s.id),
         }
     }
     Ok(())
@@ -177,8 +178,10 @@ async fn prepend_session(db: &DatabaseConnection, id: &str, created_at: &str) ->
             .count(db)
             .await
             .map_err(|e| err("count messages", e))?;
-    // ponytail: one earlier row is taken to be just the launching prompt; a resume of a
-    // session whose whole history was a single row loses it. Fold always if that matters.
+    // Invariant: exactly one persisted prompt precedes the hub's first command
+    // (`start_run` and `resume_session` persist it before the hub sees it), so more than
+    // one legacy row before `Created` is history the hub never saw. Known way to break
+    // it: board bug #1976 (the transcript sweep rewriting a resumed session's timestamps).
     if before <= 1 {
         return Ok(false);
     }
@@ -190,8 +193,9 @@ async fn prepend_session(db: &DatabaseConnection, id: &str, created_at: &str) ->
     let have = load_rows(db, id).await?;
     let mine = decode(&have)?;
     let eq = |a: &ChatMessage, b: &ChatMessage| a.role == b.role && a.content == b.content;
-    let overlap = (0..=prefix.len().min(mine.len()))
-        .rev()
+    // The hub's first message is the persisted prompt, so the true overlap is the
+    // smallest match of at least one; the largest would eat real history that repeats it.
+    let overlap = (1..=prefix.len().min(mine.len()))
         .find(|&j| prefix[prefix.len() - j..].iter().zip(&mine[..j]).all(|(a, b)| eq(a, b)))
         .unwrap_or(0);
     prefix.truncate(prefix.len() - overlap);
@@ -371,9 +375,10 @@ async fn reconcile(db: &DatabaseConnection, hub: &Arc<ThreadHub>) -> Result<usiz
             (true, _) => ThreadCommand::Portal(PortalInput::Finished { outcome: TurnOutcome::Interrupted, final_text: None }),
             (false, _) => ThreadCommand::Provider(AgentEvent::Exited { code: None }),
         };
-        let ack = hub.command(&row.id, Envelope { cmd, actor: "system".into(), command_id: None }).await?;
-        if matches!(ack.status, AckStatus::Accepted) {
-            n += 1;
+        match hub.command(&row.id, Envelope { cmd, actor: "system".into(), command_id: None }).await {
+            Ok(ack) if matches!(ack.status, AckStatus::Accepted) => n += 1,
+            Ok(_) => {}
+            Err(e) => log_warn!("Threads", "{e} (reconcile {})", row.id),
         }
     }
     Ok(n)
@@ -636,16 +641,32 @@ mod tests {
         event(db, "resume", 1, OLD, msg("assistant", "old a")).await;
         message(db, "resume", 2, "user", "again", OLD).await;
 
+        // Repeated text: old turn "go"/"ok", resume prompt "go"; the hub then sees go, ok, go.
+        // The overlap is the one prompt, not the longest run that happens to match.
+        session(db, "repeat", "claude-code").await;
+        message(db, "repeat", 0, "user", "go", OLD).await;
+        event(db, "repeat", 1, OLD, msg("assistant", "ok")).await;
+        message(db, "repeat", 2, "user", "go", OLD).await;
+
         let hub = ThreadHub::new(dbm.clone(), Arc::new(NoopSink));
-        for (id, prompt, reply) in [("start", "go", "reply"), ("resume", "again", "ok")] {
-            hub.submit(id, ThreadCommand::Provider(msg("user", prompt)));
-            hub.submit(id, ThreadCommand::Provider(msg("assistant", reply)));
-            hub.submit(id, done());
+        for (id, turns) in [
+            ("start", vec![("go", "reply")]),
+            ("resume", vec![("again", "ok")]),
+            ("repeat", vec![("go", "ok"), ("go", "fin")]),
+        ] {
+            for (prompt, reply) in turns {
+                hub.submit(id, ThreadCommand::Provider(msg("user", prompt)));
+                hub.submit(id, ThreadCommand::Provider(msg("assistant", reply)));
+                hub.submit(id, done());
+            }
             hub.snapshot(id).await.unwrap().unwrap();
         }
 
         let startup = ThreadHub::new(dbm.clone(), Arc::new(NoopSink));
-        assert_eq!(run(db, &startup).await.unwrap(), Report { imported: 0, prepended: 1, reconciled: 0 });
+        assert_eq!(run(db, &startup).await.unwrap(), Report { imported: 0, prepended: 2, reconciled: 0 });
+        let repeat = texts(db, "repeat").await;
+        assert_eq!(repeat.iter().map(|m| m.1.as_str()).collect::<Vec<_>>(), ["go", "ok", "go", "ok", "go", "fin"]);
+        assert_eq!(repeat.iter().map(|m| m.2 == 0).collect::<Vec<_>>(), [true, true, false, false, false, false]);
         let start = texts(db, "start").await;
         assert_eq!(start.iter().map(|m| m.1.as_str()).collect::<Vec<_>>(), ["go", "reply"]);
         let resume = texts(db, "resume").await;
