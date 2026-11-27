@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use chrono::{DateTime, Utc};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 use serde_json::Value;
 
 use crate::database::DatabaseManager;
@@ -194,9 +194,13 @@ async fn sync_from(db: &DatabaseManager, root: &Path) -> Result<Vec<String>, Str
         if parsed.turns.is_empty() {
             continue;
         }
-        if let Err(e) = store(db, &sid, &cwd, &parsed, mtime, known.contains_key(&sid)).await {
-            eprintln!("agents: import {sid} failed: {e}");
-            continue;
+        match store(db, &sid, &cwd, &parsed, mtime, known.contains_key(&sid)).await {
+            Ok(true) => {}
+            Ok(false) => continue,
+            Err(e) => {
+                eprintln!("agents: import {sid} failed: {e}");
+                continue;
+            }
         }
         imported.push(sid);
     }
@@ -210,8 +214,9 @@ async fn store(
     p: &ParsedSession,
     mtime: DateTime<Utc>,
     replace: bool,
-) -> Result<(), String> {
-    let conn = db.get_connection();
+) -> Result<bool, String> {
+    // One transaction, so a failure can't leave the session deleted but not re-inserted.
+    let txn = db.get_connection().begin().await.map_err(|e| e.to_string())?;
     let started = p
         .turns
         .iter()
@@ -220,13 +225,20 @@ async fn store(
     let ended = mtime.to_rfc3339();
 
     if replace {
-        agent_message::Entity::delete_many()
-            .filter(agent_message::Column::SessionId.eq(sid))
-            .exec(conn)
+        // Re-checked in the delete itself: `resume_session` may have flipped the row to
+        // running since the sweep loaded it, and the cascade would wipe the run's events.
+        let gone = agent_session::Entity::delete_many()
+            .filter(agent_session::Column::Id.eq(sid))
+            .filter(agent_session::Column::Status.ne("running"))
+            .exec(&txn)
             .await
             .map_err(|e| e.to_string())?;
-        agent_session::Entity::delete_by_id(sid.to_string())
-            .exec(conn)
+        if gone.rows_affected == 0 {
+            return Ok(false);
+        }
+        agent_message::Entity::delete_many()
+            .filter(agent_message::Column::SessionId.eq(sid))
+            .exec(&txn)
             .await
             .map_err(|e| e.to_string())?;
     }
@@ -243,7 +255,7 @@ async fn store(
         task_id: Set(None),
         backend_session_id: Set(Some(sid.to_string())),
     })
-    .exec(conn)
+    .exec(&txn)
     .await
     .map_err(|e| e.to_string())?;
 
@@ -258,11 +270,12 @@ async fn store(
             created_at: Set(t.at.clone().unwrap_or_else(|| started.clone())),
         });
         agent_message::Entity::insert_many(rows)
-            .exec(conn)
+            .exec(&txn)
             .await
             .map_err(|e| e.to_string())?;
     }
-    Ok(())
+    txn.commit().await.map_err(|e| e.to_string())?;
+    Ok(true)
 }
 
 #[cfg(test)]
@@ -301,6 +314,12 @@ mod tests {
         std::fs::write(root.path().join("a").join("sid1.jsonl"), line).unwrap();
         assert!(sync_from(&db, root.path()).await.unwrap().is_empty());
         assert_eq!(agent_message::Entity::find().all(db.get_connection()).await.unwrap().len(), 2);
+
+        // Flipped to running after the sweep loaded it: store itself leaves it alone.
+        let p = parse_transcript(line.as_bytes());
+        assert!(!store(&db, "sid1", "cwd", &p, Utc::now(), true).await.unwrap());
+        assert_eq!(agent_message::Entity::find().all(db.get_connection()).await.unwrap().len(), 2);
+        assert_eq!(agent_session::Entity::find().one(db.get_connection()).await.unwrap().unwrap().status, "running");
     }
 
     #[test]

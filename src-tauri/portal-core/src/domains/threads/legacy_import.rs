@@ -735,5 +735,17 @@ mod tests {
         am.update(db).await.unwrap();
         assert!(!hub.resync_session("t2").await.unwrap());
         assert!(store::summary(db, "t2").await.unwrap().is_none());
+
+        // The hub already wrote to it: a newer session stamp must not reset the thread.
+        session(db, "t3", "claude-code").await;
+        message(db, "t3", 0, "user", "q", OLD).await;
+        hub.submit("t3", ThreadCommand::Provider(msg("assistant", "live")));
+        hub.snapshot("t3").await.unwrap().unwrap();
+        let before = dump(db).await;
+        let mut am: agent_session::ActiveModel = agent_session::Entity::find_by_id("t3").one(db).await.unwrap().unwrap().into();
+        am.ended_at = Set(Some("2026-01-03T00:00:00Z".into()));
+        am.update(db).await.unwrap();
+        assert!(!hub.resync_session("t3").await.unwrap());
+        assert_eq!(dump(db).await, before);
     }
 }

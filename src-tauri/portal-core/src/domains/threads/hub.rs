@@ -27,6 +27,8 @@ const EVENT_FRAME: &str = "coder://thread-event";
 const DELTA_FRAME: &str = "coder://thread-delta";
 /// Live-only, like deltas; the name stays under the `coder` domain for `event_cap`.
 const HEARTBEAT_FRAME: &str = "coder://thread-heartbeat";
+/// Live-only: a projection was rewritten without an event, so clients must re-snapshot.
+const RESET_FRAME: &str = "coder://thread-reset";
 const PORTAL: &str = "portal";
 
 enum Msg {
@@ -224,6 +226,7 @@ async fn actor_loop(hub: Arc<ThreadHub>, id: String, mut rx: mpsc::UnboundedRece
                     a.trusted = false; // the projection changed under the cached state
                     a.last_load = None;
                     a.ensure_trusted().await;
+                    a.sink.emit(RESET_FRAME, serde_json::json!({ "thread_id": a.id }));
                 }
                 let _ = reply.send(done);
             }
