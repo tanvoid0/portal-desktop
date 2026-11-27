@@ -130,7 +130,8 @@ impl ThreadEffects for Rec {
 
 fn record(hub: &Arc<ThreadHub>) -> Arc<Rec> {
     let rec = Arc::new(Rec::default());
-    hub.register_effects(rec.clone(), rec.clone());
+    hub.register_portal_effects(rec.clone());
+    hub.register_cli_effects(rec.clone());
     rec
 }
 

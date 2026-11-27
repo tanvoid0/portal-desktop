@@ -296,6 +296,10 @@ pub fn run() {
             .map_err(|e| format!("Failed to initialize deployment service: {}", e))?;
             app.manage(std::sync::Arc::new(deployment_service));
 
+            // Server-owned thread log (design: CODER_THREAD_LOG_DESIGN.md). Created
+            // before the services that feed it; each registers its own effects.
+            let thread_hub = domains::threads::ThreadHub::new(db_manager_arc.clone(), sink.clone());
+
             // Initialize coder agent service (loads threads + rules from DB)
             let coder_service = tauri::async_runtime::block_on(async {
                 domains::coder::CoderService::new(db_manager_arc.clone(), vault_session.clone())
@@ -343,7 +347,6 @@ pub fn run() {
                     }
                 });
             }
-            let thread_hub = domains::threads::ThreadHub::new(db_manager_arc.clone(), sink.clone());
             agents_service.attach_thread_hub(thread_hub.clone());
             app.manage(thread_hub);
             app.manage(agents_service);

@@ -55,10 +55,14 @@ impl ThreadHub {
         })
     }
 
-    /// First registration wins; later ones are ignored.
-    pub fn register_effects(&self, portal: Arc<dyn ThreadEffects>, cli: Arc<dyn ThreadEffects>) {
-        let _ = self.portal_fx.set(portal);
-        let _ = self.cli_fx.set(cli);
+    /// Effects for Portal-engine threads. First registration wins.
+    pub fn register_portal_effects(&self, fx: Arc<dyn ThreadEffects>) {
+        let _ = self.portal_fx.set(fx);
+    }
+
+    /// Effects for every other provider (the agent CLIs). First registration wins.
+    pub fn register_cli_effects(&self, fx: Arc<dyn ThreadEffects>) {
+        let _ = self.cli_fx.set(fx);
     }
 
     /// Sync and cheap (the agent pump calls it per event). An unknown thread is
