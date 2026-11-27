@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { pressureClass, usedPct } from './utils';
+import { pressureClass, pressureTextClass, usedPct } from './utils';
+
+describe('pressureTextClass', () => {
+  it('steps from green to amber at 75 and red at 90', () => {
+    expect(pressureTextClass(74.9)).toBe('text-status-success');
+    expect(pressureTextClass(75)).toBe('text-status-warning');
+    expect(pressureTextClass(89.9)).toBe('text-status-warning');
+    expect(pressureTextClass(90)).toBe('text-status-error');
+  });
+});
 
 describe('usedPct', () => {
   it('is the used share of the total', () => {

@@ -27,13 +27,13 @@
 <div
   class="divider-edge-t divider-edge-full divider-edge-sidebar flex-shrink-0 p-4 group-data-[collapsible=icon]:p-2"
 >
-  {#if !isMobileShell}
-    <HostStats />
-  {/if}
   <div
     class="flex items-center justify-between gap-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1"
   >
     <ThemeToggle />
+    {#if !isMobileShell}
+      <HostStats />
+    {/if}
     <div
       class="flex items-center gap-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1"
     >

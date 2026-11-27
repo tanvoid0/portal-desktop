@@ -1,6 +1,6 @@
 <!--
 	System Page
-	Live CPU, memory and per-volume usage of the host, over `host_stats` + `disk_usage`.
+	Live CPU, memory, GPU and per-volume usage of the host, over `host_stats` + `disk_usage`.
 	Same page on the desktop and the thin client — both commands are served over RPC.
 -->
 <script lang="ts">
@@ -18,6 +18,7 @@
   import { fmtBytes, pressureClass, usedPct } from '$lib/domains/disk/utils';
   import { getErrorMessage } from '$lib/utils/errorMessage';
   import Cpu from '~icons/fa6-solid/microchip';
+  import Cube from '~icons/fa6-solid/cube';
   import HardDrive from '~icons/fa6-solid/hard-drive';
   import MemoryStick from '~icons/fa6-solid/memory';
 
@@ -44,6 +45,10 @@
           ? `${fmtBytes(h.memoryUsedBytes)} of ${fmtBytes(h.memoryTotalBytes)}`
           : 'Reading…',
       },
+      // Only once a reading says there is a GPU to report.
+      ...(h?.gpuPercent != null
+        ? [{ label: 'GPU', icon: Cube, pct: usedPct(h.gpuPercent, 100), detail: 'Compute load' }]
+        : []),
     ];
   });
 </script>
@@ -54,7 +59,7 @@
 
 <!-- px-0: the app shell's own PageContainer already sets the gutter. -->
 <PageContainer variant="readable" class="space-y-6 px-0">
-  <PageHeader title="System" description="Live CPU, memory and storage usage of the host machine" />
+  <PageHeader title="System" description="Live resource and storage usage of the host machine" />
 
   {#if hostQ.error && !hostQ.data}
     <PageError
@@ -63,7 +68,7 @@
       onRetry={() => hostQ.refetch()}
     />
   {:else}
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+    <div class="grid grid-cols-1 gap-4 {meters.length > 2 ? 'lg:grid-cols-3' : 'md:grid-cols-2'}">
       {#each meters as m (m.label)}
         {@const Icon = m.icon}
         <Card class="gap-0 py-4">

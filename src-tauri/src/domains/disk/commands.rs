@@ -295,10 +295,11 @@ pub fn disk_usage() -> Vec<DiskUsage> {
     disk::disk_usage()
 }
 
-/// CPU / memory readout for the AI sidebar status bar. Read-only.
+/// CPU / memory / GPU readout for the sidebar and the System page. Read-only.
+/// Async so the GPU probe never runs on the UI thread.
 #[portal_rpc_macro::rpc(cap = "sysinfo")]
-pub fn host_stats() -> HostStats {
-    disk::host_stats()
+pub async fn host_stats() -> HostStats {
+    disk::host_stats().await
 }
 
 /// Advisory: asks the configured AI provider (via the desktop `ai` domain) for a

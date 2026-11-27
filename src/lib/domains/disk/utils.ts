@@ -30,6 +30,13 @@ export function pressureClass(pct: number): string {
   return '';
 }
 
+/** Text colour for a usage %: the same steps as `pressureClass`, with green below them. */
+export function pressureTextClass(pct: number): string {
+  if (pct >= 90) return 'text-status-error';
+  if (pct >= 75) return 'text-status-warning';
+  return 'text-status-success';
+}
+
 export function fmtDate(unixSecs: number): string {
   return new Date(unixSecs * 1000).toLocaleString();
 }
