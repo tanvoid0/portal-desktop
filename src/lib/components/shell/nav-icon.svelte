@@ -18,6 +18,7 @@
   import MessageSquare from '~icons/fa6-solid/message';
   import MobileScreenButton from '~icons/fa6-solid/mobile-screen-button';
   import Rocket from '~icons/fa6-solid/rocket';
+  import Rotate from '~icons/fa6-solid/rotate';
   import ScanSearch from '~icons/fa6-solid/magnifying-glass';
   import Settings from '~icons/fa6-solid/gear';
   import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
@@ -80,6 +81,8 @@
   <HardDrive class={className} />
 {:else if icon === 'gauge'}
   <Gauge class={className} />
+{:else if icon === 'rotate'}
+  <Rotate class={className} />
 {:else if icon === 'scan-search'}
   <ScanSearch class={className} />
 {:else if icon === 'mobile-screen-button'}

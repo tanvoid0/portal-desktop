@@ -4,4 +4,9 @@ export type SyncAllOptions = {
 /**
  * Snapshot password; `None` skips the cloud snapshot. Never logged or emitted.
  */
-snapshotPassword: string | null, };
+snapshotPassword: string | null, 
+/**
+ * Sync just these projects (and any sharing their repository): their env
+ * files and repository, no snapshot. `None` = everything.
+ */
+projectIds: Array<number> | null, };

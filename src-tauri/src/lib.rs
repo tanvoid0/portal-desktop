@@ -510,6 +510,8 @@ pub fn run() {
             domains::projects::discovery_commands::cancel_discovery,
             domains::projects::sync_all_commands::sync_all_projects,
             domains::projects::sync_all_commands::cancel_sync_all,
+            domains::projects::sync_all_commands::sync_repo_facts,
+            domains::projects::sync_all_commands::sync_apply_resolution,
             domains::projects::discovery_commands::get_discovery_state,
             domains::projects::discovery_commands::save_discovery_config,
             domains::projects::discovery_commands::export_discovery_csv,

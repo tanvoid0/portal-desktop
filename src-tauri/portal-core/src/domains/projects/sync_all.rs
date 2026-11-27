@@ -4,7 +4,7 @@
 //! Phase order is env, git, snapshot. Every failure is a step status, never an
 //! `Err`; `attention` means "needs your hand", `failed` means "a command errored".
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -93,6 +93,10 @@ pub struct SyncAllProgress {
 pub struct SyncAllOptions {
     /// Snapshot password; `None` skips the cloud snapshot. Never logged or emitted.
     pub snapshot_password: Option<String>,
+    /// Sync just these projects (and any sharing their repository): their env
+    /// files and repository, no snapshot. `None` = everything.
+    #[serde(default)]
+    pub project_ids: Option<Vec<i32>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ts_rs::TS)]
@@ -251,7 +255,7 @@ pub fn sync_repo(dir: &Path, push_ok: bool, cancel: &AtomicBool, on_step: OnStep
     let p = git::probe(dir);
     if p.dirty > 0 || p.untracked > 0 {
         let d = format!(
-            "{} modified, {} untracked — commit manually",
+            "{} modified, {} untracked",
             p.dirty.max(0),
             p.untracked.max(0)
         );
@@ -334,6 +338,11 @@ impl SyncAllService {
             })
         };
 
+        let only: Option<HashSet<i32>> = options
+            .project_ids
+            .as_ref()
+            .map(|ids| ids.iter().copied().collect());
+
         // --- env ---
         tick(SyncAllPhase::Env, 0, None);
         let mut env_note = None;
@@ -341,7 +350,7 @@ impl SyncAllService {
             if !self.session.is_unlocked() {
                 env_note = Some("Vault locked — env files not backed up".to_string());
             } else {
-                match self.env_phase().await {
+                match self.env_phase(only.as_ref()).await {
                     Ok(per_project) => {
                         for (id, status, detail) in per_project {
                             let Some(r) = results.iter_mut().find(|r| r.id == id) else {
@@ -377,7 +386,10 @@ impl SyncAllService {
             let push_ok: Vec<bool> = rows.iter().map(|r| r.push_ok).collect();
             let names: Vec<(i32, String)> = rows.iter().map(|r| (r.id, r.name.clone())).collect();
             let (cancel, emit) = (cancel.clone(), emit.clone());
-            tokio::task::spawn_blocking(move || git_phase(&paths, &push_ok, &names, &cancel, &emit))
+            let only = only.clone();
+            tokio::task::spawn_blocking(move || {
+                git_phase(&paths, &push_ok, &names, only.as_ref(), &cancel, &emit)
+            })
                 .await
                 .map_err(|e| e.to_string())?
         };
@@ -414,6 +426,11 @@ impl SyncAllService {
             }
         }
 
+        // Untouched projects have no steps; a partial run reports only its own.
+        if only.is_some() {
+            results.retain(|r| !r.steps.is_empty());
+        }
+
         // --- snapshot ---
         tick(SyncAllPhase::Snapshot, total, None);
         let snap = |status, detail: Option<String>| SyncStepResult {
@@ -421,7 +438,9 @@ impl SyncAllService {
             status,
             detail,
         };
-        let snapshot = if cancel.load(Ordering::Relaxed) {
+        let snapshot = if only.is_some() {
+            snap(SyncStepStatus::Skipped, Some("single project".into()))
+        } else if cancel.load(Ordering::Relaxed) {
             snap(SyncStepStatus::Skipped, Some("cancelled".into()))
         } else if let Some(password) = options.snapshot_password {
             // Never force: a newer cloud snapshot is the user's call.
@@ -455,12 +474,16 @@ impl SyncAllService {
     }
 
     /// Backs up env files; one (project id, status, detail) per project that has any.
-    async fn env_phase(&self) -> Result<Vec<(i32, SyncStepStatus, Option<String>)>, String> {
+    async fn env_phase(
+        &self,
+        only: Option<&HashSet<i32>>,
+    ) -> Result<Vec<(i32, SyncStepStatus, Option<String>)>, String> {
         use SyncStepStatus as S;
         let svc = EnvBackupService::new(self.db.get_connection().clone(), self.session.clone());
         let scan = svc.scan().await?;
-        // project -> (worst status, ok count, non-ok notes), in first-seen order.
+        // project -> (worst status, backed up, non-ok notes), in first-seen order.
         let mut acc: HashMap<i32, (S, usize, Vec<String>)> = HashMap::new();
+        let mut in_sync: HashMap<i32, usize> = HashMap::new();
         let mut order = Vec::new();
         let mut note = |id: i32, st: S, msg: Option<String>| {
             let e = acc.entry(id).or_insert_with(|| {
@@ -482,7 +505,11 @@ impl SyncAllService {
             matches!((p(a), p(b)), (Some(a), Some(b)) if a > b)
         };
         let mut refs = Vec::new();
-        for f in &scan.files {
+        let wanted = |id: i32| only.is_none_or(|ids| ids.contains(&id));
+        for f in scan.files.iter().filter(|f| wanted(f.project_id)) {
+            if f.state == EnvFileState::InSync {
+                *in_sync.entry(f.project_id).or_default() += 1;
+            }
             // A differing vault copy is only replaced when the disk file is newer.
             let overwrite = match f.state {
                 EnvFileState::New => Some(false),
@@ -517,6 +544,13 @@ impl SyncAllService {
                 }
             }
         }
+        // Projects with nothing to do still say their env files were looked at.
+        for &id in in_sync.keys() {
+            acc.entry(id).or_insert_with(|| {
+                order.push(id);
+                (S::Ok, 0, Vec::new())
+            });
+        }
         Ok(order
             .into_iter()
             .map(|id| {
@@ -524,6 +558,9 @@ impl SyncAllService {
                 let mut parts = Vec::new();
                 if n > 0 {
                     parts.push(format!("{n} backed up"));
+                }
+                if let Some(same) = in_sync.get(&id) {
+                    parts.push(format!("{same} already in sync"));
                 }
                 parts.extend(notes);
                 (id, st, Some(parts.join("; ")))
@@ -554,6 +591,7 @@ fn git_phase(
     paths: &[String],
     push_ok: &[bool],
     names: &[(i32, String)],
+    only: Option<&HashSet<i32>>,
     cancel: &AtomicBool,
     emit: &Emit,
 ) -> (Vec<Group>, Vec<RepoOutcome>) {
@@ -600,6 +638,13 @@ fn git_phase(
             g.members.iter().all(|&m| push_ok[m])
         };
     }
+
+    // Filtered after grouping, so a shared repository keeps the same leader and
+    // push permission as in a full run.
+    if let Some(ids) = only {
+        groups.retain(|g| g.members.iter().any(|&m| ids.contains(&names[m].0)));
+    }
+    let total = groups.iter().map(|g| g.members.len()).sum();
 
     let ev = |step, status, detail: Option<String>, i: usize| {
         emit(SyncAllProgress {

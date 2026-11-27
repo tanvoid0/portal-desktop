@@ -83,6 +83,12 @@ export function buildMainNavSections(
           badge: projectCount > 0 ? projectCount : null,
           submenu: [
             {
+              title: 'Sync',
+              url: '/projects/sync',
+              icon: 'rotate',
+              description: 'Pull, push and back up every project',
+            },
+            {
               title: 'Audit',
               url: '/projects/audit',
               icon: 'scan-search',

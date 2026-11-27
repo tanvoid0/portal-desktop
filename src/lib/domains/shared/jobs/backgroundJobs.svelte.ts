@@ -10,7 +10,7 @@ import type { ScanProgress } from '$lib/domains/disk/types';
 
 export interface BackgroundJob {
   id: string;
-  kind: 'scan' | 'run' | 'download';
+  kind: 'scan' | 'run' | 'download' | 'sync';
   title: string;
   detail?: string;
   /** 0-100; null/undefined = indeterminate */

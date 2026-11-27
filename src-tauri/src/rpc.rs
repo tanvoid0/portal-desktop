@@ -291,7 +291,13 @@ mod tests {
     /// the push allowlist: none of it may be reachable by a LAN device.
     #[test]
     fn sync_all_is_local_only() {
-        for name in ["sync_all_projects", "cancel_sync_all", "set_project_push_ok"] {
+        for name in [
+            "sync_all_projects",
+            "cancel_sync_all",
+            "set_project_push_ok",
+            "sync_repo_facts",
+            "sync_apply_resolution",
+        ] {
             // local_only commands are not in the registry at all.
             assert!(!is_registered(name), "{name}");
             assert_eq!(capability(name), None, "{name}");

@@ -37,12 +37,20 @@
     projectName?: string;
     title?: string;
     description?: string;
+    /** Bindable so a page can keep them across navigation. */
+    filter?: string;
+    lastRun?: EnvItemResult[];
+    /** A backup or restore changed something. */
+    onChanged?: () => void;
   }
   let {
     projectId,
     projectName,
     title = 'Project env files',
     description = "Back up each project's .env files into the vault, encrypted, and write them back on this or another machine. They are never sent anywhere unencrypted.",
+    filter = $bindable(''),
+    lastRun = $bindable([]),
+    onChanged,
   }: Props = $props();
 
   const stateUi: Record<EnvFileState, { label: string; variant: BadgeVariant }> = {
@@ -68,10 +76,7 @@
   const scanQuery = createEnvBackupScanQuery();
   const scan = $derived(scanQuery.data);
 
-  let filter = $state('');
   let busy = $state(false);
-  /** The last run, minus the rows where nothing happened. */
-  let lastRun = $state<EnvItemResult[]>([]);
 
   const files = $derived(
     (scan?.files ?? []).filter((f) => projectId == null || f.projectId === projectId)
@@ -110,10 +115,12 @@
   }
 
   function finish(items: EnvItemResult[]) {
+    // `lastRun` keeps the last run, minus the rows where nothing happened.
     lastRun = items.filter((i) => i.outcome !== 'unchanged' && i.outcome !== 'identical');
     const text = items.length ? summarize(items) : 'Nothing to do';
     if (items.some((i) => i.outcome === 'failed')) toast.error('Some files failed', text);
     else toast.success('Env files', text);
+    if (lastRun.length) onChanged?.();
   }
 
   /** Unlock first (a clean prompt, not a command that waits on one), then run. */

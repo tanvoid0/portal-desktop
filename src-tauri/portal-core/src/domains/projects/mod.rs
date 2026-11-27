@@ -8,3 +8,4 @@ pub mod relocation;
 pub mod repositories;
 pub mod services;
 pub mod sync_all;
+pub mod sync_resolve;
