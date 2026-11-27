@@ -56,6 +56,7 @@ pub mod m20261120_000053_create_project_env_files_table;
 pub mod m20261125_000054_create_project_device_paths_table;
 pub mod m20261125_000055_add_project_push_ok;
 pub mod m20261127_000056_create_thread_log;
+pub mod m20261127_000057_create_agent_session_tombstones;
 pub mod runner;
 
 // Re-export all migrations for easy access
@@ -115,6 +116,7 @@ pub use m20261120_000053_create_project_env_files_table::Migration as createProj
 pub use m20261125_000054_create_project_device_paths_table::Migration as createProjectDevicePathsTable;
 pub use m20261125_000055_add_project_push_ok::Migration as addProjectPushOk;
 pub use m20261127_000056_create_thread_log::Migration as createThreadLog;
+pub use m20261127_000057_create_agent_session_tombstones::Migration as createAgentSessionTombstones;
 
 pub struct Migrator;
 
@@ -208,5 +210,6 @@ pub fn get_migrations() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(createProjectDevicePathsTable),
         Box::new(addProjectPushOk),
         Box::new(createThreadLog),
+        Box::new(createAgentSessionTombstones),
     ]
 }

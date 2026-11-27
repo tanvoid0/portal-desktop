@@ -12,7 +12,7 @@ use std::time::Duration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DbBackend, EntityTrait,
-    FromQueryResult, QueryFilter, QueryOrder, QuerySelect, Statement,
+    FromQueryResult, QueryFilter, QueryOrder, QuerySelect, Statement, TransactionTrait,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -454,7 +454,28 @@ impl AgentRunService {
             isolate_settings: false,
         };
         let (tx, rx) = mpsc::unbounded_channel::<AgentEvent>();
-        let control = backend.start(params, tx).await?;
+        // Running before the process exists, so a transcript sweep can't replace the row
+        // in the gap (#1976); put the old state back if the start fails.
+        let prior = (row.status.clone(), row.ended_at.clone());
+        let mut am: agent_session::ActiveModel = row.into();
+        am.status = Set("running".to_string());
+        am.ended_at = Set(None);
+        let mut am: agent_session::ActiveModel = am
+            .update(conn)
+            .await
+            .map_err(|e| format!("agents: persist resume start failed: {e}"))?
+            .into();
+        let control = match backend.start(params, tx).await {
+            Ok(c) => c,
+            Err(e) => {
+                am.status = Set(prior.0);
+                am.ended_at = Set(prior.1);
+                if let Err(e) = am.update(conn).await {
+                    eprintln!("agents: restore session after failed resume failed: {e}");
+                }
+                return Err(e);
+            }
+        };
 
         let seq = self.next_persisted_seq(session_id).await;
         self.runs.lock().await.insert(
@@ -467,12 +488,6 @@ impl AgentRunService {
             },
         );
 
-        let mut am: agent_session::ActiveModel = row.into();
-        am.status = Set("running".to_string());
-        am.ended_at = Set(None);
-        if let Err(e) = am.update(conn).await {
-            eprintln!("agents: persist resume start failed: {e}");
-        }
         self.persist_message(session_id, seq, "user", &text, None)
             .await;
         // Also when the thread still reads as mid-turn: the message just appends.
@@ -1011,11 +1026,18 @@ impl AgentRunService {
         if let Some(hub) = self.thread_hub.get() {
             hub.delete(session_id).await?;
         }
+        // The transcript sweep imports any jsonl it has no row for, so remember the ids
+        // (a Portal-launched run's jsonl is named by its backend id, not the row id) or the
+        // session returns within 30s (#2019).
+        let txn = conn.begin().await.map_err(|e| format!("agents: delete session failed: {e}"))?;
+        for sid in std::iter::once(session_id).chain(row.backend_session_id.as_deref()) {
+            tombstone(&txn, sid).await?;
+        }
         agent_session::Entity::delete_by_id(session_id.to_string())
-            .exec(conn)
+            .exec(&txn)
             .await
             .map_err(|e| format!("agents: delete session failed: {e}"))?;
-        Ok(())
+        txn.commit().await.map_err(|e| format!("agents: delete session failed: {e}"))
     }
 
     /// One session's full persisted transcript + event log, in order.
@@ -1118,6 +1140,13 @@ impl AgentRunService {
                 return;
             }
         };
+        // A forking `--resume` moves the id on; the old jsonl stays on disk and must not
+        // be imported as a session of its own by the transcript sweep (#1976).
+        if let Some(old) = existing.backend_session_id.as_deref().filter(|o| *o != backend_session_id) {
+            if let Err(e) = tombstone(conn, old).await {
+                eprintln!("agents: {e}");
+            }
+        }
         let mut am: agent_session::ActiveModel = existing.into();
         am.backend_session_id = Set(Some(backend_session_id.to_string()));
         if let Err(e) = am.update(conn).await {
@@ -1245,6 +1274,18 @@ fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339()
 }
 
+/// Mark a jsonl session id as not-to-import for the transcript sweep.
+async fn tombstone(conn: &impl ConnectionTrait, sid: &str) -> Result<(), String> {
+    conn.execute(Statement::from_sql_and_values(
+        DbBackend::Sqlite,
+        "INSERT OR IGNORE INTO agent_session_tombstones (session_id, deleted_at) VALUES (?, ?)",
+        [sid.into(), now_iso().into()],
+    ))
+    .await
+    .map(|_| ())
+    .map_err(|e| format!("agents: tombstone session failed: {e}"))
+}
+
 /// First `max` chars of `s`, `…`-suffixed if it was longer — char-counted,
 /// not byte-counted, so it never splits a multi-byte char.
 fn truncate_title(s: &str, max: usize) -> String {
@@ -1329,6 +1370,89 @@ mod tests {
             .await
             .unwrap_err();
         assert!(err.contains("already running"), "got: {err}");
+    }
+
+    struct FailingBackend;
+    #[async_trait::async_trait]
+    impl AgentBackend for FailingBackend {
+        fn id(&self) -> &'static str {
+            "claude-code"
+        }
+        fn display_name(&self) -> &'static str {
+            "fail"
+        }
+        async fn detect(&self) -> bool {
+            false
+        }
+        async fn list_models(&self) -> Vec<BackendModel> {
+            vec![]
+        }
+        async fn start(&self, _: StartParams, _: mpsc::UnboundedSender<AgentEvent>) -> Result<Box<dyn RunControl>, String> {
+            Err("boom".into())
+        }
+    }
+
+    /// The pre-start `running` write is undone when the CLI fails to start.
+    #[tokio::test]
+    async fn failed_resume_start_restores_the_row() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = DatabaseManager::new(dir.path().to_path_buf()).await.unwrap();
+        let mut svc = AgentRunService::new(Arc::new(db));
+        svc.backends = vec![Arc::new(FailingBackend)];
+        let svc = Arc::new(svc);
+        let conn = svc.db.get_connection();
+        agent_session::Entity::insert(agent_session::ActiveModel {
+            id: Set("r".to_string()),
+            backend_id: Set("claude-code".to_string()),
+            model: Set(None),
+            cwd: Set(".".to_string()),
+            status: Set("exited".to_string()),
+            started_at: Set("2026-01-01T00:00:00Z".to_string()),
+            ended_at: Set(Some("2026-01-01T01:00:00Z".to_string())),
+            exit_code: Set(None),
+            title: Set(None),
+            task_id: Set(None),
+            backend_session_id: Set(Some("b".to_string())),
+        })
+        .exec(conn)
+        .await
+        .unwrap();
+        assert_eq!(svc.resume_session("r", "go".into(), None).await.unwrap_err(), "boom");
+        let row = agent_session::Entity::find_by_id("r").one(conn).await.unwrap().unwrap();
+        assert_eq!((row.status.as_str(), row.ended_at.as_deref()), ("exited", Some("2026-01-01T01:00:00Z")));
+    }
+
+    /// A forking `--resume` (and a double fork) leaves every earlier backend id tombstoned,
+    /// so the transcript sweep never imports their jsonl as sessions of their own (#1976).
+    #[tokio::test]
+    async fn a_moved_backend_id_is_tombstoned_each_time() {
+        let (svc, _dir) = test_service().await;
+        let conn = svc.db.get_connection();
+        agent_session::Entity::insert(agent_session::ActiveModel {
+            id: Set("x".to_string()),
+            backend_id: Set("claude-code".to_string()),
+            model: Set(None),
+            cwd: Set(".".to_string()),
+            status: Set("exited".to_string()),
+            started_at: Set(now_iso()),
+            ended_at: Set(Some(now_iso())),
+            exit_code: Set(None),
+            title: Set(None),
+            task_id: Set(None),
+            backend_session_id: Set(Some("s1".to_string())),
+        })
+        .exec(conn)
+        .await
+        .expect("insert");
+        for next in ["s2", "s2", "s3"] {
+            svc.persist_backend_session_id("x", next).await;
+        }
+        let rows = conn
+            .query_all(Statement::from_string(DbBackend::Sqlite, "SELECT session_id FROM agent_session_tombstones ORDER BY 1"))
+            .await
+            .unwrap();
+        let ids: Vec<String> = rows.iter().map(|r| r.try_get_by_index(0).unwrap()).collect();
+        assert_eq!(ids, ["s1", "s2"]);
     }
 
     /// The straightforward case the row alone already covers.

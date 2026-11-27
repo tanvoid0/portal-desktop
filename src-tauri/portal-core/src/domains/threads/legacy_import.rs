@@ -140,7 +140,16 @@ pub(super) async fn resync(db: &DatabaseConnection, id: &str) -> Result<bool, St
     if !matches!(action(known.as_ref(), &stamp, |_| false), Action::Import) {
         return Ok(false);
     }
-    import_session(db, id, &s.started_at, &stamp).await.map(|()| true)
+    let log = session_log(db, id, None).await?;
+    // A resume may have flipped the row and saved its prompt since the read above; the
+    // hub records that prompt itself, so folding it in here would duplicate it.
+    let still_idle = agent_session::Entity::find_by_id(id.to_string()).one(db).await.map_err(|e| err("reload session", e))?;
+    if still_idle.is_none_or(|s| s.status == "running") {
+        return Ok(false);
+    }
+    let state = fold_session(db, id, log).await?;
+    let msgs = state.messages.clone();
+    write_whole(db, id, state, msgs, &s.started_at, &stamp).await.map(|()| true)
 }
 
 async fn import_portal(db: &DatabaseConnection, row: &coder_thread::Model) -> Result<(), String> {

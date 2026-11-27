@@ -11,13 +11,15 @@
 // ponytail: poll-only (no fs watcher), messages only (no tool events). Add a
 // debounced watcher / event rows if 30s latency or tool detail matters.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use chrono::{DateTime, Utc};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DbBackend, EntityTrait, QueryFilter, Set, Statement, TransactionTrait,
+};
 use serde_json::Value;
 
 use crate::database::DatabaseManager;
@@ -165,10 +167,21 @@ async fn sync_from(db: &DatabaseManager, root: &Path) -> Result<Vec<String>, Str
         .into_iter()
         .filter_map(|r| r.backend_session_id.map(|b| (b, (r.id, r.ended_at, r.status))))
         .collect();
+    // Sessions the user deleted (#2019) and ids a forking `--resume` moved on from (#1976).
+    let deleted: HashSet<String> = conn
+        .query_all(Statement::from_string(DbBackend::Sqlite, "SELECT session_id FROM agent_session_tombstones"))
+        .await
+        .map_err(|e| format!("agents: load tombstones failed: {e}"))?
+        .iter()
+        .filter_map(|r| r.try_get_by_index(0).ok())
+        .collect();
 
     let mut imported = Vec::new();
     for (sid, path, mtime) in files {
         let mtime: DateTime<Utc> = mtime.into();
+        if deleted.contains(&sid) {
+            continue;
+        }
         match known.get(&sid) {
             // Portal-launched run: its own persistence is authoritative.
             Some((id, ..)) if *id != sid => continue,
@@ -320,6 +333,50 @@ mod tests {
         assert!(!store(&db, "sid1", "cwd", &p, Utc::now(), true).await.unwrap());
         assert_eq!(agent_message::Entity::find().all(db.get_connection()).await.unwrap().len(), 2);
         assert_eq!(agent_session::Entity::find().one(db.get_connection()).await.unwrap().unwrap().status, "running");
+    }
+
+    /// Forked resumes (#1976) and deleted sessions (#2019) are not imported.
+    #[tokio::test]
+    async fn sweep_skips_forked_and_deleted() {
+        let data = tempfile::tempdir().unwrap();
+        let db = DatabaseManager::new(data.path().to_path_buf()).await.unwrap();
+        let conn = db.get_connection();
+        let root = tempfile::tempdir().unwrap();
+        let proj = root.path().join("p");
+        std::fs::create_dir(&proj).unwrap();
+        let line = r#"{"type":"user","cwd":"D:\\p","timestamp":"2026-11-11T00:00:00Z","message":{"content":"hi"}}"#;
+        let write = |sid: &str| std::fs::write(proj.join(format!("{sid}.jsonl")), line).unwrap();
+        let sweep = || async { sync_from(&db, root.path()).await.unwrap() };
+
+        write("live");
+        assert_eq!(sweep().await, ["live"]);
+
+        // Forked resume: the row id names the old file, the backend id moved on.
+        agent_session::Entity::insert(agent_session::ActiveModel {
+            id: Set("old".into()),
+            backend_id: Set(BACKEND_ID.into()),
+            model: Set(None),
+            cwd: Set("c".into()),
+            status: Set("exited".into()),
+            started_at: Set("2026-11-11T00:00:00Z".into()),
+            ended_at: Set(Some("2026-11-11T00:00:00Z".into())),
+            exit_code: Set(None),
+            title: Set(None),
+            task_id: Set(None),
+            backend_session_id: Set(Some("new".into())),
+        })
+        .exec(conn)
+        .await
+        .unwrap();
+        conn.execute_unprepared("INSERT INTO agent_session_tombstones VALUES ('old', 'now')").await.unwrap(); // what persist_backend_session_id does
+        write("old");
+        assert!(sweep().await.is_empty());
+
+        // Deleted: tombstoned, so the jsonl that is still on disk stays gone.
+        conn.execute_unprepared("INSERT INTO agent_session_tombstones VALUES ('live', 'now')").await.unwrap();
+        agent_session::Entity::delete_by_id("live").exec(conn).await.unwrap();
+        assert!(sweep().await.is_empty());
+        assert_eq!(agent_session::Entity::find().all(conn).await.unwrap().len(), 1);
     }
 
     #[test]
