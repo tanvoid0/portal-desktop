@@ -12,6 +12,7 @@
     - "display": read-only xterm buffer (no PTY).
 -->
 <script lang="ts">
+  import { generateId } from '$lib/domains/shared/utils';
   import { onMount, onDestroy } from 'svelte';
   import '@xterm/xterm/css/xterm.css';
   import type { ITheme } from '@xterm/xterm';
@@ -63,7 +64,7 @@
     onExit,
   }: Props = $props();
 
-  const resolvedTabId = tabId ?? crypto.randomUUID();
+  const resolvedTabId = tabId ?? generateId();
 
   let containerEl = $state<HTMLDivElement | null>(null);
   let session = $state<XtermSession | null>(null);

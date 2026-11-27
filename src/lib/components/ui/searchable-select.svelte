@@ -57,28 +57,31 @@
 <div class={cn('relative', className)}>
   <Popover.Root bind:open>
     <Popover.Trigger>
-      <Button
-        variant="outline"
-        role="combobox"
-        aria-expanded={open}
-        {disabled}
-        size="sm"
-        class={cn(
-          'w-full justify-between',
-          !selectedOption && 'text-muted-foreground',
-          open && 'ring-2 ring-ring ring-offset-2'
-        )}
-      >
-        <span class="truncate text-left">
-          {selectedOption?.label ?? placeholder}
-        </span>
-        <ChevronsUpDown
+      {#snippet child({ props })}
+        <Button
+          {...props}
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          {disabled}
+          size="sm"
           class={cn(
-            'ml-2 h-4 w-4 shrink-0 opacity-50 transition-transform duration-200',
-            open && 'rotate-180'
+            'w-full justify-between',
+            !selectedOption && 'text-muted-foreground',
+            open && 'ring-2 ring-ring ring-offset-2'
           )}
-        />
-      </Button>
+        >
+          <span class="truncate text-left">
+            {selectedOption?.label ?? placeholder}
+          </span>
+          <ChevronsUpDown
+            class={cn(
+              'ml-2 h-4 w-4 shrink-0 opacity-50 transition-transform duration-200',
+              open && 'rotate-180'
+            )}
+          />
+        </Button>
+      {/snippet}
     </Popover.Trigger>
     <Popover.Content
       class="w-56 max-w-[calc(100vw-2rem)] p-0 shadow-md sm:w-64 md:w-72"

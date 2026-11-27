@@ -1,3 +1,4 @@
+import { generateId } from '$lib/domains/shared/utils';
 /**
  * Block Resolver — single source of truth for turning block references
  * into executable commands with merged parameters and variables.
@@ -131,7 +132,7 @@ export function createStepFromBlock(
   };
 
   return {
-    id: overrides?.id ?? crypto.randomUUID(),
+    id: overrides?.id ?? generateId(),
     blockId: block.id,
     name: overrides?.name ?? block.name,
     config,
@@ -236,7 +237,7 @@ export function buildExecutionPlan(
     }
 
     steps.push({
-      id: input.id ?? crypto.randomUUID(),
+      id: input.id ?? generateId(),
       blockId: input.blockId,
       name: input.name ?? block.name,
       command,

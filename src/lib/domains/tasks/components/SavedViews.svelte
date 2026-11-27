@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { generateId } from '$lib/domains/shared/utils';
   import FaStar from '~icons/fa6-solid/star';
   import FaPlus from '~icons/fa6-solid/plus';
   import FaList from '~icons/fa6-solid/list';
@@ -46,7 +47,7 @@
     // This would save the current filter state
     // For now, we'll use a placeholder
     const newView: SavedView = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       name: newViewName.trim(),
       description: newViewDescription.trim() || undefined,
       filters: {}, // Current filters would be passed here

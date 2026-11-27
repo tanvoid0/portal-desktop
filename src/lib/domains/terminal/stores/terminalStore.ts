@@ -1,3 +1,4 @@
+import { generateId } from '$lib/domains/shared/utils';
 /**
  * Terminal Store
  * Unified state management for terminal tabs and processes
@@ -202,7 +203,7 @@ export const terminalActions = {
   createTab: (tab: Omit<TerminalTab, 'id' | 'createdAt' | 'status'>) => {
     console.log('TerminalStore: Creating new tab:', tab);
     const newTab: TerminalTab = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       status: 'inactive',
       createdAt: new Date(),
       ...tab,
@@ -297,7 +298,7 @@ export const terminalActions = {
   // Process management
   createProcess: (process: Omit<TerminalProcess, 'id' | 'startTime'>) => {
     const newProcess: TerminalProcess = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       startTime: new Date(),
       ...process,
     };

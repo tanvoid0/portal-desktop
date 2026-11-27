@@ -1,3 +1,4 @@
+import { generateId } from '$lib/domains/shared/utils';
 /**
  * Per-thread terminal tabs for Coder sessions.
  * Lightweight — no full TerminalWorkspace chrome; backs the session dock.
@@ -103,7 +104,7 @@ class CoderTerminalStoreState {
   ): CoderTerminalTab {
     this.ensureLoaded(threadId);
     const tabs = this.tabsByThread[threadId] ?? [];
-    const id = opts.id ?? crypto.randomUUID().slice(0, 8);
+    const id = opts.id ?? generateId().slice(0, 8);
     const n = tabs.length + 1;
     const tab: CoderTerminalTab = {
       id,

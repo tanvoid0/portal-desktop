@@ -1,7 +1,6 @@
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { notify, initNotify } from '$lib/utils/notify';
 import { permissionFact, pipelineFacts } from '$lib/domains/notifications/utils/facts';
-import { agentsApi } from '$lib/domains/agents/api/agentsApi';
 import { agentRuns } from '$lib/domains/agents/state/agentRuns.svelte.js';
 import { toastActions } from '$lib/domains/shared/stores/toastStore';
 import { threadApi } from '$lib/domains/threads/api/threadApi';
@@ -51,31 +50,6 @@ export function startAppNotifications(): () => void {
   // event (#641).
   initNotify().then(keep);
   void agentRuns.ensureInit();
-  agentsApi
-    .onEvent(({ run_id, event }) => {
-      const route = `${agentTabPath()}?session=${run_id}`;
-      const about = { route, source: 'agent' as const, runId: run_id };
-      if (event.type === 'turn_done' && !event.is_error) {
-        // Errored turns are reported by the `exited` branch below instead —
-        // skip here so the user doesn't see "finished" then "failed".
-        notify({
-          ...about,
-          title: 'Agent finished',
-          body: event.final_text?.slice(0, 120),
-          type: 'success',
-        });
-      } else if (event.type === 'exited' && event.code) {
-        notify({
-          ...about,
-          title: 'Agent run failed',
-          body: `Exited with code ${event.code}`,
-          type: 'error',
-          facts: [{ kind: 'exit', value: String(event.code) }],
-        });
-      }
-    })
-    .then(keep);
-
   // One alert per approval, for the Portal coder and every CLI agent alike: the thread log's
   // `approval_requested` is the single source (the legacy `agents://event` one is not used).
   // Keyed per thread (call ids restart per thread); a re-request of the same call is not a new
@@ -90,9 +64,32 @@ export function startAppNotifications(): () => void {
   threadApi
     .onEvent((f) => {
       const e = f.event;
+      const portal = f.provider === 'portal';
+      const route = portal
+        ? `${PORTAL_ENGINE_TAB.url}?id=${f.thread_id}`
+        : `${agentTabPath(f.provider)}?session=${f.thread_id}`;
       if (e.type === 'turn_ended' || e.type === 'process_exited') {
         for (const key of [...openApprovals.keys()])
           if (key.startsWith(`${f.thread_id}:`)) close(key);
+        if (portal) return;
+        const about = { route, source: 'agent' as const, runId: f.thread_id };
+        // Errored turns are reported by `process_exited` instead — skip here so the user
+        // doesn't see "finished" then "failed".
+        if (e.type === 'turn_ended' && e.outcome === 'completed')
+          notify({
+            ...about,
+            title: 'Agent finished',
+            body: e.final_text?.slice(0, 120),
+            type: 'success',
+          });
+        else if (e.type === 'process_exited' && e.code)
+          notify({
+            ...about,
+            title: 'Agent run failed',
+            body: `Exited with code ${e.code}`,
+            type: 'error',
+            facts: [{ kind: 'exit', value: String(e.code) }],
+          });
         return;
       }
       if (e.type !== 'approval_requested' && e.type !== 'approval_resolved') return;
@@ -104,10 +101,6 @@ export function startAppNotifications(): () => void {
       }
       if (openApprovals.has(key)) return;
       const a = e.approval;
-      const portal = f.provider === 'portal';
-      const route = portal
-        ? `${PORTAL_ENGINE_TAB.url}?id=${f.thread_id}`
-        : `${agentTabPath(f.provider)}?session=${f.thread_id}`;
       const toastId = notify({
         route,
         source: 'agent',

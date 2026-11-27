@@ -1,3 +1,4 @@
+import { generateId } from '$lib/domains/shared/utils';
 /**
  * Unified Actions run API — single / list / workflow across local, GitHub, n8n.
  */
@@ -380,7 +381,7 @@ class ActionsService {
       ...options,
       target: workflow.id,
       run: {
-        workflowRunId: crypto.randomUUID(),
+        workflowRunId: generateId(),
         workflowId: workflow.id,
         workflowPlan: buildWorkflowPlan(workflow, actionIds, catalog),
       },

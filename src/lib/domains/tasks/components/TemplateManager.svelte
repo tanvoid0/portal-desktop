@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { generateId } from '$lib/domains/shared/utils';
   import FaPlus from '~icons/fa6-solid/plus';
   import FaXmark from '~icons/fa6-solid/xmark';
   import FaTableCellsLarge from '~icons/fa6-solid/table-cells-large';
@@ -74,7 +75,7 @@
     if (!templateName.trim()) return;
 
     const newTemplate: TaskTemplate = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       name: templateName.trim(),
       description: templateDescription.trim() || undefined,
       defaultStatus: templateStatus,

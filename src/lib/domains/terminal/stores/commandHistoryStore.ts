@@ -1,3 +1,4 @@
+import { generateId } from '$lib/domains/shared/utils';
 /**
  * Command History Store
  * Manages command history with input/output tracking
@@ -42,7 +43,7 @@ function createCommandHistoryStore() {
       update((state) => {
         const newEntry: CommandHistoryEntry = {
           ...entry,
-          id: crypto.randomUUID(),
+          id: generateId(),
           tabId,
           timestamp: new Date(),
           output: cleanTerminalOutput(entry.output), // Clean the output before storing

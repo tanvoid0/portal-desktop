@@ -1,3 +1,4 @@
+import { generateId } from '$lib/domains/shared/utils';
 /**
  * Unified command block store — OSC 133 events, readonly captures, AI blocks.
  */
@@ -296,7 +297,7 @@ function createCommandBlockStore() {
         timestamp?: string;
       }
     ): string {
-      const id = block.id ?? crypto.randomUUID();
+      const id = block.id ?? generateId();
       upsertBlock(tabId, {
         id,
         tabId,

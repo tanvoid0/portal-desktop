@@ -2,6 +2,7 @@
 	Quick Run — pick a folder, queue blocks, run automation
 -->
 <script lang="ts">
+  import { generateId } from '$lib/domains/shared/utils';
   import { onMount } from 'svelte';
   import { Button } from '$lib/components/ui/button';
   import Play from '~icons/fa6-solid/play';
@@ -79,7 +80,7 @@
       const blockId = typeof ref === 'string' ? ref : ref.blockId;
       const block = blocks.find((b) => b.id === blockId);
       return {
-        id: crypto.randomUUID(),
+        id: generateId(),
         blockId,
         name: block?.name ?? blockId,
       };
@@ -90,7 +91,7 @@
 
   function addBlock(block: Block) {
     if (queuedBlockIds.has(block.id)) return;
-    queued = [...queued, { id: crypto.randomUUID(), blockId: block.id, name: block.name }];
+    queued = [...queued, { id: generateId(), blockId: block.id, name: block.name }];
     previewSteps = [];
     runResult = null;
   }

@@ -83,8 +83,7 @@
     onValueChange?.(newValue);
   }
 
-  function handleRemove(optionValue: string, event: MouseEvent) {
-    event.stopPropagation();
+  function handleRemove(optionValue: string) {
     const newValue = value.filter((v) => v !== optionValue);
     value = newValue;
     onValueChange?.(newValue);
@@ -99,53 +98,31 @@
 <div class={cn('relative', className)}>
   <Popover.Root bind:open>
     <Popover.Trigger>
-      <Button
-        variant="outline"
-        role="combobox"
-        aria-expanded={open}
-        {disabled}
-        size="sm"
-        class={cn(
-          'w-full justify-between',
-          selectedOptions.length === 0 && 'text-muted-foreground',
-          open && 'ring-2 ring-ring ring-offset-2'
-        )}
-      >
-        <div class="flex flex-1 flex-wrap items-center gap-1">
-          {#if selectedOptions.length === 0}
-            <span class="text-muted-foreground">{placeholder}</span>
-          {:else}
-            {#each selectedOptions.slice(0, maxDisplay) as option}
-              <span
-                class="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs text-primary"
-              >
-                {option.label}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onclick={(e) => handleRemove(option.value, e)}
-                  class="h-4 w-4 rounded-full p-0 hover:bg-primary/20"
-                  tabindex={-1}
-                >
-                  <X class="h-3 w-3" />
-                </Button>
-              </span>
-            {/each}
-            {#if selectedOptions.length > maxDisplay}
-              <span class="text-xs text-muted-foreground">
-                and {selectedOptions.length - maxDisplay} more
-              </span>
-            {/if}
-          {/if}
-        </div>
-        <ChevronsUpDown
+      {#snippet child({ props })}
+        <Button
+          {...props}
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          {disabled}
+          size="sm"
           class={cn(
-            'ml-2 h-4 w-4 shrink-0 opacity-50 transition-transform duration-200',
-            open && 'rotate-180'
+            'w-full justify-between',
+            selectedOptions.length === 0 && 'text-muted-foreground',
+            open && 'ring-2 ring-ring ring-offset-2'
           )}
-        />
-      </Button>
+        >
+          <span class="truncate text-left">
+            {selectedOptions.length === 0 ? placeholder : `${selectedOptions.length} selected`}
+          </span>
+          <ChevronsUpDown
+            class={cn(
+              'ml-2 h-4 w-4 shrink-0 opacity-50 transition-transform duration-200',
+              open && 'rotate-180'
+            )}
+          />
+        </Button>
+      {/snippet}
     </Popover.Trigger>
     <Popover.Content
       class="w-56 max-w-[calc(100vw-2rem)] p-0 shadow-md sm:w-64 md:w-72"
@@ -197,4 +174,30 @@
       </Command.Root>
     </Popover.Content>
   </Popover.Root>
+  {#if selectedOptions.length > 0}
+    <div class="mt-1 flex flex-wrap items-center gap-1">
+      {#each selectedOptions.slice(0, maxDisplay) as option}
+        <span
+          class="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs text-primary"
+        >
+          {option.label}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Remove {option.label}"
+            onclick={() => handleRemove(option.value)}
+            class="h-4 w-4 rounded-full p-0 hover:bg-primary/20"
+          >
+            <X class="h-3 w-3" />
+          </Button>
+        </span>
+      {/each}
+      {#if selectedOptions.length > maxDisplay}
+        <span class="text-xs text-muted-foreground">
+          and {selectedOptions.length - maxDisplay} more
+        </span>
+      {/if}
+    </div>
+  {/if}
 </div>

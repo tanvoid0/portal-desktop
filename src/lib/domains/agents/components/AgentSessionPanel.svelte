@@ -300,6 +300,9 @@
               onDecision={(approve) => agentRuns.decide(sessionId ?? '', approval.call_id, approve)}
             />
           {/each}
+          {#if thread?.stopping}
+            <p class="text-xs text-muted-foreground">Stopping…</p>
+          {/if}
         </PageContainer>
       </ScrollArea>
     {/if}
