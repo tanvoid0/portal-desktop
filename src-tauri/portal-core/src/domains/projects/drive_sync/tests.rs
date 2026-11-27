@@ -101,6 +101,17 @@ impl Fx {
     }
 }
 
+/// #2177: a real file called `nul` used to fail with "Incorrect function".
+#[cfg(windows)]
+#[test]
+fn a_file_with_a_device_name_is_copied() {
+    let f = Fx::plain();
+    fs::write(verbatim(&f.local.join("nul")), "data").unwrap();
+    f.push();
+    assert_eq!(fs::read_to_string(join(&f.replica(), "nul")).unwrap(), "data");
+    assert_eq!(f.state().state, S::InSync);
+}
+
 #[test]
 fn mirror_then_local_commit_round_trip() {
     let f = Fx::git();

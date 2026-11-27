@@ -200,9 +200,32 @@ fn cap(mut v: Vec<String>) -> Vec<String> {
 /// `root.join("")` would append a separator.
 fn join(root: &Path, rel: &str) -> PathBuf {
     if rel.is_empty() {
-        root.to_path_buf()
+        return root.to_path_buf();
+    }
+    let path = root.join(rel);
+    if cfg!(windows) && rel.split('/').any(is_device_name) {
+        return verbatim(&path);
+    }
+    path
+}
+
+/// `nul`, `con.txt`, `com1`...: Windows opens a plain path to one as a device,
+/// so a file really named that (git and Unix tools make them) cannot be read.
+fn is_device_name(name: &str) -> bool {
+    let stem = name.split('.').next().unwrap_or("").trim_end().to_ascii_uppercase();
+    matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || matches!(stem.as_bytes(), [b'C', b'O', b'M', n] | [b'L', b'P', b'T', n] if (b'1'..=b'9').contains(n))
+}
+
+/// The `\\?\` form of an absolute path, which Windows takes literally.
+fn verbatim(path: &Path) -> PathBuf {
+    let s = path.to_string_lossy().replace('/', r"\");
+    if s.starts_with(r"\\?\") {
+        PathBuf::from(s)
+    } else if let Some(share) = s.strip_prefix(r"\\") {
+        PathBuf::from(format!(r"\\?\UNC\{share}"))
     } else {
-        root.join(rel)
+        PathBuf::from(format!(r"\\?\{s}"))
     }
 }
 
