@@ -111,12 +111,10 @@ pub async fn coder_send(
     message: String,
     command_id: Option<String>,
 ) -> Result<(), String> {
-    // The legacy UI neither shows nor drains the hub's queue, so a Send that would be
-    // queued (turn open: parked on an approval, or still stopping) is refused instead.
+    // The legacy UI neither shows nor drains the hub's queue: a new message supersedes a
+    // parked or stopping turn instead of queueing behind it.
     // ponytail: S4a (#1933) switches to a plain Send with a visible queue.
-    if let Some(busy) = service.busy_reason(&thread_id).await {
-        return Err(busy.into());
-    }
+    service.supersede_for_send(&thread_id, &caller.actor()).await?;
     let cmd = ThreadCommand::Send { text: message };
     accepted(service.hub_command(&thread_id, cmd, caller.actor(), command_id).await?)
 }
@@ -164,7 +162,7 @@ pub async fn coder_approve(
         edited_command: None,
     };
     let ack = service.hub_command(&thread_id, cmd, caller.actor(), command_id).await?;
-    if ack.code.as_deref() == Some("not_found") {
+    if ack.code.as_deref() == Some("not_found") && service.is_legacy_approval(&thread_id, &call_id).await {
         // An approval from before the hub existed: the old direct path.
         return service
             .resume_approve(&thread_id, call_id, approve, remember, edited_pattern, None)

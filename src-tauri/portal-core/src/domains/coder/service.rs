@@ -574,6 +574,10 @@ impl CoderService {
 
     /// A client command through the hub: dedup, first-wins and the queue live there;
     /// what it decides comes back as an `Effect` (see the `ThreadEffects` impl).
+    ///
+    /// Retry, Edit and Approve return the effect's prepare error, but the hub has already
+    /// accepted the command and recorded its `command_id`: a client that retries a failed
+    /// one must use a fresh id, or it gets `Duplicate` (a success) and nothing runs.
     pub async fn hub_command(
         &self,
         thread_id: &str,
@@ -581,8 +585,20 @@ impl CoderService {
         actor: String,
         command_id: Option<String>,
     ) -> Result<CommandAck, String> {
-        let hub = self.hub_for(thread_id).await.ok_or("thread not found")?;
         let remote = crate::domains::credentials::services::REMOTE_CALLER.try_with(|_| ()).is_ok();
+        self.hub_command_as(thread_id, cmd, actor, command_id, remote).await
+    }
+
+    /// `hub_command` for a caller whose remote mark is no longer a task-local (a spawned task).
+    async fn hub_command_as(
+        &self,
+        thread_id: &str,
+        cmd: ThreadCommand,
+        actor: String,
+        command_id: Option<String>,
+        remote: bool,
+    ) -> Result<CommandAck, String> {
+        let hub = self.hub_for(thread_id).await.ok_or("thread not found")?;
         {
             let mut set = self.remote_threads.lock().unwrap_or_else(|e| e.into_inner());
             if remote {
@@ -611,19 +627,43 @@ impl CoderService {
         }
     }
 
-    /// Why a `Send` would not start a turn right now (the hub would queue it, which the
-    /// legacy UI cannot see). `None` when the thread is idle or the hub is not attached.
-    // ponytail: S4a (#1933) switches the UI to plain Send with a visible queue; until then
-    // the legacy window gets an error it already knows how to show.
-    pub async fn busy_reason(&self, thread_id: &str) -> Option<&'static str> {
+    /// The hub's state of a thread; `None` while no hub is attached or the thread is unknown.
+    async fn hub_state(&self, thread_id: &str) -> Option<crate::domains::threads::ThreadState> {
         let hub = self.hub_for(thread_id).await?;
-        let state = hub.snapshot(thread_id).await.ok()??.state;
-        match (state.turn_open(), state.stopping, state.approvals.is_empty()) {
-            (false, ..) => None,
-            (_, true, _) => Some("busy: still stopping, try again in a moment"),
-            (_, _, false) => Some("busy: answer the pending approval first"),
-            _ => Some("busy: a turn is already running"),
+        Some(hub.snapshot(thread_id).await.ok()??.state)
+    }
+
+    /// Make room for a `Send`. The hub would queue it behind an open turn, which the
+    /// legacy UI cannot see, so a new message supersedes instead, as it did before the hub:
+    /// a turn parked on an approval is stopped, a stopping one is waited out. A turn that is
+    /// running (the legacy UI queues locally then) or does not close in time is `busy:`.
+    // ponytail: polls the snapshot every 100 ms for 15 s; S4a (#1933) switches the UI to a
+    // plain Send with a visible queue and this goes away.
+    pub async fn supersede_for_send(&self, thread_id: &str, actor: &str) -> Result<(), String> {
+        let Some(state) = self.hub_state(thread_id).await else { return Ok(()) };
+        if !state.turn_open() {
+            return Ok(());
         }
+        if !state.stopping {
+            if state.status != crate::domains::threads::ThreadStatus::Waiting {
+                return Err("busy: a turn is already running".into());
+            }
+            self.hub_command(thread_id, ThreadCommand::Stop, actor.into(), None).await?;
+        }
+        for _ in 0..150 {
+            if !self.hub_state(thread_id).await.is_some_and(|s| s.turn_open()) {
+                return Ok(());
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        Err("busy: still stopping, try again in a moment".into())
+    }
+
+    /// An approval only the legacy transcript knows (parked before the hub existed):
+    /// nothing open in the hub, and the call is still there to answer.
+    pub async fn is_legacy_approval(&self, thread_id: &str, call_id: &str) -> bool {
+        let idle = !self.hub_state(thread_id).await.is_some_and(|s| s.turn_open());
+        idle && self.find_open_call(thread_id, call_id).await.is_some()
     }
 
     fn prepared(&self, thread_id: &str, res: &Result<(), String>) {
@@ -1307,14 +1347,21 @@ impl CoderService {
     }
 
     pub async fn delete_thread(&self, id: &str) -> bool {
-        // `hub.delete` is only safe with no live run.
-        self.stop(id).await;
+        // Unknown first, so a late feed finds no thread to re-create in the hub.
         let removed = self.threads.lock().await.remove(id).is_some();
+        self.hub_ready.lock().await.remove(id);
         if removed {
             let _ = coder_thread::Entity::delete_by_id(id.to_string())
                 .exec(self.db.get_connection())
                 .await;
-            self.hub_ready.lock().await.remove(id);
+            // `hub.delete` is only safe with no live run: stop it and wait (bounded) for it to leave.
+            self.stop(id).await;
+            for _ in 0..50 {
+                if !self.active_runs.lock().await.contains_key(id) {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
             if let Some(hub) = self.hub.get() {
                 let _ = hub.delete(id).await;
             }
@@ -1551,6 +1598,7 @@ impl CoderService {
             );
 
             let svc = Arc::clone(self);
+            let remote = crate::domains::credentials::services::REMOTE_CALLER.try_with(|_| ()).is_ok();
             let prompt = fallback_prompt_for_task(&task);
             let child_thread_id = child_thread.id.clone();
             let sub_agent_id = sub_agent.id.clone();
@@ -1577,7 +1625,7 @@ impl CoderService {
                     .await;
                 // Through the hub, so the child's user message and turn are in the log.
                 let sent = svc
-                    .hub_command(&child_thread_id, ThreadCommand::Send { text: prompt }, "system".into(), None)
+                    .hub_command_as(&child_thread_id, ThreadCommand::Send { text: prompt }, "system".into(), None, remote)
                     .await
                     .and_then(|ack| match ack.status {
                         AckStatus::Rejected => Err(ack.code.unwrap_or_else(|| "rejected".into())),
@@ -3236,6 +3284,58 @@ mod hub_tests {
         let legacy: Vec<ChatMessage> = serde_json::from_str(&row.messages_json).unwrap();
         assert_eq!(bare(state.messages), bare(legacy));
         assert_eq!(state.status, ThreadStatus::Idle);
+    }
+
+    /// Forwards Cancel to the service (as the app's registration does) and records the rest.
+    struct CancelOnly(Arc<CoderService>, std::sync::Mutex<Vec<Effect>>);
+    #[async_trait::async_trait]
+    impl ThreadEffects for CancelOnly {
+        async fn run(&self, thread_id: &str, effect: Effect) {
+            match effect {
+                Effect::Cancel => self.0.run(thread_id, Effect::Cancel).await,
+                other => self.1.lock().unwrap().push(other),
+            }
+        }
+    }
+
+    /// The legacy UI cannot see the hub's queue, so a Send onto a turn parked on an approval
+    /// stops that turn (approvals cleared) and starts the new one.
+    #[tokio::test]
+    async fn send_while_waiting_supersedes_the_parked_turn() {
+        let (svc, hub, _db, id, _dir) = setup().await;
+        let fx = Arc::new(CancelOnly(svc.clone(), Default::default()));
+        hub.register_portal_effects(fx.clone());
+        send(&svc, &id, "first").await;
+        let pending = PendingApproval {
+            call_id: "c1".into(),
+            tool: "run_command".into(),
+            arguments: json!({}),
+            suggested_rule: String::new(),
+            summary: "ls".into(),
+        };
+        svc.feed(&id, PortalInput::Pending(pending)).await;
+
+        svc.supersede_for_send(&id, "local").await.unwrap();
+        send(&svc, &id, "second").await;
+
+        let s = hub.snapshot(&id).await.unwrap().unwrap();
+        assert!(s.state.approvals.is_empty() && s.state.queue.is_empty());
+        assert_eq!(s.state.status, ThreadStatus::Running);
+        assert_eq!(s.messages.last().and_then(|m| m.content.as_deref()), Some("second"));
+        let started: Vec<_> = fx.1.lock().unwrap().iter().filter_map(|e| match e {
+            Effect::StartTurn { text, .. } => Some(text.clone()),
+            _ => None,
+        }).collect();
+        assert_eq!(started, ["first", "second"]);
+    }
+
+    /// A running turn is not ours to supersede: `busy`.
+    #[tokio::test]
+    async fn send_while_running_is_busy() {
+        let (svc, _hub, _db, id, _dir) = setup().await;
+        send(&svc, &id, "first").await;
+        let err = svc.supersede_for_send(&id, "local").await.unwrap_err();
+        assert!(err.starts_with("busy"), "{err}");
     }
 
     /// A run that returns on a pending approval leaves the turn Waiting, and Stop with no
