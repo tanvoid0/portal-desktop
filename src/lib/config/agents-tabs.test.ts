@@ -44,17 +44,20 @@ describe('engineTabsFor', () => {
 
   it('Overview needs a backend and agents.history', () => {
     expect(engineTabsFor([], null).map((t) => t.id)).toEqual(['portal']);
-    expect(engineTabsFor(backends, ['agents']).map((t) => t.id)).not.toContain('overview');
-    expect(engineTabsFor(backends, ['agents', 'agents.history']).map((t) => t.id)).toEqual([
-      'claude-code',
-      'codex',
-      'overview',
-    ]);
+    expect(engineTabsFor(backends, ['coder', 'agents']).map((t) => t.id)).not.toContain('overview');
+    expect(engineTabsFor(backends, ['coder', 'agents', 'agents.history']).map((t) => t.id)).toEqual(
+      ['portal', 'claude-code', 'codex', 'overview']
+    );
   });
 
-  it('mobile gates Portal on coder and backends on agents', () => {
+  it('mobile gates Portal on coder and backends on agents plus coder (thread reads)', () => {
     expect(engineTabsFor(backends, ['coder']).map((t) => t.id)).toEqual(['portal']);
-    expect(engineTabsFor(backends, ['agents']).map((t) => t.id)).toEqual(['claude-code', 'codex']);
+    expect(engineTabsFor(backends, ['agents'])).toEqual([]);
+    expect(engineTabsFor(backends, ['coder', 'agents']).map((t) => t.id)).toEqual([
+      'portal',
+      'claude-code',
+      'codex',
+    ]);
     expect(engineTabsFor(backends, [])).toEqual([]);
   });
 });

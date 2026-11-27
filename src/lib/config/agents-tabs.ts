@@ -29,7 +29,7 @@ export const OVERVIEW_ENGINE_TAB: EngineTab = {
 
 /**
  * Engine tabs for the Code workspace. `caps` null = desktop (everything);
- * otherwise the mobile shell: Portal needs cap `coder`, backend tabs need `agents`,
+ * otherwise the mobile shell: Portal needs cap `coder`, backend tabs need `agents` and `coder` (their transcript is a thread read),
  * Overview needs a backend plus `agents.history` (its session list is gated on it).
  */
 export function engineTabsFor(
@@ -38,7 +38,7 @@ export function engineTabsFor(
 ): EngineTab[] {
   const tabs: EngineTab[] = [];
   if (!caps || caps.includes('coder')) tabs.push(PORTAL_ENGINE_TAB);
-  if (!caps || caps.includes('agents')) {
+  if (!caps || (caps.includes('agents') && caps.includes('coder'))) {
     for (const b of backends)
       tabs.push({ id: b.id, label: b.display_name, url: agentTabPath(b.id) });
     if (backends.length && (!caps || caps.includes('agents.history')))

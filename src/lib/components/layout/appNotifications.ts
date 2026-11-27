@@ -1,5 +1,5 @@
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { notify, initNotify } from '$lib/utils/notify';
+import { notify, initNotify, dismissNotification } from '$lib/utils/notify';
 import { permissionFact, pipelineFacts } from '$lib/domains/notifications/utils/facts';
 import { agentsApi } from '$lib/domains/agents/api/agentsApi';
 import { agentRuns } from '$lib/domains/agents/state/agentRuns.svelte.js';
@@ -77,19 +77,30 @@ export function startAppNotifications(): () => void {
 
   // One alert per approval, for the Portal coder and every CLI agent alike: the thread log's
   // `approval_requested` is the single source (the legacy `agents://event` one is not used).
-  // A re-request of the same call_id (upsert) is not a new ask.
-  const notifiedApprovals = new Set<string>();
+  // Keyed per thread (call ids restart per thread); a re-request of the same call is not a new
+  // ask, and the entry goes (with its toast) once the call is resolved. Value = the route.
+  const openApprovals = new Map<string, string>();
   threadApi
     .onEvent((f) => {
-      if (f.event.type !== 'approval_requested') return;
-      const a = f.event.approval;
-      if (notifiedApprovals.has(a.call_id)) return;
-      notifiedApprovals.add(a.call_id);
+      const e = f.event;
+      if (e.type !== 'approval_requested' && e.type !== 'approval_resolved') return;
+      const callId = e.type === 'approval_requested' ? e.approval.call_id : e.call_id;
+      const key = `${f.thread_id}:${callId}`;
+      if (e.type === 'approval_resolved') {
+        const route = openApprovals.get(key);
+        if (route) dismissNotification(route);
+        openApprovals.delete(key);
+        return;
+      }
+      if (openApprovals.has(key)) return;
+      const a = e.approval;
       const portal = f.provider === 'portal';
+      const route = portal
+        ? `${PORTAL_ENGINE_TAB.url}?id=${f.thread_id}`
+        : `${agentTabPath(f.provider)}?session=${f.thread_id}`;
+      openApprovals.set(key, route);
       notify({
-        route: portal
-          ? `${PORTAL_ENGINE_TAB.url}?id=${f.thread_id}`
-          : `${agentTabPath(f.provider)}?session=${f.thread_id}`,
+        route,
         source: 'agent',
         runId: f.thread_id,
         title: portal ? 'Portal needs your approval' : 'Agent needs your approval',

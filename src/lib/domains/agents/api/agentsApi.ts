@@ -1,4 +1,5 @@
 import { invokeClient } from '$lib/utils/invokeClient';
+import { generateId } from '$lib/domains/shared/utils';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type {
   AgentEvent,
@@ -11,7 +12,7 @@ import type {
 } from '../generated';
 
 /** A fresh id per call: the hub dedups on it, so a user's retry after an error is a new call. */
-const commandId = () => crypto.randomUUID();
+const commandId = generateId;
 
 /** Thin wrapper over the `agents_*` Tauri commands — the backend trait, the
  * process spawn, and the permission-hook relay all live in Rust. */

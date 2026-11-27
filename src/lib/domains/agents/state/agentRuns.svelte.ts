@@ -79,7 +79,7 @@ class AgentRunsState {
    *  key means "not attached" — `append` drops events for those. */
   private logs = $state<Record<string, AgentEventSeq[]>>({});
   // ponytail: thread subscriptions are never released, like `logs`; unsubscribe on delete if it costs.
-  private subscribed = new Set<string>();
+  private subscribed = new Map<string, () => void>();
   /** Session ids with a live backend process right now. */
   runningIds = $state<Set<string>>(new Set());
   /** True once `listRunning` answered — before that `runningIds` is empty, not authoritative. */
@@ -103,13 +103,20 @@ class AgentRunsState {
     await this.initPromise;
   }
 
-  private async runInit(): Promise<void> {
+  /** A failed first answer is retried in the background (2s, 4s, 8s): until one lands
+   *  `runningKnown` is false and no session reads as ended. */
+  private async loadRunning(attempt = 0): Promise<void> {
     try {
       this.runningIds = new Set(await agentsApi.listRunning());
       this.runningKnown = true;
     } catch (e) {
       console.error('agents: listRunning failed', e);
+      if (attempt < 3) setTimeout(() => void this.loadRunning(attempt + 1), 2000 * 2 ** attempt);
     }
+  }
+
+  private async runInit(): Promise<void> {
+    await this.loadRunning();
 
     this.unlisten = await agentsApi.onEvent(({ run_id, seq, event }) => {
       this.append(run_id, { seq, event });
@@ -153,9 +160,11 @@ class AgentRunsState {
    *  live events arrive via the shared listener. A no-op if already tracked. */
   async attach(sessionId: string): Promise<AgentEventSeq[]> {
     await this.ensureInit();
-    if (!this.subscribed.has(sessionId)) {
-      this.subscribed.add(sessionId);
-      threadStore.subscribe(sessionId);
+    // A subscription whose `listen` failed (or whose thread is unknown) has no view: re-subscribe
+    // on the next attach rather than trust it forever.
+    if (!threadStore.view(sessionId)) {
+      this.subscribed.get(sessionId)?.();
+      this.subscribed.set(sessionId, threadStore.subscribe(sessionId));
     }
     const cached = this.logs[sessionId];
     if (cached) return cached;

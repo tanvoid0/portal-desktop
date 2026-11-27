@@ -38,9 +38,19 @@ export interface NotifyPayload extends NotificationContext {
   duration?: number;
 }
 
+/** Closes the toast `notify` left for this route, e.g. once the ask is answered elsewhere. */
+export function dismissNotification(route: string): void {
+  const id = toastByRoute.get(route);
+  if (id) toastActions.dismiss(id);
+  toastByRoute.delete(route);
+}
+
 export function notify(p: NotifyPayload): void {
   const focused = document.hasFocus();
-  if (focused && p.route === location.pathname) return;
+  // Routes may carry a query (`?session=`): the page counts as open on the full path+query,
+  // or on the bare path for a route that has none.
+  if (focused && (p.route === location.pathname + location.search || p.route === location.pathname))
+    return;
 
   // History first: the toast and the banner both expire, the inbox doesn't.
   const type = p.type ?? 'info';
