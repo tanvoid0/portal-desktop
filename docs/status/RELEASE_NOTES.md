@@ -1,5 +1,20 @@
 # Portal Desktop - Release Notes
 
+## Version 0.26.0
+
+### Highlights
+
+- Coder: threads are now stored by Portal and replay after restarts; follow-ups sent mid-run are queued and removable
+- Coder: sidebar star, reorder, right-click menu and chat history delete
+- Agents: panel, approvals and notifications follow thread events; mobile alerts on approvals and turn ends
+- Projects: dedicated Sync page with env sync and AI review of leftovers
+- Release: launcher with scope picker, release details page, one-click release from the project page
+- Pipelines: foreach fans a step out to one node per item
+- Notifications inbox, GPU usage and host stats, Disk Utility keeps its state
+- Fixes: multitask sub-agent lifecycle, transcript sync, opening folders
+
+---
+
 ## Version 0.25.0
 
 ### Highlights
