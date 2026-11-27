@@ -2290,22 +2290,33 @@ mod tests {
         .spawn(pipe);
         let (_cancel_tx, mut cancel_rx) = watch::channel(false);
         let drained = tokio::time::timeout(
-            READER_IDLE_GRACE * 3,
+            // Only has to be finite: without the idle give-up this never ends.
+            READER_IDLE_GRACE * 20,
             drain_log_readers(vec![reader], &lines_read, &mut cancel_rx),
         )
         .await;
         assert!(drained.is_ok(), "drain waited on a pipe that never closes");
-        assert_eq!(svc.get_step_logs("e", "a").await.unwrap(), ["one", "two"]);
+        expect_logs(&svc, &["one", "two"]).await;
         // Detached, not aborted: the read end is still open, so a background
         // child writing later gets no EPIPE, and its output is still logged.
         tokio::io::AsyncWriteExt::write_all(&mut held_open, b"late\n")
             .await
             .expect("reader was aborted: write end got a broken pipe");
-        tokio::time::sleep(LOG_FLUSH_EVERY * 2).await;
-        assert_eq!(
-            svc.get_step_logs("e", "a").await.unwrap(),
-            ["one", "two", "late"]
-        );
+        expect_logs(&svc, &["one", "two", "late"]).await;
+    }
+
+    /// Step "a"'s log reaches `want`. Waits rather than sleeping a fixed time:
+    /// the batched write has no deadline on a loaded machine.
+    async fn expect_logs(svc: &ExecutionService, want: &[&str]) {
+        let mut got = Vec::new();
+        for _ in 0..600 {
+            got = svc.get_step_logs("e", "a").await.unwrap();
+            if got == want {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        assert_eq!(got, want);
     }
 
     /// A service over a scratch database holding execution "e" with pending
