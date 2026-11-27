@@ -1,5 +1,17 @@
 # Portal Desktop - Release Notes
 
+## Version 0.25.0
+
+### Highlights
+
+- Coder: the agent can ask questions with a clickable card; tool rows have icons
+- Vault: configurable lock policy
+- Env: per-project Backup tab for env file vault backup
+- AI: agent-platform sidecar stays reachable, configurable port
+- Fixes: Sync all Resolve with AI, long project names, toasts hidden behind the sheet; model picker overlap
+
+---
+
 ## Version 0.24.0
 
 ### Highlights
