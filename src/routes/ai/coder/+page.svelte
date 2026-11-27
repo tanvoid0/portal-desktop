@@ -8,7 +8,6 @@
     if (to?.url.pathname !== AI_CODER_PATH) return;
     await coderSession.ensureInit();
     await coderSession.refreshThreads();
-    await coderSession.syncRunningThreads();
   });
 </script>
 

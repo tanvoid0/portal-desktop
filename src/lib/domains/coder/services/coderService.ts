@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import type { ContextUsage, LlmUsage } from '$lib/domains/ai/types/index.js';
+import type { ContextUsage } from '$lib/domains/ai/types/index.js';
 import type {
   ChatMessage,
   CoderDoneEvent,
@@ -20,8 +20,6 @@ import type {
   PermissionMode,
   PermissionRule,
   ThreadTitleEvent,
-  RunCommandEvent,
-  ListTerminalsEvent,
 } from '../types.js';
 
 /**
@@ -77,14 +75,18 @@ export class CoderService {
     return invoke<void>('coder_set_thread_kind', { threadId, threadKind });
   }
 
+  // Every write carries a fresh `command_id` (the hub dedups on it), so a user retry after
+  // an error is a new command. Writes still answer in the legacy shape: Ok, or the
+  // rejection code as the error string (`busy: ...`, `already_resolved`).
+
   /** Send a user message and start a background run. */
   send(threadId: string, message: string): Promise<void> {
-    return invoke<void>('coder_send', { threadId, message });
+    return invoke<void>('coder_send', { threadId, message, commandId: crypto.randomUUID() });
   }
 
   /** Resume a failed run from the current thread state. */
   retry(threadId: string): Promise<void> {
-    return invoke<void>('coder_retry', { threadId });
+    return invoke<void>('coder_retry', { threadId, commandId: crypto.randomUUID() });
   }
 
   /** Edit a user message and rerun the agent from that point. */
@@ -93,6 +95,7 @@ export class CoderService {
       threadId,
       messageIndex,
       content,
+      commandId: crypto.randomUUID(),
     });
   }
 
@@ -102,9 +105,7 @@ export class CoderService {
     callId: string,
     approve: boolean,
     remember = false,
-    editedPattern?: string,
-    rememberTool?: string,
-    rememberArgs?: Record<string, unknown>
+    editedPattern?: string
   ): Promise<void> {
     return invoke<void>('coder_approve', {
       threadId,
@@ -112,19 +113,13 @@ export class CoderService {
       approve,
       remember,
       editedPattern: editedPattern ?? null,
-      rememberTool: rememberTool ?? null,
-      rememberArgs: rememberArgs ?? null,
+      commandId: crypto.randomUUID(),
     });
   }
 
   /** Cancel an in-flight run for a thread. */
   stop(threadId: string): Promise<boolean> {
-    return invoke<boolean>('coder_stop', { threadId });
-  }
-
-  /** Thread ids with active agent loops. */
-  listRunning(): Promise<string[]> {
-    return invoke<string[]>('coder_list_running');
+    return invoke<boolean>('coder_stop', { threadId, commandId: crypto.randomUUID() });
   }
 
   getMode(): Promise<CoderAgentMode> {
@@ -188,18 +183,6 @@ export class CoderService {
 
   // ---- live streaming events (emitted during a run) ------------------
 
-  /** Still waiting on the LLM for the current step (no output yet). */
-  onHeartbeat(cb: (p: { thread_id: string; waited_seconds: number }) => void): Promise<UnlistenFn> {
-    return listen<{ thread_id: string; waited_seconds: number }>('coder://heartbeat', (e) =>
-      cb(e.payload)
-    );
-  }
-
-  /** An incremental assistant text token during generation. */
-  onToken(cb: (p: { thread_id: string; delta: string }) => void): Promise<UnlistenFn> {
-    return listen<{ thread_id: string; delta: string }>('coder://token', (e) => cb(e.payload));
-  }
-
   /** A message (assistant or tool) was appended to a thread. */
   onMessage(cb: (p: { thread_id: string; message: ChatMessage }) => void): Promise<UnlistenFn> {
     return listen<{ thread_id: string; message: ChatMessage }>('coder://message', (e) =>
@@ -217,17 +200,6 @@ export class CoderService {
   /** Thread title updated (fallback or smart). */
   onTitle(cb: (p: ThreadTitleEvent) => void): Promise<UnlistenFn> {
     return listen<ThreadTitleEvent>('coder://title', (e) => cb(e.payload));
-  }
-
-  /** Context window usage updated for a thread. */
-  onContextUsage(
-    cb: (p: { thread_id: string; context_usage: ContextUsage; llm_usage?: LlmUsage | null }) => void
-  ): Promise<UnlistenFn> {
-    return listen<{
-      thread_id: string;
-      context_usage: ContextUsage;
-      llm_usage?: LlmUsage | null;
-    }>('coder://context-usage', (e) => cb(e.payload));
   }
 
   /** Fetch current context usage from agent-platform for a thread. */
@@ -276,24 +248,9 @@ export class CoderService {
     return listen<CoderDoneEvent>('coder://done', (e) => cb(e.payload));
   }
 
-  /** Run started or stopped for a thread. */
-  onRunning(cb: (p: { thread_id: string; running: boolean }) => void): Promise<UnlistenFn> {
-    return listen<{ thread_id: string; running: boolean }>('coder://running', (e) => cb(e.payload));
-  }
-
   /** Run failed with an error. */
   onError(cb: (p: { thread_id: string; error: string }) => void): Promise<UnlistenFn> {
     return listen<{ thread_id: string; error: string }>('coder://error', (e) => cb(e.payload));
-  }
-
-  /** Backend requests frontend terminal execution for run_command. */
-  onRunCommand(cb: (p: RunCommandEvent) => void): Promise<UnlistenFn> {
-    return listen<RunCommandEvent>('coder://run_command', (e) => cb(e.payload));
-  }
-
-  /** Backend requests the list of session terminals. */
-  onListTerminals(cb: (p: ListTerminalsEvent) => void): Promise<UnlistenFn> {
-    return listen<ListTerminalsEvent>('coder://list_terminals', (e) => cb(e.payload));
   }
 
   submitCommandResult(threadId: string, callId: string, result: string): Promise<void> {
@@ -301,6 +258,7 @@ export class CoderService {
       threadId,
       callId,
       result,
+      commandId: crypto.randomUUID(),
     });
   }
 
@@ -308,7 +266,8 @@ export class CoderService {
     return invoke<void>('coder_submit_terminal_list', {
       threadId,
       callId,
-      listJson: listJson,
+      listJson,
+      commandId: crypto.randomUUID(),
     });
   }
 

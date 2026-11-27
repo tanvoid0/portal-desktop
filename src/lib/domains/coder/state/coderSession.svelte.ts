@@ -1,44 +1,36 @@
 /**
- * Global coder session state — survives page navigation and thread switches.
- * Event listeners register once and route updates per thread id.
+ * Global coder session state — survives page navigation and thread switches. View state
+ * only: what a thread says (messages, status, approvals, queue) is `threadStore`'s view of
+ * the hub's log. Sub-agents, file-change bodies and the context gauge are not in that log
+ * yet, so their listeners and fetches stay here.
  */
 
 import { aiProviderService } from '$lib/domains/ai/services/aiProviderService.js';
 import { coderService } from '../services/coderService.js';
-import {
-  getToolCallDisplay,
-  formatFailedResult,
-  isToolResultFailure,
-} from '../utils/toolCallDisplay.js';
-import { withMessageTimestamps } from '../utils/messageTimestamps.js';
+import { threadStore } from '$lib/domains/threads/state/threadStore.svelte';
+import type { ThreadView } from '$lib/domains/threads/utils/reducer';
 import type {
-  ChatMessage,
   CoderSubAgent,
   CoderThread,
   CoderThreadKind,
   SpawnSubAgentTask,
   FileChange,
-  PendingApproval,
   PermissionRule,
   CoderAgentMode,
   PermissionMode,
   ThreadTitleEvent,
 } from '../types.js';
 import { summaryToThread } from '../types.js';
-import type { ContextUsage, LlmUsage, ProviderType } from '$lib/domains/ai/types/index.js';
+import type { ContextUsage, ProviderType } from '$lib/domains/ai/types/index.js';
 import {
   fallbackTitleFromMessage,
   isPlaceholderTitle,
   reconcileThreadTitle,
 } from '$lib/domains/chat/title.js';
 import { loadChatCatalogPrefs } from '$lib/domains/ai/utils/chatCatalogPrefs.js';
-import {
-  abortAgentCommands,
-  executeAgentCommand,
-  mirrorCommandOutput,
-} from '../services/coderTerminalCoordinator.js';
+import { abortAgentCommands } from '../services/coderTerminalCoordinator.js';
+import { startHostResponder } from '../services/hostResponder.js';
 import { coderTerminalStore } from './coderTerminalStore.svelte.js';
-import { coderWorkspaceStore } from './coderWorkspaceStore.svelte.js';
 import { inferEffectiveMode } from '../config/agentModes.js';
 import { coderUi } from './coderUi.svelte.js';
 import { toast } from '$lib/utils/toast';
@@ -67,30 +59,11 @@ export type SubAgentNotificationEvent =
 
 export type SubAgentNotificationHandler = (event: SubAgentNotificationEvent) => void;
 
+/** Per-thread view state; the thread's own content is `threadStore.view(id)`. */
 export interface ThreadRuntime {
-  messages: ChatMessage[];
-  streamingText: string;
-  /** Seconds waited on the current LLM step with no output yet (0 = not waiting). */
-  waitingSeconds: number;
-  running: boolean;
-  pending: PendingApproval | null;
-  error: string | null;
-  canRetry: boolean;
+  /** Context window gauge, fetched (it is not in the log). */
   contextUsage: ContextUsage | null;
-  llmUsage: LlmUsage | null;
-  lastRetry:
-    | null
-    | { type: 'send' }
-    | {
-        type: 'approve';
-        callId: string;
-        approve: boolean;
-        remember: boolean;
-        editedPattern?: string;
-      };
   draftInput: string;
-  /** Follow-ups queued while the agent is running (Cursor-style). */
-  messageQueue: string[];
   subAgents: CoderSubAgent[];
   multitaskMode: boolean;
   /** Inferred sub-mode when agentMode is "auto" (UI subtitle only). */
@@ -101,127 +74,26 @@ export interface ThreadRuntime {
 
 function emptyRuntime(): ThreadRuntime {
   return {
-    messages: [],
-    streamingText: '',
-    waitingSeconds: 0,
-    running: false,
-    pending: null,
-    error: null,
-    canRetry: false,
     contextUsage: null,
-    llmUsage: null,
-    lastRetry: null,
     draftInput: '',
-    messageQueue: [],
     subAgents: [],
     multitaskMode: false,
     effectiveMode: null,
   };
 }
 
-function summarizeTool(tool: string, args: Record<string, unknown>): string {
-  const { label, detail } = getToolCallDisplay(tool, args);
-  return detail ? `${label}: ${detail}` : label;
-}
-
-function suggestedRule(tool: string, args: Record<string, unknown>): string {
-  switch (tool) {
-    case 'run_command': {
-      const cmd = String(args.command ?? '');
-      return cmd.split(/\s+/)[0] ?? '';
-    }
-    case 'write_file':
-    case 'edit_file': {
-      const p = String(args.path ?? '');
-      const parts = p.replace(/\\/g, '/').split('/');
-      if (parts.length > 1) {
-        parts.pop();
-        return `${parts.join('/')}/*`;
-      }
-      return '*';
-    }
-    default:
-      return '';
-  }
-}
-
-function parseToolArgs(raw: string): Record<string, unknown> {
-  try {
-    return JSON.parse(raw || '{}') as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
-
-function commandForToolCall(messages: ChatMessage[], toolCallId: string): string | null {
-  for (const m of messages) {
-    if (m.role !== 'assistant' || !m.tool_calls?.length) continue;
-    const call = m.tool_calls.find((c) => c.id === toolCallId);
-    if (!call || call.function.name !== 'run_command') continue;
-    const args = parseToolArgs(call.function.arguments);
-    return String(args.command ?? '');
-  }
-  return null;
-}
-
-function appendRunCommandToTerminal(
-  threadId: string,
-  messages: ChatMessage[],
-  toolCallId: string,
-  content: string
-) {
-  const command = commandForToolCall(messages, toolCallId);
-  if (!command) return;
-  const failed = isToolResultFailure('run_command', content);
-  const output = failed ? formatFailedResult('run_command', content) : content;
-  mirrorCommandOutput(threadId, null, command, output, failed);
-}
-
-/** Rebuild pending approval from open tool calls in persisted messages. */
-export function inferPending(messages: ChatMessage[]): PendingApproval | null {
-  const answered = new Set(
-    messages.filter((m) => m.role === 'tool' && m.tool_call_id).map((m) => m.tool_call_id as string)
-  );
-
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (m.role !== 'assistant' || !m.tool_calls?.length) continue;
-    const open = m.tool_calls.find((c) => !answered.has(c.id));
-    // `ask_user` is answered on its own card, not approved.
-    if (!open || open.function.name === 'ask_user') return null;
-    const args = parseToolArgs(open.function.arguments);
-    return {
-      call_id: open.id,
-      tool: open.function.name,
-      arguments: args,
-      suggested_rule: suggestedRule(open.function.name, args),
-      summary: summarizeTool(open.function.name, args),
-    };
-  }
-  return null;
-}
-
-/** True when the latest user message has no assistant reply yet. */
-export function lastUserTurnNeedsReply(messages: ChatMessage[]): boolean {
-  let lastUserIdx = -1;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === 'user') {
-      lastUserIdx = i;
-      break;
-    }
-  }
-  if (lastUserIdx < 0) return false;
-
-  for (let i = lastUserIdx + 1; i < messages.length; i++) {
-    const m = messages[i];
-    if (m.role !== 'assistant') continue;
-    const content = (m.content ?? '').trim();
-    if (content || (m.tool_calls?.length ?? 0) > 0) return false;
-  }
-  return true;
-}
-
 const PROVIDER_KEY = 'portal.coder.backendProvider';
+
+/** `local`, `device:<id>` or `remote` (see `Caller::actor`) as something a person can read. */
+export function actorLabel(by: string): string {
+  if (by === 'local') return 'this computer';
+  if (by === 'remote') return 'a remote device';
+  return by.replace(/^device:/, 'device ');
+}
+
+export function errorText(e: unknown): string {
+  return (e instanceof Error ? e.message : String(e)).replace(/^busy:\s*/, '');
+}
 
 function loadStoredProvider(): string | null {
   try {
@@ -249,7 +121,6 @@ class CoderSessionState {
   permissionMode = $state<PermissionMode>('review');
   rules = $state<PermissionRule[]>([]);
   changes = $state<FileChange[]>([]);
-  runningThreadIds = $state<Set<string>>(new Set());
   selectedProvider = $state<ProviderType | null>('AgentPlatform');
   selectedBackendProvider = $state<string | null>(loadStoredProvider());
   selectedModel = $state<string | null>(null);
@@ -265,15 +136,20 @@ class CoderSessionState {
    *  Coder" from another page; consumed once by CoderPanel on mount). */
   pendingPrompt = $state<string | null>(null);
 
-  /** Per-thread ephemeral UI + streaming state. */
+  /** Per-thread view state. */
   private runtimes = $state<Record<string, ThreadRuntime>>({});
   /** Threads with user-edited titles — ignore incoming title events. */
   private userRenamedThreadIds = new Set<string>();
-  /** Tool calls already executed via frontend terminal delegation. */
-  private delegatedCommandIds = new Set<string>();
+  /** Approvals whose decision is in flight, so a double click is one command. */
+  private deciding = new Set<string>();
 
   private touchRuntime() {
     this.runtimeRevision += 1;
+  }
+
+  /** The active thread's live view from the hub's log; null until its snapshot lands. */
+  get view(): ThreadView | null {
+    return this.activeThreadId ? threadStore.view(this.activeThreadId) : null;
   }
 
   get activeRuntime(): ThreadRuntime {
@@ -294,28 +170,8 @@ class CoderSessionState {
     return this.runtimes[threadId];
   }
 
-  isThreadRunning(threadId: string): boolean {
-    return this.runningThreadIds.has(threadId);
-  }
-
   isCoordinatorThread(thread?: CoderThread | null): boolean {
     return thread?.thread_kind === 'coordinator';
-  }
-
-  /** Show retry when the run failed or the last user turn got no assistant reply. */
-  shouldShowRetry(): boolean {
-    if (!this.thread) return false;
-    const rt = this.activeRuntime;
-    if (rt.running || rt.pending) return false;
-    return rt.canRetry || lastUserTurnNeedsReply(rt.messages);
-  }
-
-  private updateRetryFromMessages(rt: ThreadRuntime, messages: ChatMessage[]) {
-    if (rt.running || rt.pending) return;
-    if (lastUserTurnNeedsReply(messages)) {
-      rt.canRetry = true;
-      if (!rt.lastRetry) rt.lastRetry = { type: 'send' };
-    }
   }
 
   async ensureInit(): Promise<void> {
@@ -350,147 +206,10 @@ class CoderSessionState {
     // Load sessions first so the sidebar works even if provider config fails.
     await this.refreshThreads();
 
-    try {
-      await this.syncRunningThreads();
-    } catch (e) {
-      console.error('coder: syncRunningThreads failed', e);
-    }
-
     void this.initProviderDefaults();
-
-    await coderService.onToken(({ thread_id, delta }) => {
-      const rt = this.runtimeFor(thread_id);
-      rt.streamingText += delta;
-      rt.waitingSeconds = 0;
-      this.touchRuntime();
-    });
-
-    await coderService.onHeartbeat(({ thread_id, waited_seconds }) => {
-      const rt = this.runtimeFor(thread_id);
-      rt.waitingSeconds = waited_seconds;
-      this.touchRuntime();
-    });
-
-    await coderService.onContextUsage(({ thread_id, context_usage, llm_usage }) => {
-      const rt = this.runtimeFor(thread_id);
-      rt.contextUsage = context_usage;
-      if (llm_usage) rt.llmUsage = llm_usage;
-      this.touchRuntime();
-    });
 
     await coderService.onTitle(({ thread_id, title }) => {
       this.applyThreadTitle(thread_id, title);
-    });
-
-    await coderService.onMessage(({ thread_id, message }) => {
-      const rt = this.runtimeFor(thread_id);
-      const stampedMessage: ChatMessage = {
-        ...message,
-        timestamp: message.timestamp ?? new Date().toISOString(),
-      };
-      if (stampedMessage.role === 'assistant') rt.streamingText = '';
-      rt.waitingSeconds = 0;
-      const last = rt.messages[rt.messages.length - 1];
-      const dup =
-        last &&
-        last.role === stampedMessage.role &&
-        last.content === stampedMessage.content &&
-        JSON.stringify(last.tool_calls) === JSON.stringify(stampedMessage.tool_calls);
-      if (!dup) {
-        rt.messages = [...rt.messages, stampedMessage];
-      }
-      if (
-        stampedMessage.role === 'tool' &&
-        stampedMessage.tool_call_id &&
-        stampedMessage.content != null
-      ) {
-        if (this.delegatedCommandIds.has(stampedMessage.tool_call_id)) {
-          this.delegatedCommandIds.delete(stampedMessage.tool_call_id);
-        } else {
-          appendRunCommandToTerminal(
-            thread_id,
-            rt.messages,
-            stampedMessage.tool_call_id,
-            stampedMessage.content
-          );
-        }
-        if (this.terminalOpen && thread_id) {
-          const root = this.thread?.workspace_root ?? this.workspaceRoot;
-          if (root) {
-            const tab = coderTerminalStore.ensureDefault(thread_id, root);
-            coderWorkspaceStore.openTerminal(thread_id, tab.id, tab.label);
-          }
-        }
-      }
-      this.touchRuntime();
-      if (thread_id === this.activeThreadId) {
-        this.thread = { ...this.thread!, messages: rt.messages };
-      }
-    });
-
-    await coderService.onPending(({ thread_id, pending }) => {
-      const rt = this.runtimeFor(thread_id);
-      rt.pending = pending;
-      rt.running = false;
-      rt.streamingText = '';
-      rt.waitingSeconds = 0;
-      this.touchRuntime();
-      this.setRunning(thread_id, false);
-      void this.syncThreadFromBackend(thread_id);
-    });
-
-    await coderService.onDone(({ thread_id, exhausted, cancelled, title }) => {
-      const rt = this.runtimeFor(thread_id);
-      rt.running = false;
-      rt.streamingText = '';
-      rt.waitingSeconds = 0;
-      rt.pending = null;
-      rt.canRetry = false;
-      rt.lastRetry = null;
-      if (exhausted) {
-        rt.error = 'Agent hit the max iteration limit.';
-        rt.canRetry = true;
-        rt.lastRetry = { type: 'send' };
-      } else if (cancelled) {
-        rt.error = null;
-      }
-      this.touchRuntime();
-      this.setRunning(thread_id, false);
-      if (title) {
-        this.applyThreadTitle(thread_id, title);
-      }
-      void this.syncThreadFromBackend(thread_id).then(() => {
-        const synced = this.runtimeFor(thread_id);
-        if (!cancelled && !exhausted) {
-          this.updateRetryFromMessages(synced, synced.messages);
-        }
-        this.touchRuntime();
-        if (!cancelled && !exhausted) {
-          void this.processQueue(thread_id);
-        }
-      });
-    });
-
-    await coderService.onRunning(({ thread_id, running }) => {
-      const rt = this.runtimeFor(thread_id);
-      rt.running = running;
-      this.touchRuntime();
-      this.setRunning(thread_id, running);
-      if (running) {
-        void this.ensureThreadListed(thread_id);
-      }
-    });
-
-    await coderService.onError(({ thread_id, error }) => {
-      const rt = this.runtimeFor(thread_id);
-      rt.error = error;
-      rt.running = false;
-      rt.waitingSeconds = 0;
-      rt.canRetry = true;
-      rt.lastRetry = { type: 'send' };
-      this.touchRuntime();
-      this.setRunning(thread_id, false);
-      void this.syncThreadFromBackend(thread_id);
     });
 
     await coderService.onChange(({ change }) => {
@@ -499,28 +218,8 @@ class CoderSessionState {
       else this.changes = [...this.changes, change];
     });
 
-    await coderService.onRunCommand(async (req) => {
+    void startHostResponder(() => {
       this.terminalOpen = true;
-      const tab = coderTerminalStore.ensureDefault(req.thread_id, req.workspace_root);
-      coderWorkspaceStore.openTerminal(req.thread_id, tab.id, tab.label);
-      this.delegatedCommandIds.add(req.call_id);
-      try {
-        const result = await executeAgentCommand({
-          threadId: req.thread_id,
-          callId: req.call_id,
-          command: req.command,
-          workspaceRoot: req.workspace_root,
-          terminalId: req.terminal_id,
-        });
-        await coderService.submitCommandResult(req.thread_id, req.call_id, result);
-      } catch (e) {
-        await coderService.submitCommandResult(req.thread_id, req.call_id, `Error: ${e}`);
-      }
-    });
-
-    await coderService.onListTerminals(async (req) => {
-      const list = coderTerminalStore.listForAgent(req.thread_id);
-      await coderService.submitTerminalList(req.thread_id, req.call_id, JSON.stringify(list));
     });
 
     await coderService.onSubAgentStarted(({ coordinator_id, subagent }) => {
@@ -683,14 +382,13 @@ class CoderSessionState {
     if (this.thread?.id === threadId) {
       return { ...this.thread };
     }
-    const rt = this.runtimes[threadId];
     return {
       id: threadId,
       title: 'Running session',
       workspace_root: this.workspaceRoot,
       model: null,
       thread_kind: 'session',
-      messages: rt?.messages ?? [],
+      messages: [],
       created_at: '',
       updated_at: new Date().toISOString(),
     };
@@ -736,53 +434,6 @@ class CoderSessionState {
     this.upsertThread(this.stubThread(threadId));
   }
 
-  /** Refresh running-thread flags and make sure each appears in the sidebar. */
-  async syncRunningThreads(): Promise<void> {
-    const running = await coderService.listRunning();
-    this.runningThreadIds = new Set(running);
-    for (const id of running) {
-      this.runtimeFor(id).running = true;
-      await this.ensureThreadListed(id);
-    }
-    this.touchRuntime();
-  }
-
-  /**
-   * On page load: attach to the most recent running session so the UI matches
-   * background agent work.
-   */
-  async attachToRunningThread(): Promise<string | null> {
-    await this.ensureInit();
-    const running = await coderService.listRunning();
-    if (running.length === 0) return null;
-
-    await this.syncRunningThreads();
-
-    const runningSet = new Set(running);
-    const candidates = this.threads
-      .filter((t) => runningSet.has(t.id))
-      .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-    const pick = candidates[0]?.id ?? running[0];
-    await this.selectThread(pick);
-    return pick;
-  }
-
-  private setRunning(threadId: string, running: boolean) {
-    const next = new Set(this.runningThreadIds);
-    if (running) {
-      next.add(threadId);
-      if (!this.threads.some((t) => t.id === threadId)) {
-        this.upsertThread(this.stubThread(threadId));
-      }
-      void this.ensureThreadListed(threadId);
-    } else {
-      next.delete(threadId);
-    }
-    this.runningThreadIds = next;
-    this.bumpThreads();
-    this.touchRuntime();
-  }
-
   private async refreshContextUsage(threadId: string) {
     try {
       const usage = await coderService.getContextUsage(threadId);
@@ -814,29 +465,12 @@ class CoderSessionState {
     }
   }
 
-  private async syncThreadFromBackend(threadId: string) {
+  /** Re-read the thread row (title, updated_at, model) and the context gauge, e.g. when a turn ends. */
+  async syncThread(threadId: string) {
     const t = await coderService.getThread(threadId);
-    if (!t) {
-      console.warn(`coder: syncThreadFromBackend — thread ${threadId} not found`);
-      return;
-    }
-    const rt = this.runtimeFor(threadId);
-    const stamped = withMessageTimestamps(t.messages, rt.messages, t.updated_at);
-    rt.messages = stamped;
-    if (!rt.pending) rt.pending = inferPending(stamped);
-    this.touchRuntime();
-    if (this.activeThreadId === threadId) {
-      this.thread = { ...t, messages: stamped };
-    }
-    const idx = this.threads.findIndex((x) => x.id === threadId);
-    if (idx >= 0) {
-      this.threads[idx] = { ...t, messages: stamped };
-      this.threads = [...this.threads];
-      this.bumpThreads();
-    } else {
-      this.upsertThread({ ...t, messages: stamped });
-    }
-    this.updateRetryFromMessages(rt, stamped);
+    if (!t) return;
+    if (this.activeThreadId === threadId) this.thread = t;
+    this.upsertThread(t);
     void this.refreshContextUsage(threadId);
   }
 
@@ -941,15 +575,8 @@ class CoderSessionState {
     }
 
     const rt = this.runtimeFor(id);
-    const stamped = withMessageTimestamps(t.messages, rt.messages, t.updated_at);
-    rt.messages = stamped;
-    this.thread = { ...t, messages: stamped };
-    if (!rt.pending) rt.pending = inferPending(stamped);
+    this.thread = t;
     rt.multitaskMode = this.multitaskMode;
-    const running = await coderService.listRunning();
-    rt.running = running.includes(id);
-    this.runningThreadIds = new Set(running);
-    this.updateRetryFromMessages(rt, rt.messages);
     this.touchRuntime();
 
     await this.refreshChanges(id);
@@ -994,38 +621,10 @@ class CoderSessionState {
     this.activeThreadId = t.id;
     this.upsertThread(t);
     const rt = this.runtimeFor(t.id);
-    rt.messages = withMessageTimestamps(t.messages, rt.messages, t.updated_at);
     rt.multitaskMode = t.thread_kind === 'coordinator';
     this.touchRuntime();
     await this.refreshThreads();
     return t;
-  }
-
-  private shouldQueue(threadId: string): boolean {
-    const rt = this.runtimeFor(threadId);
-    return rt.running || this.isThreadRunning(threadId);
-  }
-
-  removeFromQueue(threadId: string, index: number) {
-    const rt = this.runtimeFor(threadId);
-    rt.messageQueue = rt.messageQueue.filter((_, i) => i !== index);
-    this.touchRuntime();
-  }
-
-  private async processQueue(threadId: string) {
-    const rt = this.runtimeFor(threadId);
-    if (
-      rt.running ||
-      this.isThreadRunning(threadId) ||
-      rt.pending ||
-      rt.messageQueue.length === 0
-    ) {
-      return;
-    }
-    const next = rt.messageQueue[0];
-    rt.messageQueue = rt.messageQueue.slice(1);
-    this.touchRuntime();
-    await this.sendNow(next, threadId);
   }
 
   private looksLikeMultitaskInput(text: string): boolean {
@@ -1089,14 +688,7 @@ class CoderSessionState {
     const trimmed = text.trim();
     if (!trimmed) return false;
 
-    if (!this.workspaceRoot.trim()) {
-      if (this.activeThreadId) {
-        const rt = this.runtimeFor(this.activeThreadId);
-        rt.error = 'Set a workspace folder first.';
-        this.touchRuntime();
-      }
-      return false;
-    }
+    if (!this.workspaceRoot.trim()) throw new Error('Set a workspace folder first.');
 
     const t = await this.createThreadIfNeeded();
     this.activeThreadId = t.id;
@@ -1153,8 +745,6 @@ class CoderSessionState {
     threadId: string,
     request: { tasks?: SpawnSubAgentTask[]; issueUrls?: string[] }
   ) {
-    const rt = this.runtimeFor(threadId);
-    rt.error = null;
     await coderService.multitaskSpawn({
       coordinatorThreadId: threadId,
       tasks: request.tasks ?? [],
@@ -1164,46 +754,17 @@ class CoderSessionState {
     this.touchRuntime();
   }
 
+  /**
+   * Plain Send: a message while a turn is open is the hub's to queue (shown from the thread
+   * state). Throws the hub's rejection (`busy: ...`) so the caller can restore the draft.
+   */
   async send(text: string) {
     await this.ensureInit();
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    if (this.thread && this.shouldQueue(this.thread.id)) {
-      if (this.looksLikeMultitaskInput(trimmed)) {
-        await this.sendNow(trimmed);
-        return;
-      }
-      const rt = this.runtimeFor(this.thread.id);
-      rt.messageQueue = [...rt.messageQueue, trimmed];
-      rt.draftInput = '';
-      this.touchRuntime();
-      return;
-    }
-
-    await this.sendNow(trimmed);
-  }
-
-  private async sendNow(text: string, explicitThreadId?: string) {
-    await this.ensureInit();
-    const trimmed = text.trim();
-    if (!trimmed) return;
-
-    let t: CoderThread | null = null;
-    if (explicitThreadId) {
-      t = (await coderService.getThread(explicitThreadId)) ?? null;
-    }
-    if (!t) {
-      if (!this.workspaceRoot.trim()) {
-        if (this.activeThreadId) {
-          const rt = this.runtimeFor(this.activeThreadId);
-          rt.error = 'Set a workspace folder first.';
-          this.touchRuntime();
-        }
-        return;
-      }
-      t = await this.createThreadIfNeeded();
-    }
+    if (!this.workspaceRoot.trim()) throw new Error('Set a workspace folder first.');
+    const t = await this.createThreadIfNeeded();
 
     this.activeThreadId = t.id;
     this.thread = t;
@@ -1227,160 +788,66 @@ class CoderSessionState {
 
     const rt = this.runtimeFor(t.id);
     rt.effectiveMode = inferEffectiveMode(trimmed, this.agentMode);
-    rt.error = null;
-    rt.canRetry = false;
-    rt.lastRetry = { type: 'send' };
-    rt.running = true;
-    rt.streamingText = '';
-    rt.waitingSeconds = 0;
     this.touchRuntime();
-    this.setRunning(t.id, true);
 
+    const isFirst = !(this.view?.messages ?? []).some((m) => m.role === 'user');
+    await coderService.send(t.id, trimmed);
+    if (isFirst && isPlaceholderTitle(t.title)) {
+      this.applyThreadTitle(t.id, fallbackTitleFromMessage(trimmed, 'New session'));
+    }
+    if (this.activeThreadId === t.id) rt.draftInput = '';
+  }
+
+  /** Writes other than `send` have no draft to give back: a failure is a toast. */
+  private async write(fn: () => Promise<unknown>) {
     try {
-      const isFirst =
-        t.messages.filter((m) => m.role === 'user').length === 0 && isPlaceholderTitle(t.title);
-      if (isFirst) {
-        const fb = fallbackTitleFromMessage(trimmed, 'New session');
-        this.applyThreadTitle(t.id, fb);
-      }
-      if (this.activeThreadId === t.id) {
-        rt.draftInput = '';
-      }
-      await coderService.send(t.id, trimmed);
+      await fn();
     } catch (e) {
-      rt.error = String(e);
-      rt.canRetry = true;
-      rt.running = false;
-      this.touchRuntime();
-      this.setRunning(t.id, false);
+      toast.error(errorText(e));
     }
   }
 
-  queuedCountFor(threadId: string): number {
-    return this.peekRuntime(threadId).messageQueue.length;
+  stop() {
+    const id = this.activeThreadId;
+    if (!id) return Promise.resolve();
+    abortAgentCommands(id);
+    return this.write(() => coderService.stop(id));
   }
 
-  async stop() {
-    if (!this.activeThreadId) return;
-    const threadId = this.activeThreadId;
-    abortAgentCommands(threadId);
-    const rt = this.runtimeFor(threadId);
-    rt.running = false;
-    rt.streamingText = '';
-    rt.waitingSeconds = 0;
-    rt.error = null;
-    rt.pending = null;
-    this.touchRuntime();
-    this.setRunning(threadId, false);
-    await coderService.stop(threadId);
-  }
-
+  /** Resume a failed run, or answer a user turn nobody answered. */
   async retry() {
-    if (!this.thread || !this.shouldShowRetry()) return;
-    const rt = this.activeRuntime;
-    const threadId = this.thread.id;
-    rt.error = null;
-    rt.running = true;
-    rt.streamingText = '';
-    rt.waitingSeconds = 0;
-    rt.canRetry = false;
-    this.touchRuntime();
-    this.setRunning(threadId, true);
-    try {
-      if (rt.lastRetry?.type === 'approve') {
-        const { callId, approve, remember, editedPattern } = rt.lastRetry;
-        await coderService.approve(threadId, callId, approve, remember, editedPattern);
-        if (remember) this.rules = await coderService.listRules();
-      } else {
-        await coderService.retry(threadId);
-        await this.syncThreadFromBackend(threadId);
-      }
-      rt.canRetry = false;
-      rt.lastRetry = null;
-    } catch (e) {
-      rt.error = String(e);
-      rt.canRetry = true;
-      rt.lastRetry = { type: 'send' };
-      rt.running = false;
-      this.touchRuntime();
-      this.setRunning(threadId, false);
-    }
+    const id = this.thread?.id;
+    if (id && this.view?.canRetry) await this.write(() => coderService.retry(id));
   }
 
+  /** `messageIndex` is the index into the view's messages, which is the hub's own. */
   async editMessage(messageIndex: number, content: string) {
-    if (!this.thread || !this.activeThreadId) return;
+    const id = this.thread?.id;
     const trimmed = content.trim();
-    if (!trimmed) return;
-
-    const threadId = this.thread.id;
-    const rt = this.runtimeFor(threadId);
-    if (rt.running || rt.pending) return;
-
-    rt.error = null;
-    rt.canRetry = false;
-    rt.lastRetry = { type: 'send' };
-    rt.running = true;
-    rt.streamingText = '';
-    rt.waitingSeconds = 0;
-    rt.messageQueue = [];
-    this.touchRuntime();
-    this.setRunning(threadId, true);
-
-    try {
-      await coderService.editMessage(threadId, messageIndex, trimmed);
-      await this.syncThreadFromBackend(threadId);
-    } catch (e) {
-      rt.error = String(e);
-      rt.canRetry = true;
-      rt.lastRetry = { type: 'send' };
-      rt.running = false;
-      this.touchRuntime();
-      this.setRunning(threadId, false);
-    }
+    const status = this.view?.status;
+    if (!id || !trimmed || !status || status === 'running' || status === 'waiting') return;
+    await this.write(() => coderService.editMessage(id, messageIndex, trimmed));
   }
 
+  /** Decide the first open approval. A loser of the first-wins race gets a notice, not an error. */
   async decide(approve: boolean, remember: boolean, editedPattern?: string) {
-    if (!this.thread || !this.activeRuntime.pending) return;
-    const rt = this.activeRuntime;
-    const savedPending = rt.pending;
-    if (!savedPending) return;
-    const threadId = this.thread.id;
-    const callId = savedPending.call_id;
-
-    rt.running = true;
-    rt.streamingText = '';
-    rt.waitingSeconds = 0;
-    rt.error = null;
-    rt.canRetry = false;
-    rt.lastRetry = {
-      type: 'approve',
-      callId,
-      approve,
-      remember,
-      editedPattern,
-    };
-    rt.pending = null;
-    this.touchRuntime();
-
+    const id = this.thread?.id;
+    const call = this.view?.approvals[0];
+    if (!id || !call || this.deciding.has(call.call_id)) return;
+    this.deciding.add(call.call_id);
     try {
-      await coderService.approve(
-        threadId,
-        callId,
-        approve,
-        remember,
-        editedPattern,
-        savedPending?.tool,
-        savedPending?.arguments as Record<string, unknown> | undefined
-      );
-      rt.canRetry = false;
-      rt.lastRetry = null;
+      await coderService.approve(id, call.call_id, approve, remember, editedPattern);
       if (remember) this.rules = await coderService.listRules();
     } catch (e) {
-      rt.error = String(e);
-      rt.pending = savedPending;
-      rt.canRetry = true;
-      rt.running = false;
-      this.touchRuntime();
+      if (!String(e).includes('already_resolved')) return void toast.error(errorText(e));
+      const won = this.view?.recentlyResolved.find((r) => r.call_id === call.call_id);
+      toast.info(
+        won
+          ? `Already ${won.allow ? 'approved' : 'denied'} by ${actorLabel(won.by)}`
+          : 'Already decided on another device'
+      );
+    } finally {
+      this.deciding.delete(call.call_id);
     }
   }
 

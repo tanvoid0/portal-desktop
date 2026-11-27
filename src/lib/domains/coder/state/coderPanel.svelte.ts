@@ -1,19 +1,29 @@
 import { onMount } from 'svelte';
+import { createQuery } from '@tanstack/svelte-query';
 import { page } from '$app/state';
 import { afterNavigate, replaceState } from '$app/navigation';
 import { toast } from '$lib/utils/toast';
 import { confirmAction } from '$lib/utils/confirm';
 import { aiPlatform } from '$lib/domains/ai/state/aiPlatform.svelte.js';
-import { coderSession, type SubAgentNotificationEvent } from './coderSession.svelte.js';
+import {
+  actorLabel,
+  coderSession,
+  errorText,
+  type SubAgentNotificationEvent,
+} from './coderSession.svelte.js';
 import { coderUi } from './coderUi.svelte.js';
 import { coderTerminalStore } from './coderTerminalStore.svelte.js';
 import { coderWorkspaceStore } from './coderWorkspaceStore.svelte.js';
 import { coderService } from '../services/coderService.js';
+import { mirrorToolResult } from '../services/hostResponder.js';
+import { threadApi } from '$lib/domains/threads/api/threadApi';
+import { threadStore } from '$lib/domains/threads/state/threadStore.svelte';
+import { queryKeys } from '$lib/domains/shared/query/keys';
 import { withMessageTimestamps } from '../utils/messageTimestamps.js';
 import { formatConversationForCopy } from '../utils/formatConversation.js';
 import { toastSubAgentEvent } from '../utils/subAgentToasts.js';
 import { deleteHistoryMessage } from '../utils/threadMenu.js';
-import type { CoderThread, GitDiffStats } from '../types.js';
+import type { ChatMessage, CoderThread, GitDiffStats } from '../types.js';
 
 /**
  * Script-side state of CoderPanel. Construct once during component init: the
@@ -34,38 +44,56 @@ export class CoderPanelState {
   showWorkspace = $derived(coderWorkspaceStore.activePanel !== 'chat');
   platformBlocked = $derived(aiPlatform.blocked);
 
+  /** The active thread's live view from the hub's log (null until its snapshot lands). */
+  view = $derived(coderSession.view);
   rt = $derived.by(() => {
     coderSession.runtimeRevision;
     return coderSession.activeRuntime;
   });
   thread = $derived(coderSession.thread);
+  /** True from the click until the hub's first frame lands, so the empty hero does not flash. */
+  sending = $state(false);
+  private stamped: { id: string | null; list: ChatMessage[] } = { id: null, list: [] };
   messages = $derived.by(() => {
-    coderSession.runtimeRevision;
-    const raw = this.rt.messages;
-    return withMessageTimestamps(raw, raw, this.thread?.updated_at);
+    const raw = this.view?.messages ?? [];
+    // First sight of a thread is anchored on its row; after that only new messages are stamped, now.
+    const fresh = this.stamped.id !== this.activeThreadId || this.stamped.list.length === 0;
+    const list = withMessageTimestamps(
+      raw,
+      fresh ? raw : this.stamped.list,
+      fresh ? this.thread?.updated_at : undefined
+    );
+    this.stamped = { id: this.activeThreadId, list };
+    return list;
   });
-  pending = $derived(this.rt.pending);
-  running = $derived(this.rt.running);
-  streamingText = $derived(this.rt.streamingText);
-  waitingSeconds = $derived(this.rt.waitingSeconds);
-  error = $derived(this.rt.error);
-  showRetry = $derived.by(() => {
-    coderSession.runtimeRevision;
-    return coderSession.shouldShowRetry();
+  pending = $derived(this.view?.approvals[0] ?? null);
+  running = $derived(this.view?.status === 'running');
+  stopping = $derived(this.view?.stopping ?? false);
+  streamingText = $derived(this.view?.streamingText ?? '');
+  waitingSeconds = $derived(this.view?.waitingSeconds ?? 0);
+  error = $derived(this.view?.error ?? null);
+  showRetry = $derived(!!this.thread && !!this.view?.canRetry);
+  /** Who decided the latest approval, when it was not this computer. */
+  decidedNote = $derived.by(() => {
+    const r = this.view?.recentlyResolved.at(-1);
+    return r && r.by !== 'local'
+      ? `${r.allow ? 'Approved' : 'Denied'} by ${actorLabel(r.by)}`
+      : null;
   });
   pendingChangeCount = $derived(coderSession.changes.filter((c) => c.status === 'pending').length);
   composerDisabled = $derived(!!this.pending || this.platformBlocked);
   isEmpty = $derived(
     this.messages.filter((m) => m.role === 'user' || m.role === 'assistant').length === 0 &&
       !this.streamingText &&
-      !this.running
+      !this.running &&
+      !this.sending
   );
   workspaceName = $derived(
     coderSession.workspaceRoot.split(/[/\\]/).filter(Boolean).pop() ?? coderSession.workspaceRoot
   );
   contextUsage = $derived(this.rt.contextUsage);
-  llmUsage = $derived(this.rt.llmUsage);
-  queuedMessages = $derived(this.rt.messageQueue);
+  /** The hub's queue behind the open turn; read-only (no remove command yet). */
+  queuedMessages = $derived((this.view?.queue ?? []).map((q) => q.text));
   subAgents = $derived(this.rt.subAgents);
   parentCoordinatorId = $derived.by(() => {
     coderSession.runtimeRevision;
@@ -95,10 +123,22 @@ export class CoderPanelState {
     coderSession.threadsRevision;
     return coderSession.activeThreadId;
   });
+  // Every thread's status, any provider; the active one is overridden by its live view.
+  private threadList = createQuery(() => ({
+    queryKey: queryKeys.threads.list,
+    queryFn: () => threadApi.list(),
+    refetchInterval: 5000, // ponytail: poll; the store only follows the subscribed thread
+  }));
   runningThreadIds = $derived.by(() => {
-    coderSession.threadsRevision;
-    coderSession.runtimeRevision;
-    return coderSession.runningThreadIds;
+    const ids = new Set(
+      (this.threadList.data ?? []).filter((s) => s.status === 'running').map((s) => s.id)
+    );
+    const status = this.view?.status;
+    if (this.activeThreadId && status) {
+      if (status === 'running') ids.add(this.activeThreadId);
+      else ids.delete(this.activeThreadId);
+    }
+    return ids;
   });
   changesRevision = $derived(coderSession.changes.map((c) => `${c.id}:${c.status}`).join('|'));
   terminalOpen = $derived.by(() => {
@@ -108,7 +148,9 @@ export class CoderPanelState {
   activeTerminalThread = $derived(
     this.sessionThreads.find((t) => t.id === this.activeThreadId) ?? this.thread
   );
-  canEditMessages = $derived(!this.running && !this.pending && !this.composerDisabled);
+  canEditMessages = $derived(
+    !this.running && !this.stopping && !this.pending && !this.composerDisabled
+  );
   canCopyConversation = $derived(
     this.messages.some((m) => m.role !== 'system') ||
       !!this.streamingText ||
@@ -148,6 +190,36 @@ export class CoderPanelState {
     $effect(() => {
       const id = coderSession.activeThreadId;
       if (id) this.input = coderSession.runtimeFor(id).draftInput;
+    });
+
+    $effect(() => {
+      const id = coderSession.activeThreadId;
+      if (id) return threadStore.subscribe(id);
+    });
+
+    // A turn closing refreshes the thread row and the context gauge.
+    let openFor: string | null = null;
+    $effect(() => {
+      const id = coderSession.activeThreadId;
+      const open = this.view?.status === 'running' || this.view?.status === 'waiting';
+      if (id && !open && openFor === id) void coderSession.syncThread(id);
+      openFor = open ? id : null;
+    });
+
+    // Threads running elsewhere (phone, agents page) appear in the sidebar.
+    $effect(() => {
+      for (const id of this.runningThreadIds) void coderSession.ensureThreadListed(id);
+    });
+
+    // Echo tool results this window did not run into the session terminal. The first
+    // view of a thread is history and is not echoed.
+    let echoed = { id: '', n: 0 };
+    $effect(() => {
+      const id = coderSession.activeThreadId;
+      const msgs = this.view?.messages;
+      if (!id || !msgs) return;
+      if (echoed.id === id) for (const m of msgs.slice(echoed.n)) mirrorToolResult(id, msgs, m);
+      echoed = { id, n: msgs.length };
     });
 
     // External goto('/ai/coder?id=X') while this panel is already mounted reuses
@@ -215,9 +287,19 @@ export class CoderPanelState {
         }
       }
     } else if (!coderSession.activeThreadId) {
-      const attached = await coderSession.attachToRunningThread();
+      const attached = await this.attachToRunningThread();
       if (attached) this.syncUrl(attached);
     }
+  }
+
+  /** On page load, follow the most recent running session so the UI matches background work. */
+  private async attachToRunningThread(): Promise<string | null> {
+    const running = (await threadApi.list())
+      .filter((s) => s.status === 'running')
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0];
+    if (!running) return null;
+    await coderSession.selectThread(running.id);
+    return running.id;
   }
 
   deleteSession = async (t: CoderThread) => {
@@ -328,8 +410,17 @@ export class CoderPanelState {
   send = async () => {
     const text = this.takeInput();
     if (text === null) return;
-    await coderSession.send(text);
-    if (coderSession.activeThreadId) this.syncUrl(coderSession.activeThreadId);
+    this.sending = true;
+    try {
+      await coderSession.send(text);
+      if (coderSession.activeThreadId) this.syncUrl(coderSession.activeThreadId);
+    } catch (e) {
+      // Nothing was sent (`busy`, a failed write): give the draft back.
+      if (!this.input) this.input = text;
+      toast.error(errorText(e));
+    } finally {
+      this.sending = false;
+    }
   };
 
   spawnBackground = async () => {
@@ -341,14 +432,12 @@ export class CoderPanelState {
         this.syncUrl(coderSession.activeThreadId);
       }
     } catch (e) {
-      toast.error('Failed to spawn background sub-agent', String(e));
+      toast.error('Failed to spawn background sub-agent', errorText(e));
     }
   };
 
-  removeQueued = (index: number) => {
-    const id = coderSession.activeThreadId;
-    if (id) coderSession.removeFromQueue(id, index);
-  };
+  /** Only the open thread's queue is live. */
+  queuedCountFor = (id: string) => (id === this.activeThreadId ? this.queuedMessages.length : 0);
 
   openChanges = () => {
     coderWorkspaceStore.openChanges();

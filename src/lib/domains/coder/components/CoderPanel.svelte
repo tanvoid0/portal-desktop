@@ -58,10 +58,7 @@
     onCreateNew={p.newSession}
     onDeleteThread={p.deleteSession}
     onDeleteThreads={p.deleteSessions}
-    queuedCountFor={(id) => {
-      coderSession.runtimeRevision;
-      return coderSession.queuedCountFor(id);
-    }}
+    queuedCountFor={p.queuedCountFor}
     subAgentSummaryFor={(id) => {
       coderSession.runtimeRevision;
       return coderSession.subAgentSummaryFor(id);
@@ -118,7 +115,6 @@
             disabled={p.composerDisabled}
             running={p.running}
             queuedMessages={p.queuedMessages}
-            onRemoveQueued={p.removeQueued}
             agentMode={caps.agentModes ? coderSession.agentMode : undefined}
             effectiveMode={p.effectiveMode}
             onAgentModeChange={caps.agentModes ? (m) => coderSession.changeAgentMode(m) : undefined}
@@ -134,7 +130,6 @@
             showGitChanges={p.showGitChanges}
             pendingChangeCount={p.pendingChangeCount}
             contextUsage={caps.contextUsage ? p.contextUsage : null}
-            llmUsage={caps.contextUsage ? p.llmUsage : null}
             class="px-0 pb-0"
           />
         </PageContainer>
@@ -173,6 +168,12 @@
           onCleanupSubAgent={(id) => void coderSession.cleanupSubAgents([id], true)}
           onDecision={(a, r, d) => coderSession.decide(a, r, d)}
         />
+        {#if p.stopping}
+          <p class="text-xs text-muted-foreground">Stopping…</p>
+        {/if}
+        {#if p.decidedNote}
+          <p class="text-xs text-muted-foreground">{p.decidedNote}</p>
+        {/if}
       </PageContainer>
     </ScrollArea>
   {/if}
@@ -187,9 +188,8 @@
       disabled={p.composerDisabled}
       placeholder={p.platformBlocked ? p.blockedPlaceholder : undefined}
       running={p.running}
-      canStop={p.running || !!p.pending}
+      canStop={(p.running || !!p.pending) && !p.stopping}
       queuedMessages={p.queuedMessages}
-      onRemoveQueued={p.removeQueued}
       agentMode={caps.agentModes ? coderSession.agentMode : undefined}
       effectiveMode={p.effectiveMode}
       onAgentModeChange={caps.agentModes ? (m) => coderSession.changeAgentMode(m) : undefined}
@@ -206,7 +206,6 @@
       pendingChangeCount={p.pendingChangeCount}
       changesRevision={p.changesRevision}
       contextUsage={caps.contextUsage ? p.contextUsage : null}
-      llmUsage={caps.contextUsage ? p.llmUsage : null}
       class="pt-0"
     />
   </div>
