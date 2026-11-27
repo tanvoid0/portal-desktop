@@ -320,6 +320,8 @@ fn adds_key(top: &Path, c: &Change) -> Result<bool, String> {
             "diff",
             "HEAD",
             "-U0",
+            // `.gitattributes` can mark a text file binary and hide its lines.
+            "--text",
             "--no-ext-diff",
             "--no-textconv",
             "--no-color",
@@ -835,6 +837,17 @@ mod tests {
         assert!(!f.diff.contains("ghp_"), "{}", f.diff);
         assert!(f.files.iter().any(|c| c.path == "app/.env" && c.secret));
         assert!(!looks_secret(".env.example"));
+    }
+
+    #[test]
+    fn sync_resolve_gitattributes_cannot_hide_a_key() {
+        let t = fixture();
+        let d = t.path();
+        write(d, ".gitattributes", "a.txt -diff\n");
+        sh(d, &["add", ".gitattributes"]);
+        sh(d, &["commit", "-m", "attrs"]);
+        write(d, "a.txt", &format!("ghp_{}\n", "a".repeat(36)));
+        assert!(apply(d, &reviewed(d, commit_plan(&["a.txt"]))).is_err());
     }
 
     #[test]
