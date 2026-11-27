@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 use tauri::State;
 
+use crate::rpc::Caller;
+
 use super::backend::StartParams;
 use super::service::{
     AgentAnalytics, AgentEventSeq, AgentFeedPage, AgentRunService, AgentSessionDetail, AgentSessionSummary,
@@ -28,6 +30,7 @@ pub async fn agents_list_backends(
 
 #[portal_rpc_macro::rpc(cap = "agents.exec")]
 pub async fn agents_start_run(
+    caller: Caller,
     service: State<'_, Arc<AgentRunService>>,
     backend_id: String,
     cwd: String,
@@ -35,6 +38,7 @@ pub async fn agents_start_run(
     model: Option<String>,
     resume_session_id: Option<String>,
     task_id: Option<String>,
+    command_id: Option<String>,
 ) -> Result<String, String> {
     let params = StartParams {
         cwd,
@@ -48,18 +52,20 @@ pub async fn agents_start_run(
         // same as coder already does (`coder/service.rs`'s own `start` call).
         isolate_settings: false,
     };
-    service.inner().start_run(&backend_id, params).await
+    service.inner().start_run(&backend_id, params, &caller.actor(), command_id).await
 }
 
 /// Resumes a prior session in place (same row, same id, same backend
 /// conversation) rather than starting a new one.
 #[portal_rpc_macro::rpc(cap = "agents.exec")]
 pub async fn agents_resume_session(
+    caller: Caller,
     service: State<'_, Arc<AgentRunService>>,
     run_id: String,
     text: String,
+    command_id: Option<String>,
 ) -> Result<String, String> {
-    service.inner().resume_session(&run_id, text).await
+    service.resume(&run_id, text, &caller.actor(), command_id).await
 }
 
 /// Deletes a persisted session and its transcript/event log. Refused while
@@ -74,29 +80,36 @@ pub async fn agents_delete_session(
 
 #[portal_rpc_macro::rpc(cap = "agents.exec")]
 pub async fn agents_send_user(
+    caller: Caller,
     service: State<'_, Arc<AgentRunService>>,
     run_id: String,
     text: String,
+    command_id: Option<String>,
 ) -> Result<(), String> {
-    service.send_user(&run_id, text).await
+    service.send_user(&run_id, text, &caller.actor(), command_id).await?;
+    Ok(())
 }
 
 #[portal_rpc_macro::rpc(cap = "agents.exec")]
 pub async fn agents_decide_permission(
+    caller: Caller,
     service: State<'_, Arc<AgentRunService>>,
     run_id: String,
     request_id: String,
     allow: bool,
+    command_id: Option<String>,
 ) -> Result<(), String> {
-    service.decide_permission(&run_id, request_id, allow).await
+    service.decide_permission(&run_id, request_id, allow, &caller.actor(), command_id).await
 }
 
 #[portal_rpc_macro::rpc(cap = "agents.exec")]
 pub async fn agents_interrupt(
+    caller: Caller,
     service: State<'_, Arc<AgentRunService>>,
     run_id: String,
+    command_id: Option<String>,
 ) -> Result<(), String> {
-    service.interrupt(&run_id).await
+    service.interrupt(&run_id, &caller.actor(), command_id).await
 }
 
 #[portal_rpc_macro::rpc(cap = "agents.exec")]

@@ -20,7 +20,7 @@ use tokio::sync::{mpsc, Mutex, Semaphore};
 use ts_rs::TS;
 
 use crate::database::DatabaseManager;
-use crate::domains::threads::{ThreadCommand, ThreadHub};
+use crate::domains::threads::{AckStatus, CommandAck, Effect, Envelope, ThreadCommand, ThreadEffects, ThreadHub};
 use crate::events::{EventSink, EventSinkExt};
 
 use super::backend::{AgentBackend, BackendModel, RunControl, StartParams};
@@ -244,6 +244,8 @@ struct RunEntry {
     /// `agent_events.seq` — only needs to be strictly increasing within a
     /// run, not contiguous per-table, so one counter for both is enough.
     next_seq: i64,
+    /// The process is gone; the entry only lingers for `EVENT_REPLAY_GRACE`.
+    exited: bool,
 }
 
 pub struct AgentRunService {
@@ -272,18 +274,14 @@ impl AgentRunService {
         let _ = self.thread_hub.set(hub);
     }
 
-    /// The backend never echoes the user's turn, so the thread log is told here.
-    fn observe_user(&self, run_id: &str, text: &str) {
-        if let Some(hub) = self.thread_hub.get() {
-            hub.submit(
-                run_id,
-                ThreadCommand::Provider(AgentEvent::Message {
-                    role: "user".into(),
-                    text: text.to_string(),
-                    parent_tool_use_id: None,
-                }),
-            );
-        }
+    /// A command through the thread hub (dedup, first-wins, queue).
+    async fn command(&self, run_id: &str, cmd: ThreadCommand, actor: &str, command_id: Option<String>) -> Result<(), String> {
+        let hub = self.thread_hub.get().ok_or("threads: hub not attached")?;
+        accepted(hub.command(run_id, Envelope { cmd, actor: actor.into(), command_id }).await?)
+    }
+
+    async fn is_live(&self, run_id: &str) -> bool {
+        self.runs.lock().await.get(run_id).is_some_and(|e| !e.exited)
     }
 
     pub async fn init_events(&self, sink: Arc<dyn EventSink>) {
@@ -322,6 +320,8 @@ impl AgentRunService {
         self: &Arc<Self>,
         backend_id: &str,
         params: StartParams,
+        actor: &str,
+        command_id: Option<String>,
     ) -> Result<String, String> {
         let backend = self
             .find_backend(backend_id)
@@ -347,6 +347,7 @@ impl AgentRunService {
                 control,
                 ring: VecDeque::new(),
                 next_seq: if has_prompt { 1 } else { 0 },
+                exited: false,
             },
         );
 
@@ -355,26 +356,22 @@ impl AgentRunService {
         if has_prompt {
             self.persist_message(&run_id, 0, "user", &params.prompt, None)
                 .await;
-            self.observe_user(&run_id, &params.prompt);
+            // The backend never echoes the user's turn, so the log is told here. Awaited,
+            // after the session row exists: the thread is created before the id is returned.
+            let first = AgentEvent::Message { role: "user".into(), text: params.prompt.clone(), parent_tool_use_id: None };
+            if let Err(e) = self.command(&run_id, ThreadCommand::Provider(first), actor, command_id).await {
+                eprintln!("agents: thread log missed the first turn: {e}");
+            }
         }
 
         self.spawn_pump(run_id.clone(), rx, permit);
         Ok(run_id)
     }
 
-    /// Resumes a prior session **in place** — same `agent_sessions` row,
-    /// same id reused as the new run's id, same backend conversation (the
-    /// backend's own `--resume <backend_session_id>`), never a new row.
-    /// Confirmed decision for the IDE-shaped session view (#546): "Resume"
-    /// continues the thread rather than forking a new one.
-    pub async fn resume_session(
-        self: &Arc<Self>,
-        session_id: &str,
-        text: String,
-    ) -> Result<String, String> {
-        let conn = self.db.get_connection();
+    /// The persisted row of a session that can be resumed, and its backend session id.
+    async fn resumable(&self, session_id: &str) -> Result<(agent_session::Model, String), String> {
         let row = agent_session::Entity::find_by_id(session_id.to_string())
-            .one(conn)
+            .one(self.db.get_connection())
             .await
             .map_err(|e| format!("agents: load session for resume failed: {e}"))?
             .ok_or("session not found")?;
@@ -386,9 +383,26 @@ impl AgentRunService {
         // The live `runs` map is the source of truth, not just the persisted
         // `status` — covers the DB lagging reality during the race right
         // after a run starts or exits (see `spawn_pump`'s own entry removal).
-        if row.status == "running" || self.runs.lock().await.contains_key(session_id) {
+        if row.status == "running" || self.is_live(session_id).await {
             return Err("session is already running".to_string());
         }
+        Ok((row, backend_session_id))
+    }
+
+    /// Resumes a prior session **in place** — same `agent_sessions` row,
+    /// same id reused as the new run's id, same backend conversation (the
+    /// backend's own `--resume <backend_session_id>`), never a new row.
+    /// Confirmed decision for the IDE-shaped session view (#546): "Resume"
+    /// continues the thread rather than forking a new one.
+    /// Starts the process only: the user turn is already in the thread log
+    /// (clients come in through `resume` / `send_user`).
+    pub async fn resume_session(
+        self: &Arc<Self>,
+        session_id: &str,
+        text: String,
+    ) -> Result<String, String> {
+        let conn = self.db.get_connection();
+        let (row, backend_session_id) = self.resumable(session_id).await?;
 
         let backend = self
             .find_backend(&row.backend_id)
@@ -420,6 +434,7 @@ impl AgentRunService {
                 control,
                 ring: VecDeque::new(),
                 next_seq: seq + 1,
+                exited: false,
             },
         );
 
@@ -431,7 +446,6 @@ impl AgentRunService {
         }
         self.persist_message(session_id, seq, "user", &text, None)
             .await;
-        self.observe_user(session_id, &text);
 
         self.spawn_pump(session_id.to_string(), rx, permit);
         Ok(session_id.to_string())
@@ -485,6 +499,10 @@ impl AgentRunService {
                     // session would otherwise sit at status "running" forever
                     // with no `ended_at`, since nothing else reconciles it.
                     svc.persist_session_end(&rid, None, "interrupted").await;
+                    // So a thread left mid-turn does not wait on a process that is gone.
+                    if let Some(hub) = svc.thread_hub.get() {
+                        hub.submit(&rid, ThreadCommand::Provider(AgentEvent::Exited { code: None }));
+                    }
                     break;
                 };
                 if let AgentEvent::SessionStarted { session_id } = &event {
@@ -553,49 +571,68 @@ impl AgentRunService {
                 }
             }
             drop(permit);
+            if let Some(e) = svc.runs.lock().await.get_mut(&rid) {
+                e.exited = true;
+            }
 
             // Grace period for a client mid-poll of `get_events` to still
             // see the final events, then free the entry so `runs` doesn't
             // grow for the life of the process.
             tokio::time::sleep(EVENT_REPLAY_GRACE).await;
-            svc.runs.lock().await.remove(&rid);
+            // Not a newer run that resumed this session in the meantime.
+            let mut runs = svc.runs.lock().await;
+            if runs.get(&rid).is_some_and(|e| e.exited) {
+                runs.remove(&rid);
+            }
         });
+    }
+
+    /// A user turn from a client: the hub records it (queued behind a running turn) and
+    /// its `StartTurn` effect delivers it, resuming a finished run. Returns the run id.
+    pub async fn send_user(&self, run_id: &str, text: String, actor: &str, command_id: Option<String>) -> Result<String, String> {
+        // Fail here, not in the effect, where nobody could hear it.
+        if !self.is_live(run_id).await {
+            self.resumable(run_id).await?;
+        }
+        self.command(run_id, ThreadCommand::Send { text }, actor, command_id).await?;
+        Ok(run_id.to_string())
+    }
+
+    /// Resume in place: `send_user` that insists the run is not live.
+    pub async fn resume(&self, session_id: &str, text: String, actor: &str, command_id: Option<String>) -> Result<String, String> {
+        self.resumable(session_id).await?;
+        self.send_user(session_id, text, actor, command_id).await
+    }
+
+    /// The hub records `ApprovalResolved{by: actor}` first and rejects a second answer.
+    pub async fn decide_permission(&self, run_id: &str, request_id: String, allow: bool, actor: &str, command_id: Option<String>) -> Result<(), String> {
+        let approve = ThreadCommand::Approve { call_id: request_id, allow, remember: false, edited_pattern: None, edited_command: None };
+        self.command(run_id, approve, actor, command_id).await
+    }
+
+    /// Stop the turn, not the process. Nothing to stop is not an error.
+    pub async fn interrupt(&self, run_id: &str, actor: &str, command_id: Option<String>) -> Result<(), String> {
+        match self.command(run_id, ThreadCommand::Stop, actor, command_id).await {
+            Err(e) if e.contains("not_running") => Ok(()),
+            r => r,
+        }
     }
 
     // ponytail: one `Mutex<HashMap<..>>` for every run's control handle —
     // each call below just forwards a quick stdin write/HTTP-decision, so
     // holding it for the await is cheap. Split per-run if a slow backend ever
     // makes that untrue.
-    pub async fn send_user(&self, run_id: &str, text: String) -> Result<(), String> {
+    async fn send_live(&self, run_id: &str, text: String) -> Result<(), String> {
         let seq = {
             let mut runs = self.runs.lock().await;
             let entry = runs.get_mut(run_id).ok_or("run not found")?;
             let seq = entry.next_seq;
             entry.next_seq += 1;
             entry.control.send_user(text.clone()).await?;
-            // Inside the lock so it orders before the reply's events.
-            self.observe_user(run_id, &text);
             seq
         };
         self.persist_message(run_id, seq, "user", &text, None).await;
         Ok(())
-    }
-
-    pub async fn decide_permission(
-        &self,
-        run_id: &str,
-        request_id: String,
-        allow: bool,
-    ) -> Result<(), String> {
-        let runs = self.runs.lock().await;
-        let entry = runs.get(run_id).ok_or("run not found")?;
-        entry.control.decide_permission(request_id, allow).await
-    }
-
-    pub async fn interrupt(&self, run_id: &str) -> Result<(), String> {
-        let runs = self.runs.lock().await;
-        let entry = runs.get(run_id).ok_or("run not found")?;
-        entry.control.interrupt().await
     }
 
     pub async fn cancel(&self, run_id: &str) -> Result<(), String> {
@@ -644,6 +681,10 @@ impl AgentRunService {
             am.update(conn)
                 .await
                 .map_err(|e| format!("agents: reconcile stale session failed: {e}"))?;
+            // Its thread may be mid-turn; end it (a no-op without a hub or when idle).
+            if let Some(hub) = self.thread_hub.get() {
+                hub.submit(&row.id, ThreadCommand::Provider(AgentEvent::Exited { code: None }));
+            }
         }
         Ok(stale.len())
     }
@@ -1096,6 +1137,51 @@ impl AgentRunService {
     }
 }
 
+/// A rejected command is an error for the caller; accepted and duplicate both mean "done".
+fn accepted(ack: CommandAck) -> Result<(), String> {
+    if ack.status != AckStatus::Rejected {
+        return Ok(());
+    }
+    let code = ack.code.unwrap_or_default();
+    Err(match ack.resolved_by {
+        Some(by) => format!("{code}: already answered by {by}"),
+        None => code,
+    })
+}
+
+/// What a committed thread command asks of a CLI run. Runs outside the actor and
+/// never inside a transaction; a failure re-enters the log as an event.
+#[async_trait::async_trait]
+impl ThreadEffects for Arc<AgentRunService> {
+    async fn run(&self, thread_id: &str, effect: Effect) {
+        let starts_turn = matches!(effect, Effect::StartTurn { .. });
+        let result = match effect {
+            // The turn is already in the log; deliver it, resuming a finished run.
+            Effect::StartTurn { text, .. } if self.is_live(thread_id).await => self.send_live(thread_id, text).await,
+            Effect::StartTurn { text, .. } => self.resume_session(thread_id, text).await.map(|_| ()),
+            Effect::ResolveApproval { call_id, allow, .. } => match self.runs.lock().await.get(thread_id) {
+                Some(e) => e.control.decide_permission(call_id, allow).await,
+                None => Err("run not found".into()),
+            },
+            // Fire-and-forget and repeatable (a lost one is retried by a second Stop): a
+            // run that is gone has nothing left to stop.
+            Effect::Cancel => match self.runs.lock().await.get(thread_id).filter(|e| !e.exited) {
+                Some(e) => e.control.interrupt().await,
+                None => Ok(()),
+            },
+            // CLI backends make no host requests.
+            Effect::DeliverHostResult { .. } => Ok(()),
+        };
+        if let Err(e) = result {
+            eprintln!("agents: effect for {thread_id} failed: {e}");
+            // Else the turn the log opened would wait on a process that never started.
+            if let (Some(hub), true) = (self.thread_hub.get(), starts_turn) {
+                hub.submit(thread_id, ThreadCommand::Provider(AgentEvent::TurnDone { final_text: Some(e), is_error: true }));
+            }
+        }
+    }
+}
+
 fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339()
 }
@@ -1175,6 +1261,7 @@ mod tests {
                 control: Box::new(FakeControl),
                 ring: VecDeque::new(),
                 next_seq: 1,
+                exited: false,
             },
         );
 
@@ -1242,6 +1329,139 @@ mod tests {
             .await
             .unwrap_err();
         assert!(err.contains("never reached the backend"), "got: {err}");
+    }
+
+    // ---- S3b: client commands go through the thread hub ----
+
+    #[derive(Default)]
+    struct Calls {
+        sent: Vec<String>,
+        decided: Vec<(String, bool)>,
+        interrupts: usize,
+    }
+    struct RecControl(Arc<std::sync::Mutex<Calls>>);
+    #[async_trait::async_trait]
+    impl RunControl for RecControl {
+        async fn send_user(&self, text: String) -> Result<(), String> {
+            self.0.lock().unwrap().sent.push(text);
+            Ok(())
+        }
+        async fn decide_permission(&self, id: String, allow: bool) -> Result<(), String> {
+            self.0.lock().unwrap().decided.push((id, allow));
+            Ok(())
+        }
+        async fn interrupt(&self) -> Result<(), String> {
+            self.0.lock().unwrap().interrupts += 1;
+            Ok(())
+        }
+        async fn kill(&self) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    #[derive(Debug)]
+    struct NullSink;
+    impl EventSink for NullSink {
+        fn emit_json(&self, _event: &str, _payload: serde_json::Value) -> bool {
+            true
+        }
+    }
+
+    /// A service with a hub, CLI effects registered, and one live run `run-1`.
+    async fn hub_service() -> (Arc<AgentRunService>, Arc<ThreadHub>, Arc<std::sync::Mutex<Calls>>, tempfile::TempDir) {
+        let (svc, dir) = test_service().await;
+        seed_session(&svc, "run-1").await;
+        let hub = ThreadHub::new(svc.db.clone(), Arc::new(NullSink));
+        svc.attach_thread_hub(hub.clone());
+        hub.register_cli_effects(Arc::new(svc.clone()));
+        let calls = Arc::new(std::sync::Mutex::new(Calls::default()));
+        svc.runs.lock().await.insert(
+            "run-1".into(),
+            RunEntry { control: Box::new(RecControl(calls.clone())), ring: VecDeque::new(), next_seq: 1, exited: false },
+        );
+        (svc, hub, calls, dir)
+    }
+
+    fn feed(hub: &Arc<ThreadHub>, events: Vec<AgentEvent>) {
+        for e in events {
+            hub.submit("run-1", ThreadCommand::Provider(e));
+        }
+    }
+
+    /// Effects run in their own tasks; wait for one's side effect.
+    async fn until(mut done: impl FnMut() -> bool) {
+        for _ in 0..200 {
+            if done() {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        panic!("timed out");
+    }
+
+    fn user(text: &str) -> AgentEvent {
+        AgentEvent::Message { role: "user".into(), text: text.into(), parent_tool_use_id: None }
+    }
+
+    /// A recorded run replayed through the hub, with client commands in the middle: the
+    /// approval is recorded once with its answerer, the backend's echo and a second answer
+    /// are dropped, a mid-turn message queues and drains when the turn completes.
+    #[tokio::test]
+    async fn replayed_run_with_client_commands_snapshots_as_expected() {
+        use crate::domains::threads::{ThreadEvent, ThreadStatus};
+        let (svc, hub, calls, _dir) = hub_service().await;
+        feed(
+            &hub,
+            vec![
+                user("go"),
+                AgentEvent::SessionStarted { session_id: "sess".into() },
+                AgentEvent::PermissionRequest { request_id: "r1".into(), tool_name: "Bash".into(), tool_input: json!({"command": "ls"}), suggestions: vec![] },
+            ],
+        );
+        svc.send_user("run-1", "next".into(), "local", None).await.unwrap();
+        assert!(calls.lock().unwrap().sent.is_empty(), "queued behind the running turn");
+
+        svc.decide_permission("run-1", "r1".into(), true, "device:phone", Some("c1".into())).await.unwrap();
+        until(|| calls.lock().unwrap().decided == [("r1".to_string(), true)]).await;
+        let again = svc.decide_permission("run-1", "r1".into(), false, "local", None).await.unwrap_err();
+        assert!(again.contains("already_resolved") && again.contains("device:phone"), "got: {again}");
+
+        feed(
+            &hub,
+            vec![
+                AgentEvent::PermissionResolved { request_id: "r1".into(), allowed: true }, // the backend's echo
+                AgentEvent::Message { role: "assistant".into(), text: "ok".into(), parent_tool_use_id: None },
+                AgentEvent::TurnDone { final_text: Some("ok".into()), is_error: false },
+            ],
+        );
+        until(|| calls.lock().unwrap().sent == ["next"]).await;
+
+        let snap = hub.snapshot("run-1").await.unwrap().unwrap();
+        let page = hub.events_since("run-1", 0).await.unwrap();
+        let resolved: Vec<_> = page.events.iter().filter(|f| matches!(f.event, ThreadEvent::ApprovalResolved { .. })).collect();
+        assert_eq!(resolved.len(), 1, "the echo is dropped as already resolved");
+        assert_eq!((resolved[0].actor.as_str(), resolved[0].command_id.as_deref()), ("device:phone", Some("c1")));
+        assert_eq!(snap.state.status, ThreadStatus::Running, "the queued turn started");
+        assert!(snap.state.queue.is_empty() && snap.state.approvals.is_empty());
+        let texts: Vec<_> = snap.messages.iter().map(|m| m.content.clone().unwrap_or_default()).collect();
+        assert_eq!(texts, ["go", "ok", "next"]);
+        assert_eq!(snap.seq, page.head_seq);
+    }
+
+    /// A Stop while stopping fires the interrupt again; one with nothing to stop is fine.
+    #[tokio::test]
+    async fn interrupt_is_idempotent() {
+        let (svc, hub, calls, _dir) = hub_service().await;
+        feed(&hub, vec![user("go")]);
+        svc.interrupt("run-1", "local", None).await.unwrap();
+        svc.interrupt("run-1", "local", None).await.unwrap();
+        until(|| calls.lock().unwrap().interrupts == 2).await;
+        feed(&hub, vec![AgentEvent::TurnDone { final_text: None, is_error: false }]);
+        svc.interrupt("run-1", "local", None).await.unwrap(); // idle: nothing to stop
+        let page = hub.events_since("run-1", 0).await.unwrap();
+        let stops = page.events.iter().filter(|f| matches!(f.event, crate::domains::threads::ThreadEvent::StopRequested)).count();
+        assert_eq!(stops, 1);
+        assert_eq!(calls.lock().unwrap().interrupts, 2);
     }
 
     /// Cross-session feed: newest first, noise dropped, `after_seq`/`before_seq`

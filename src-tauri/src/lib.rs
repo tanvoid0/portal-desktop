@@ -366,6 +366,7 @@ pub fn run() {
                 });
             }
             agents_service.attach_thread_hub(thread_hub.clone());
+            thread_hub.register_cli_effects(std::sync::Arc::new(agents_service.clone()));
             app.manage(thread_hub);
             app.manage(agents_service);
 
