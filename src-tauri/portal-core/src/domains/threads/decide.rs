@@ -159,7 +159,11 @@ fn portal(state: &ThreadState, p: &PortalInput) -> Vec<ThreadEvent> {
         }],
         P::Pending(approval) => vec![E::ApprovalRequested { approval: approval.clone() }],
         P::Failed { error } => ends(TurnOutcome::Error, Some(error.clone()), None),
-        P::Finished { outcome, final_text } => ends(*outcome, None, final_text.clone()),
+        P::Finished { outcome, final_text } => {
+            // Else the UI ends the turn silently and offers no Retry.
+            let error = (*outcome == TurnOutcome::Exhausted).then(|| "Agent hit the max iteration limit.".to_string());
+            ends(*outcome, error, final_text.clone())
+        }
     }
 }
 

@@ -91,6 +91,17 @@ pub async fn agents_send_user(
 }
 
 #[portal_rpc_macro::rpc(cap = "agents.exec")]
+pub async fn agents_remove_queued(
+    caller: Caller,
+    service: State<'_, Arc<AgentRunService>>,
+    run_id: String,
+    queue_id: String,
+    command_id: Option<String>,
+) -> Result<(), String> {
+    service.remove_queued(&run_id, queue_id, &caller.actor(), command_id).await
+}
+
+#[portal_rpc_macro::rpc(cap = "agents.exec")]
 pub async fn agents_decide_permission(
     caller: Caller,
     service: State<'_, Arc<AgentRunService>>,

@@ -111,11 +111,20 @@ pub async fn coder_send(
     message: String,
     command_id: Option<String>,
 ) -> Result<(), String> {
-    // The legacy UI neither shows nor drains the hub's queue: a new message supersedes a
-    // parked or stopping turn instead of queueing behind it.
-    // ponytail: S4a (#1933) switches to a plain Send with a visible queue.
-    service.supersede_for_send(&thread_id, &caller.actor()).await?;
+    // While a turn is open the hub queues it; the queue drains once the turn completes.
     let cmd = ThreadCommand::Send { text: message };
+    accepted(service.hub_command(&thread_id, cmd, caller.actor(), command_id).await?)
+}
+
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
+pub async fn coder_remove_queued(
+    caller: Caller,
+    service: State<'_, Arc<CoderService>>,
+    thread_id: String,
+    queue_id: String,
+    command_id: Option<String>,
+) -> Result<(), String> {
+    let cmd = ThreadCommand::RemoveQueued { queue_id };
     accepted(service.hub_command(&thread_id, cmd, caller.actor(), command_id).await?)
 }
 

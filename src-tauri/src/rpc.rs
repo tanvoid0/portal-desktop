@@ -375,6 +375,7 @@ mod tests {
         assert!(SENSITIVE_CAPS.contains(&"coder.exec"));
         for name in [
             "coder_send",
+            "coder_remove_queued",
             "coder_retry",
             "coder_edit_message",
             "coder_approve",

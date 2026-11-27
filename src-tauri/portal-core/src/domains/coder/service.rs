@@ -633,32 +633,6 @@ impl CoderService {
         Some(hub.snapshot(thread_id).await.ok()??.state)
     }
 
-    /// Make room for a `Send`. The hub would queue it behind an open turn, which the
-    /// legacy UI cannot see, so a new message supersedes instead, as it did before the hub:
-    /// a turn parked on an approval is stopped, a stopping one is waited out. A turn that is
-    /// running (the legacy UI queues locally then) or does not close in time is `busy:`.
-    // ponytail: polls the snapshot every 100 ms for 15 s; S4a (#1933) switches the UI to a
-    // plain Send with a visible queue and this goes away.
-    pub async fn supersede_for_send(&self, thread_id: &str, actor: &str) -> Result<(), String> {
-        let Some(state) = self.hub_state(thread_id).await else { return Ok(()) };
-        if !state.turn_open() {
-            return Ok(());
-        }
-        if !state.stopping && state.status != crate::domains::threads::ThreadStatus::Waiting {
-            return Err("busy: a turn is already running".into());
-        }
-        // Also when already stopping: a repeated Stop re-fires a Cancel that may have been
-        // lost. Its ack does not matter (the turn may close meanwhile); the poll decides.
-        let _ = self.hub_command(thread_id, ThreadCommand::Stop, actor.into(), None).await;
-        for _ in 0..150 {
-            if !self.hub_state(thread_id).await.is_some_and(|s| s.turn_open()) {
-                return Ok(());
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        }
-        Err("busy: still stopping, try again in a moment".into())
-    }
-
     /// An approval only the legacy transcript knows (parked before the hub existed):
     /// nothing open in the hub, and the call is still there to answer.
     pub async fn is_legacy_approval(&self, thread_id: &str, call_id: &str) -> bool {
@@ -3286,56 +3260,21 @@ mod hub_tests {
         assert_eq!(state.status, ThreadStatus::Idle);
     }
 
-    /// Forwards Cancel to the service (as the app's registration does) and records the rest.
-    struct CancelOnly(Arc<CoderService>, std::sync::Mutex<Vec<Effect>>);
-    #[async_trait::async_trait]
-    impl ThreadEffects for CancelOnly {
-        async fn run(&self, thread_id: &str, effect: Effect) {
-            match effect {
-                Effect::Cancel => self.0.run(thread_id, Effect::Cancel).await,
-                other => self.1.lock().unwrap().push(other),
-            }
-        }
-    }
-
-    /// The legacy UI cannot see the hub's queue, so a Send onto a turn parked on an approval
-    /// stops that turn (approvals cleared) and starts the new one.
+    /// `coder_send` is a plain Send: queued behind an open turn, started when it completes.
     #[tokio::test]
-    async fn send_while_waiting_supersedes_the_parked_turn() {
+    async fn send_during_a_turn_queues_and_drains_after_it() {
         let (svc, hub, _db, id, _dir) = setup().await;
-        let fx = Arc::new(CancelOnly(svc.clone(), Default::default()));
-        hub.register_portal_effects(fx.clone());
         send(&svc, &id, "first").await;
-        let pending = PendingApproval {
-            call_id: "c1".into(),
-            tool: "run_command".into(),
-            arguments: json!({}),
-            suggested_rule: String::new(),
-            summary: "ls".into(),
-        };
-        svc.feed(&id, PortalInput::Pending(pending)).await;
-
-        svc.supersede_for_send(&id, "local").await.unwrap();
         send(&svc, &id, "second").await;
-
         let s = hub.snapshot(&id).await.unwrap().unwrap();
-        assert!(s.state.approvals.is_empty() && s.state.queue.is_empty());
-        assert_eq!(s.state.status, ThreadStatus::Running);
-        assert_eq!(s.messages.last().and_then(|m| m.content.as_deref()), Some("second"));
-        let started: Vec<_> = fx.1.lock().unwrap().iter().filter_map(|e| match e {
-            Effect::StartTurn { text, .. } => Some(text.clone()),
-            _ => None,
-        }).collect();
-        assert_eq!(started, ["first", "second"]);
-    }
+        assert_eq!(s.state.queue.len(), 1);
+        assert_eq!(s.messages.last().and_then(|m| m.content.as_deref()), Some("first"));
 
-    /// A running turn is not ours to supersede: `busy`.
-    #[tokio::test]
-    async fn send_while_running_is_busy() {
-        let (svc, _hub, _db, id, _dir) = setup().await;
-        send(&svc, &id, "first").await;
-        let err = svc.supersede_for_send(&id, "local").await.unwrap_err();
-        assert!(err.starts_with("busy"), "{err}");
+        svc.finish(&id, None, false, false).await;
+        hub.snapshot(&id).await.unwrap(); // the queue drain lands behind this one
+        let s = hub.snapshot(&id).await.unwrap().unwrap();
+        assert!(s.state.queue.is_empty());
+        assert_eq!(s.messages.last().and_then(|m| m.content.as_deref()), Some("second"));
     }
 
     /// A run that returns on a pending approval leaves the turn Waiting, and Stop with no

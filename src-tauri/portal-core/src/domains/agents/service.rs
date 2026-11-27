@@ -529,6 +529,14 @@ impl AgentRunService {
                     if let Some(hub) = svc.thread_hub.get() {
                         hub.submit(&rid, ThreadCommand::Provider(AgentEvent::Exited { code: None }));
                     }
+                    // The UI keeps a crashed run as running until it hears this.
+                    let seq = svc.runs.lock().await.get_mut(&rid).map(|e| {
+                        e.next_seq += 1;
+                        e.next_seq - 1
+                    });
+                    if let Some(seq) = seq {
+                        svc.emit(&rid, seq, &AgentEvent::Exited { code: None }).await;
+                    }
                     break;
                 };
                 if let AgentEvent::SessionStarted { session_id } = &event {
@@ -621,16 +629,21 @@ impl AgentRunService {
         });
     }
 
-    /// A user turn from a client. A live run gets it straight away, even mid-turn (the
-    /// agents UI has no queue view yet; S4b, #1934, switches this to `Send` + the hub's
-    /// queue). A finished run is resumed, so start errors reach the caller. The turn is
-    /// recorded in the thread log as the backend's user message. Returns the run id.
+    /// A user turn from a client. A live run takes a hub `Send`: queued behind an open turn,
+    /// else the `StartTurn` effect writes it to the process (the log already has it). A
+    /// finished run is resumed, so start errors reach the caller; that turn is recorded in
+    /// the thread log as the backend's user message. Returns the run id.
     pub async fn send_user(self: &Arc<Self>, run_id: &str, text: String, actor: &str, command_id: Option<String>) -> Result<String, String> {
         if !self.is_live(run_id).await {
             return self.resume_session(run_id, text, Some((actor, command_id))).await;
         }
-        self.send_live(run_id, text, Some((actor, command_id))).await?;
+        self.command(run_id, ThreadCommand::Send { text }, actor, command_id).await?;
         Ok(run_id.to_string())
+    }
+
+    /// Drop a queued (not yet started) message.
+    pub async fn remove_queued(&self, run_id: &str, queue_id: String, actor: &str, command_id: Option<String>) -> Result<(), String> {
+        self.command(run_id, ThreadCommand::RemoveQueued { queue_id }, actor, command_id).await
     }
 
     /// The backend never echoes the user's turn, so the log is told here.
@@ -701,7 +714,7 @@ impl AgentRunService {
     /// while the backend sits alive (QA-127). Cheap and non-sensitive (just
     /// ids), so `agents` rather than `agents.history`.
     pub async fn list_running(&self) -> Vec<String> {
-        self.runs.lock().await.keys().cloned().collect()
+        self.runs.lock().await.iter().filter(|(_, e)| !e.exited).map(|(k, _)| k.clone()).collect()
     }
 
     /// Flips every `agent_sessions` row still `status = "running"` to
@@ -1453,10 +1466,10 @@ mod tests {
 
     /// A recorded run replayed through the hub, with client commands in the middle: the
     /// approval is recorded once with its answerer, the backend's echo and a second answer
-    /// are dropped, a mid-turn message goes to the backend and is logged in order.
+    /// are dropped, a mid-turn message is queued and reaches the backend after the turn.
     #[tokio::test]
     async fn replayed_run_with_client_commands_snapshots_as_expected() {
-        use crate::domains::threads::{ThreadEvent, ThreadStatus};
+        use crate::domains::threads::ThreadEvent;
         let (svc, hub, calls, _dir) = hub_service().await;
         feed(
             &hub,
@@ -1467,7 +1480,7 @@ mod tests {
             ],
         );
         svc.send_user("run-1", "next".into(), "local", None).await.unwrap();
-        assert_eq!(calls.lock().unwrap().sent, ["next"], "mid-turn sends go straight to the backend");
+        assert!(calls.lock().unwrap().sent.is_empty(), "mid-turn sends queue behind the turn");
 
         svc.decide_permission("run-1", "r1".into(), true, "device:phone", Some("c1".into())).await.unwrap();
         until(|| calls.lock().unwrap().decided == [("r1".to_string(), true)]).await;
@@ -1483,28 +1496,84 @@ mod tests {
             ],
         );
 
+        until(|| calls.lock().unwrap().sent == ["next"]).await;
         let snap = hub.snapshot("run-1").await.unwrap().unwrap();
         let page = hub.events_since("run-1", 0).await.unwrap();
         let resolved: Vec<_> = page.events.iter().filter(|f| matches!(f.event, ThreadEvent::ApprovalResolved { .. })).collect();
         assert_eq!(resolved.len(), 1, "the echo is dropped as already resolved");
         assert_eq!((resolved[0].actor.as_str(), resolved[0].command_id.as_deref()), ("device:phone", Some("c1")));
-        assert_eq!(snap.state.status, ThreadStatus::Idle);
         assert!(snap.state.queue.is_empty() && snap.state.approvals.is_empty());
         let texts: Vec<_> = snap.messages.iter().map(|m| m.content.clone().unwrap_or_default()).collect();
-        assert_eq!(texts, ["go", "next", "ok"]);
+        assert_eq!(texts, ["go", "ok", "next"]);
         assert_eq!(snap.seq, page.head_seq);
     }
 
-    /// A send the backend refuses leaves nothing in the log (the user re-sends); a second
-    /// resume of a session already starting is refused.
+    /// Between turns a live run's Send reaches the process once, with one user message in
+    /// the log; during a turn it queues and `RemoveQueued` drops it (unknown ids reject).
     #[tokio::test]
-    async fn failed_send_records_nothing_and_resume_is_single_flight() {
+    async fn live_send_goes_once_and_queued_can_be_removed() {
         let (svc, hub, calls, _dir) = hub_service().await;
-        feed(&hub, vec![user("go")]);
-        calls.lock().unwrap().fail_send = true;
-        svc.send_user("run-1", "x".into(), "local", None).await.unwrap_err();
+        svc.send_user("run-1", "a".into(), "local", None).await.unwrap();
+        until(|| calls.lock().unwrap().sent == ["a"]).await;
+        svc.send_user("run-1", "b".into(), "local", None).await.unwrap();
         let snap = hub.snapshot("run-1").await.unwrap().unwrap();
-        assert_eq!(snap.messages.len(), 1, "only the first prompt");
+        assert_eq!(snap.state.queue.len(), 1);
+        let texts: Vec<_> = snap.messages.iter().map(|m| m.content.clone().unwrap_or_default()).collect();
+        assert_eq!(texts, ["a"], "one user message, not two");
+
+        svc.remove_queued("run-1", "nope".into(), "local", None).await.unwrap_err();
+        svc.remove_queued("run-1", snap.state.queue[0].queue_id.clone(), "local", None).await.unwrap();
+        feed(&hub, vec![AgentEvent::TurnDone { final_text: None, is_error: false }]);
+        let snap = hub.snapshot("run-1").await.unwrap().unwrap();
+        assert!(snap.state.queue.is_empty());
+        assert_eq!(calls.lock().unwrap().sent, ["a"], "the removed message never started");
+    }
+
+    /// A run whose channel closes with no `Exited` is announced as exited once, and a run
+    /// that already exited is not listed as running.
+    #[tokio::test]
+    async fn crashed_run_emits_exited_and_leaves_running_list() {
+        #[derive(Debug)]
+        struct Rec(Arc<std::sync::Mutex<Vec<serde_json::Value>>>);
+        impl EventSink for Rec {
+            fn emit_json(&self, _e: &str, payload: serde_json::Value) -> bool {
+                self.0.lock().unwrap().push(payload);
+                true
+            }
+        }
+        let (svc, _hub, _calls, _dir) = hub_service().await;
+        let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+        svc.init_events(Arc::new(Rec(seen.clone()))).await;
+        assert_eq!(svc.list_running().await, ["run-1"]);
+        let (tx, rx) = mpsc::unbounded_channel::<AgentEvent>();
+        let permit = Arc::clone(&svc.semaphore).acquire_owned().await.unwrap();
+        svc.spawn_pump("run-1".into(), rx, permit);
+        drop(tx);
+        until(|| seen.lock().unwrap().len() == 1).await;
+        assert_eq!(seen.lock().unwrap()[0]["event"]["type"], "exited");
+        until(|| svc.runs.try_lock().is_ok_and(|r| r["run-1"].exited)).await;
+        assert!(svc.list_running().await.is_empty());
+    }
+
+    /// A send the backend refuses surfaces as a failed turn in the log (the effect runs after
+    /// the ack), not a stuck one; a second resume of a session already starting is refused.
+    #[tokio::test]
+    async fn failed_send_closes_its_turn_and_resume_is_single_flight() {
+        use crate::domains::threads::ThreadStatus;
+        let (svc, hub, calls, _dir) = hub_service().await;
+        feed(&hub, vec![user("go"), AgentEvent::TurnDone { final_text: None, is_error: false }]);
+        calls.lock().unwrap().fail_send = true;
+        svc.send_user("run-1", "x".into(), "local", None).await.unwrap();
+        for _ in 0..200 {
+            let s = hub.snapshot("run-1").await.unwrap().unwrap();
+            if s.state.status == ThreadStatus::Error {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        let snap = hub.snapshot("run-1").await.unwrap().unwrap();
+        assert_eq!(snap.state.status, ThreadStatus::Error, "the failed turn is closed");
+        assert!(calls.lock().unwrap().sent.is_empty());
 
         svc.starting.lock().unwrap().insert("sess-9".into());
         let err = svc.resume_session("sess-9", "go".into(), None).await.unwrap_err();

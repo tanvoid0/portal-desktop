@@ -366,6 +366,17 @@ fn pending(id: &str) -> ThreadCommand {
     ThreadCommand::Portal(PortalInput::Pending(p))
 }
 
+/// An exhausted turn carries an error, else the UI ends it silently with no Retry.
+#[tokio::test]
+async fn exhausted_turn_reports_the_iteration_limit() {
+    let (hub, _db, _sink, _dir) = setup().await;
+    create_portal(&hub, "p-exh").await;
+    cmd(&hub, "p-exh", send("go"), "local", None).await;
+    cmd(&hub, "p-exh", finished(TurnOutcome::Exhausted), "system", None).await;
+    let state = hub.snapshot("p-exh").await.unwrap().unwrap().state;
+    assert_eq!(state.error.as_deref(), Some("Agent hit the max iteration limit."));
+}
+
 #[tokio::test]
 async fn stopped_turn_drops_its_approvals() {
     let (hub, _db, _sink, _dir) = setup().await;
