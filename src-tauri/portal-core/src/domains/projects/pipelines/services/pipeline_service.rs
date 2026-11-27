@@ -78,6 +78,16 @@ pub fn parse_pipeline_request(value: Value) -> Result<PipelineRequest, String> {
         .into_pipeline_request()
 }
 
+/// A `release:<workflow>` row is written by the release runner alone. These
+/// commands are reachable over `/rpc`, and what such a row holds is what a ship
+/// (or a retry of one) runs.
+pub(crate) const RELEASE_ROW_REFUSAL: &str =
+    "Release pipelines come from .portal/pipeline.yml; use Rehearse or Ship";
+
+pub(crate) fn is_release_key(preset_key: Option<&str>) -> bool {
+    preset_key.is_some_and(|k| k.starts_with("release:"))
+}
+
 pub struct PipelineService {
     pipeline_repo: PipelineRepository,
     block_repo: BlockRepository,
@@ -92,6 +102,9 @@ impl PipelineService {
     }
 
     pub async fn create_pipeline(&self, request: PipelineRequest) -> Result<i32, String> {
+        if is_release_key(request.preset_key.as_deref()) {
+            return Err(RELEASE_ROW_REFUSAL.to_string());
+        }
         let pipeline = self
             .pipeline_repo
             .create(
@@ -138,6 +151,10 @@ impl PipelineService {
         pipeline_id: i32,
         request: PipelineRequest,
     ) -> Result<i32, String> {
+        let row = self.pipeline_repo.get_by_id(pipeline_id).await?;
+        if row.is_some_and(|p| is_release_key(p.preset_key.as_deref())) {
+            return Err(RELEASE_ROW_REFUSAL.to_string());
+        }
         let _pipeline = self
             .pipeline_repo
             .update(
@@ -156,7 +173,13 @@ impl PipelineService {
         Ok(pipeline_id)
     }
 
+    /// Refused for release rows too: deleting one cascades its executions away,
+    /// including a live ship's, which then no longer blocks a second release run.
     pub async fn delete_pipeline(&self, pipeline_id: i32) -> Result<(), String> {
+        let row = self.pipeline_repo.get_by_id(pipeline_id).await?;
+        if row.is_some_and(|p| is_release_key(p.preset_key.as_deref())) {
+            return Err(RELEASE_ROW_REFUSAL.to_string());
+        }
         self.pipeline_repo.delete(pipeline_id).await?;
         Ok(())
     }

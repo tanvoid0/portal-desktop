@@ -6,6 +6,9 @@ use crate::domains::projects::pipelines::repositories::{
     ExecutionRepository, NewRun, PipelineRepository,
 };
 use crate::domains::projects::pipelines::services::pipeline_file;
+use crate::domains::projects::pipelines::services::pipeline_service::{
+    is_release_key, RELEASE_ROW_REFUSAL,
+};
 use crate::domains::projects::pipelines::services::progress::{
     compute_progress, expected_durations, parse_progress_line, HistoryRun, ProgressStep,
     StepProgress,
@@ -230,10 +233,22 @@ impl ExecutionService {
         self.running.lock().unwrap().contains_key(execution_id)
     }
 
+    /// Run a saved pipeline by id. Reachable over `/rpc`, so it refuses release
+    /// rows: shipping is `local_only` (`release_ship`), and a row left over from
+    /// a ship still has `RELEASE_DRY_RUN=0` baked into its steps.
     pub async fn execute_pipeline(
         &self,
         request: ExecutionRequestData,
         events: Arc<dyn EventSink>,
+    ) -> Result<String, String> {
+        self.run_pipeline_row(request, events, false).await
+    }
+
+    async fn run_pipeline_row(
+        &self,
+        request: ExecutionRequestData,
+        events: Arc<dyn EventSink>,
+        release: bool,
     ) -> Result<String, String> {
         let pipeline_id = request
             .pipeline_id
@@ -245,6 +260,9 @@ impl ExecutionService {
             .get_by_id(pipeline_id)
             .await?
             .ok_or_else(|| "Pipeline not found".to_string())?;
+        if !release && is_release_key(pipeline.preset_key.as_deref()) {
+            return Err(RELEASE_ROW_REFUSAL.to_string());
+        }
 
         let project = self
             .project_repo
@@ -1297,7 +1315,8 @@ impl ExecutionService {
     ///
     /// The runner is keyed to a `pipelines` row, so the workflow is materialised
     /// as one (`preset_key = "release:<workflow>"`, rewritten on every run so the
-    /// file stays the source of truth) and handed to `execute_pipeline`.
+    /// file stays the source of truth) and handed to the same runner as
+    /// `execute_pipeline`.
     /// `variables` reach each step as env vars as well as `${NAME}` substitutions.
     pub async fn execute_file_workflow(
         &self,
@@ -1347,9 +1366,11 @@ impl ExecutionService {
                         Some(name),
                         None,
                         Some(steps_json),
-                        None,
-                        None,
-                        None,
+                        // Reset with the steps: nothing outside the file may
+                        // feed a ship.
+                        Some("[]".to_string()),
+                        Some("[]".to_string()),
+                        Some("{}".to_string()),
                         None,
                         None,
                         None,
@@ -1376,7 +1397,7 @@ impl ExecutionService {
             }
         };
 
-        self.execute_pipeline(
+        self.run_pipeline_row(
             ExecutionRequestData {
                 pipeline_id: pipeline_id.to_string(),
                 variables: Some(variables),
@@ -1384,6 +1405,7 @@ impl ExecutionService {
                 triggered_by: None,
             },
             events,
+            true,
         )
         .await
     }
@@ -1428,10 +1450,7 @@ impl ExecutionService {
     ) -> Result<Vec<Value>, String> {
         let mut items = Vec::new();
         for p in self.pipeline_repo.get_all_by_project(project_id).await? {
-            if p.preset_key
-                .as_deref()
-                .is_some_and(|k| k.starts_with("release:"))
-            {
+            if is_release_key(p.preset_key.as_deref()) {
                 items.extend(self.get_executions_by_pipeline(p.id, limit).await?);
             }
         }
@@ -2399,6 +2418,38 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
         panic!("run {id} did not finish");
+    }
+
+    /// `execute_pipeline` is on `/rpc`; a `release:` row must not be its way
+    /// around `local_only` `release_ship`.
+    #[tokio::test]
+    async fn execute_pipeline_refuses_a_release_row() {
+        let (svc, _dir) = service_with_execution().await;
+        let seed = svc.execution_repo.get_by_id("e").await.unwrap().unwrap();
+        let pipeline_id = seed.pipeline_id.unwrap();
+        svc.pipeline_repo
+            .update(
+                pipeline_id,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(Some("release:ship".into())),
+                None,
+            )
+            .await
+            .unwrap();
+        let request = ExecutionRequestData {
+            pipeline_id: pipeline_id.to_string(),
+            variables: None,
+            secrets: None,
+            triggered_by: None,
+        };
+        let refused = svc.execute_pipeline(request, Arc::new(Quiet)).await;
+        assert_eq!(refused.unwrap_err(), RELEASE_ROW_REFUSAL);
     }
 
     /// One runner, two log formats: a pipeline keeps its `$ cmd` / `cwd:` header
