@@ -17,8 +17,10 @@ use tauri::State;
 
 use crate::domains::ai::platform_config::PlatformConfig;
 use crate::domains::ai::services::AISettingsService;
+use crate::domains::threads::{AckStatus, CommandAck, ThreadCommand};
+use crate::rpc::Caller;
 
-use super::service::{AgentTurn, CoderService};
+use super::service::CoderService;
 use super::types::{
     CoderAgentMode, CoderSubAgent, CoderThread, CoderThreadKind, CoderThreadSummary, FileChange,
     MultitaskCancelRequest, MultitaskCleanupRequest, MultitaskSpawnRequest, PermissionMode,
@@ -91,81 +93,97 @@ pub async fn coder_set_thread_kind(
     service.set_thread_kind(&thread_id, thread_kind).await
 }
 
+/// The drive commands go through the thread hub (dedup, first-wins, queue); what it
+/// decides runs back in `CoderService` as an effect. Accepted and duplicate are both a
+/// success; a rejection surfaces as its code (`busy`, `invalid`, `already_resolved`...).
+async fn via_hub(
+    service: &CoderService,
+    caller: &Caller,
+    thread_id: &str,
+    cmd: ThreadCommand,
+    command_id: Option<String>,
+) -> Result<CommandAck, String> {
+    service.hub_command(thread_id, cmd, caller.actor(), command_id).await
+}
+
+fn accepted(ack: CommandAck) -> Result<(), String> {
+    match ack.status {
+        AckStatus::Rejected => Err(ack.code.unwrap_or_else(|| "rejected".into())),
+        _ => Ok(()),
+    }
+}
+
 #[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_send(
+    caller: Caller,
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
     message: String,
+    command_id: Option<String>,
 ) -> Result<(), String> {
-    service.prepare_send(&thread_id, message).await?;
-    CoderService::spawn_run(service.inner().clone(), thread_id, AgentTurn::Send);
-    Ok(())
+    let cmd = ThreadCommand::Send { text: message };
+    accepted(via_hub(&service, &caller, &thread_id, cmd, command_id).await?)
 }
 
 #[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_retry(
+    caller: Caller,
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
+    command_id: Option<String>,
 ) -> Result<(), String> {
-    service.prepare_retry(&thread_id).await?;
-    CoderService::spawn_run(service.inner().clone(), thread_id, AgentTurn::Retry);
-    Ok(())
+    accepted(via_hub(&service, &caller, &thread_id, ThreadCommand::Retry, command_id).await?)
 }
 
 #[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_edit_message(
+    caller: Caller,
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
     message_index: usize,
     content: String,
+    command_id: Option<String>,
 ) -> Result<(), String> {
-    service
-        .prepare_edit_message(&thread_id, message_index, content)
-        .await?;
-    CoderService::spawn_run(service.inner().clone(), thread_id, AgentTurn::Send);
-    Ok(())
+    let cmd = ThreadCommand::EditMessage { index: message_index, text: content };
+    accepted(via_hub(&service, &caller, &thread_id, cmd, command_id).await?)
 }
 
 #[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_approve(
+    caller: Caller,
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
     call_id: String,
     approve: bool,
     remember: Option<bool>,
     edited_pattern: Option<String>,
-    remember_tool: Option<String>,
-    remember_args: Option<serde_json::Value>,
+    // The open call already carries its tool and arguments; kept so callers still type-check.
+    _remember_tool: Option<String>,
+    _remember_args: Option<serde_json::Value>,
+    command_id: Option<String>,
 ) -> Result<(), String> {
-    service
-        .prepare_approve(
-            &thread_id,
-            &call_id,
-            approve,
-            remember.unwrap_or(false),
-            edited_pattern.clone(),
-            remember_tool,
-            remember_args,
-        )
-        .await?;
-    CoderService::spawn_run(
-        service.inner().clone(),
-        thread_id,
-        AgentTurn::Approve {
-            call_id,
-            approve,
-            edited_command: None,
-        },
-    );
-    Ok(())
+    let cmd = ThreadCommand::Approve {
+        call_id,
+        allow: approve,
+        remember: remember.unwrap_or(false),
+        edited_pattern,
+        edited_command: None,
+    };
+    accepted(via_hub(&service, &caller, &thread_id, cmd, command_id).await?)
 }
 
 #[portal_rpc_macro::rpc(cap = "coder")]
 pub async fn coder_stop(
+    caller: Caller,
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
+    command_id: Option<String>,
 ) -> Result<bool, String> {
-    Ok(service.stop(&thread_id).await)
+    let ack = via_hub(&service, &caller, &thread_id, ThreadCommand::Stop, command_id).await?;
+    match ack.code.as_deref() {
+        Some("not_running") => Ok(false),
+        _ => accepted(ack).map(|()| true),
+    }
 }
 
 #[portal_rpc_macro::rpc(cap = "coder")]
@@ -416,28 +434,46 @@ pub async fn coder_git_push(
     super::git_push::git_push(&workspace_root)
 }
 
+/// A host result goes through the hub (first answer wins). A call the hub never heard of
+/// (a run from before it existed) is delivered straight to the waiting oneshot.
+async fn resolve_host(
+    caller: &Caller,
+    service: &CoderService,
+    thread_id: String,
+    call_id: String,
+    result: String,
+    command_id: Option<String>,
+) -> Result<(), String> {
+    let cmd = ThreadCommand::ResolveHost { call_id: call_id.clone(), result: result.clone().into() };
+    let ack = via_hub(service, caller, &thread_id, cmd, command_id).await?;
+    match ack.code.as_deref() {
+        Some("not_found") => service.submit_command_result(thread_id, call_id, result).await,
+        _ => accepted(ack),
+    }
+}
+
 #[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_submit_command_result(
+    caller: Caller,
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
     call_id: String,
     result: String,
+    command_id: Option<String>,
 ) -> Result<(), String> {
-    service
-        .submit_command_result(thread_id, call_id, result)
-        .await
+    resolve_host(&caller, &service, thread_id, call_id, result, command_id).await
 }
 
 #[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_submit_terminal_list(
+    caller: Caller,
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
     call_id: String,
     list_json: String,
+    command_id: Option<String>,
 ) -> Result<(), String> {
-    service
-        .submit_terminal_list(thread_id, call_id, list_json)
-        .await
+    resolve_host(&caller, &service, thread_id, call_id, list_json, command_id).await
 }
 
 #[portal_rpc_macro::rpc(cap = "coder.exec")]

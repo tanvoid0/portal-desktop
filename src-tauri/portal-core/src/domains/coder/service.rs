@@ -33,7 +33,12 @@ use crate::domains::ai::services::AISettingsService;
 use crate::domains::credentials::services::VaultSession;
 use crate::domains::github::service::GitHubService;
 use crate::domains::github::types::GitHubIssue;
+use crate::domains::agents::AgentEvent;
 use crate::domains::projects::move_lock;
+use crate::domains::threads::{
+    AckStatus, CommandAck, Effect, Envelope, PortalInput, ThreadCommand, ThreadEffects, ThreadHub,
+    ThreadMeta, TurnOutcome, TurnTrigger,
+};
 use crate::events::{EventSink, EventSinkExt};
 
 use super::agent_mode;
@@ -181,6 +186,10 @@ pub struct CoderService {
     /// Messages to prepend after an edit that rewinds the platform thread.
     edit_prefix: Mutex<HashMap<String, Vec<ChatMessage>>>,
     multitask_semaphore: Arc<Semaphore>,
+    /// The server-owned thread log; set once at startup. Unset, nothing is fed to it.
+    hub: OnceLock<Arc<ThreadHub>>,
+    /// Threads known to exist in the hub (created or confirmed once per process).
+    hub_ready: Mutex<std::collections::HashSet<String>>,
 }
 
 impl CoderService {
@@ -208,6 +217,8 @@ impl CoderService {
             pending_commands: Mutex::new(HashMap::new()),
             edit_prefix: Mutex::new(HashMap::new()),
             multitask_semaphore: Arc::new(Semaphore::new(DEFAULT_MAX_PARALLEL_SUBAGENTS)),
+            hub: OnceLock::new(),
+            hub_ready: Mutex::new(Default::default()),
         };
         svc.load_from_db().await;
         svc
@@ -453,8 +464,18 @@ impl CoderService {
             serde_json::to_string(&started).unwrap_or_else(|_| "[]".to_string())
         } else if tool == "ask_user" {
             // The tool_call message already put the question card on screen.
+            self.feed(
+                local_thread_id,
+                PortalInput::HostRequest { call_id: call_id.into(), kind: "ask_user".into(), payload: args.clone() },
+            )
+            .await;
             self.wait_user_answer(local_thread_id, call_id).await
         } else if tool == "list_terminals" {
+            self.feed(
+                local_thread_id,
+                PortalInput::HostRequest { call_id: call_id.into(), kind: "list_terminals".into(), payload: json!({}) },
+            )
+            .await;
             self.emit(
                 "coder://list_terminals",
                 json!({ "thread_id": local_thread_id, "call_id": call_id }),
@@ -494,6 +515,62 @@ impl CoderService {
     pub fn init_events(self: &Arc<Self>, events: Arc<dyn EventSink>) {
         let _ = self.events.set(events);
         let _ = self.self_ref.set(Arc::downgrade(self));
+    }
+
+    pub fn attach_hub(&self, hub: Arc<ThreadHub>) {
+        let _ = self.hub.set(hub);
+    }
+
+    /// The hub, once this thread exists in it: a thread with no `threads` row yet
+    /// (made before the hub, or by a build that predates it) is created and seeded
+    /// from the in-memory transcript. `None` while no hub is attached.
+    async fn hub_for(&self, thread_id: &str) -> Option<Arc<ThreadHub>> {
+        let hub = self.hub.get()?;
+        let mut ready = self.hub_ready.lock().await;
+        if !ready.contains(thread_id) {
+            let t = self.get_thread(thread_id).await?;
+            if hub.snapshot(thread_id).await.ok()?.is_none() {
+                let meta = ThreadMeta {
+                    provider: "portal".into(),
+                    model: t.model,
+                    llm_provider: t.llm_provider,
+                    workspace_root: t.workspace_root,
+                    project_id: t.project_id.map(i64::from),
+                    kind: thread_kind_str(t.thread_kind).into(),
+                    title: t.title,
+                };
+                hub.submit(thread_id, ThreadCommand::Create(meta));
+                // The system prompt sits in the transcript, so the hub's indexes match ours.
+                let reconcile = PortalInput::Reconcile { messages: t.messages, title: None };
+                hub.submit(thread_id, ThreadCommand::Portal(reconcile));
+            }
+            ready.insert(thread_id.to_string());
+        }
+        Some(Arc::clone(hub))
+    }
+
+    /// Report what this engine just did (actor `system`). Never fails the run.
+    async fn feed(&self, thread_id: &str, input: PortalInput) {
+        self.feed_cmd(thread_id, ThreadCommand::Portal(input)).await;
+    }
+
+    async fn feed_cmd(&self, thread_id: &str, cmd: ThreadCommand) {
+        if let Some(hub) = self.hub_for(thread_id).await {
+            hub.submit(thread_id, cmd);
+        }
+    }
+
+    /// A client command through the hub: dedup, first-wins and the queue live there;
+    /// what it decides comes back as an `Effect` (see the `ThreadEffects` impl).
+    pub async fn hub_command(
+        &self,
+        thread_id: &str,
+        cmd: ThreadCommand,
+        actor: String,
+        command_id: Option<String>,
+    ) -> Result<CommandAck, String> {
+        let hub = self.hub_for(thread_id).await.ok_or("thread not found")?;
+        hub.command(thread_id, Envelope { cmd, actor, command_id }).await
     }
 
     fn service_arc(&self) -> Result<Arc<Self>, String> {
@@ -557,16 +634,19 @@ impl CoderService {
             pending.insert(key.clone(), PendingCommand { tx });
         }
 
-        self.emit(
-            "coder://run_command",
-            json!({
-                "thread_id": thread_id,
-                "call_id": call_id,
-                "command": command,
-                "terminal_id": terminal_id,
-                "workspace_root": workspace_root,
-            }),
-        );
+        let payload = json!({
+            "thread_id": thread_id,
+            "call_id": call_id,
+            "command": command,
+            "terminal_id": terminal_id,
+            "workspace_root": workspace_root,
+        });
+        self.feed(
+            thread_id,
+            PortalInput::HostRequest { call_id: call_id.into(), kind: "run_command".into(), payload: payload.clone() },
+        )
+        .await;
+        self.emit("coder://run_command", payload);
 
         match tokio::time::timeout(std::time::Duration::from_secs(120), rx).await {
             Ok(Ok(result)) => result,
@@ -1000,6 +1080,7 @@ impl CoderService {
             .await
             .insert(thread.id.clone(), thread.clone());
         self.persist_thread(&thread.id).await;
+        self.hub_for(&thread.id).await;
         thread
     }
 
@@ -1135,6 +1216,10 @@ impl CoderService {
             let _ = coder_thread::Entity::delete_by_id(id.to_string())
                 .exec(self.db.get_connection())
                 .await;
+            self.hub_ready.lock().await.remove(id);
+            if let Some(hub) = self.hub.get() {
+                let _ = hub.delete(id).await;
+            }
         }
         removed
     }
@@ -1684,6 +1769,7 @@ impl CoderService {
         };
         let svc = Arc::clone(&self);
         let tid = thread_id.clone();
+        let stopped = cancel.clone();
         // tokio::spawn drops task-locals: carry the remote-caller mark into the run so a
         // remote-started agent cannot pop the desktop vault prompt.
         let remote = crate::domains::credentials::services::REMOTE_CALLER.try_with(|_| ()).is_ok();
@@ -1717,6 +1803,13 @@ impl CoderService {
                 eprintln!("coder: run failed for {tid}: {e}");
                 svc.sync_sub_agent_from_thread(&tid, CoderSubAgentStatus::Failed, Some(e.clone()))
                     .await;
+                // A stop that surfaces as an error is still a stop.
+                let input = if stopped.load(Ordering::SeqCst) {
+                    PortalInput::Finished { outcome: TurnOutcome::Stopped, final_text: None }
+                } else {
+                    PortalInput::Failed { error: e.clone() }
+                };
+                svc.feed(&tid, input).await;
                 svc.emit("coder://error", json!({ "thread_id": tid, "error": e }));
             } else {
                 let cancelled = {
@@ -1907,6 +2000,7 @@ impl CoderService {
         };
         self.persist_thread(thread_id).await;
         if let Some(fb) = fallback_title {
+            self.feed(thread_id, PortalInput::Title { title: fb.clone() }).await;
             self.emit(
                 "coder://title",
                 json!({ "thread_id": thread_id, "title": fb }),
@@ -2211,6 +2305,15 @@ impl CoderService {
                                 let cleaned = platform_stream::strip_leaked_tool_syntax(content);
                                 if !cleaned.is_empty() {
                                     pending_assistant_text = cleaned.clone();
+                                    // Each frame is a chunk, like the legacy token delta.
+                                    self.feed_cmd(
+                                        &thread_id_for_stream,
+                                        ThreadCommand::Provider(AgentEvent::TextDelta {
+                                            text: cleaned.clone(),
+                                            parent_tool_use_id: None,
+                                        }),
+                                    )
+                                    .await;
                                     self.emit(
                                     "coder://token",
                                     json!({ "thread_id": thread_id_for_stream, "delta": cleaned }),
@@ -2241,6 +2344,16 @@ impl CoderService {
                                 } else {
                                     Some(std::mem::take(&mut pending_assistant_text))
                                 };
+                                self.feed_cmd(
+                                    &thread_id_for_stream,
+                                    ThreadCommand::Provider(AgentEvent::ToolCall {
+                                        id: call_id.into(),
+                                        name: name.into(),
+                                        input: args.clone(),
+                                        parent_tool_use_id: None,
+                                    }),
+                                )
+                                .await;
                                 self.emit(
                                     "coder://message",
                                     json!({
@@ -2260,6 +2373,16 @@ impl CoderService {
                                     .await
                                 {
                                     Ok(result) => {
+                                        // `is_error: false`: the result already carries its `Error: ` text.
+                                        self.feed_cmd(
+                                            &thread_id_for_stream,
+                                            ThreadCommand::Provider(AgentEvent::ToolResult {
+                                                tool_use_id: call_id.into(),
+                                                content: result.clone(),
+                                                is_error: false,
+                                            }),
+                                        )
+                                        .await;
                                         self.emit(
                                             "coder://message",
                                             json!({
@@ -2277,6 +2400,11 @@ impl CoderService {
                                 .get("waited_seconds")
                                 .and_then(Value::as_f64)
                                 .unwrap_or(0.0);
+                            self.feed(
+                                &thread_id_for_stream,
+                                PortalInput::Heartbeat { waited_seconds: waited as u32 },
+                            )
+                            .await;
                             self.emit(
                                 "coder://heartbeat",
                                 json!({ "thread_id": thread_id_for_stream, "waited_seconds": waited }),
@@ -2370,6 +2498,9 @@ impl CoderService {
                     Decision::Prompt => {}
                 }
 
+                // The turn stays open (Waiting) until Approve starts the next run: a
+                // `Finished` here would clear the approval just requested.
+                self.feed(thread_id, PortalInput::Pending(pending.clone())).await;
                 self.emit(
                     "coder://pending",
                     json!({ "thread_id": thread_id, "pending": pending }),
@@ -2508,6 +2639,11 @@ impl CoderService {
             }
         }
         self.persist_thread(local_id).await;
+        // The platform's list is the truth: the hub diffs it against its own.
+        if let Some(t) = self.get_thread(local_id).await {
+            let input = PortalInput::Reconcile { messages: t.messages, title: Some(t.title) };
+            self.feed(local_id, input).await;
+        }
     }
 
     async fn finish(
@@ -2521,6 +2657,12 @@ impl CoderService {
             Some(t) => (t.messages, t.title),
             None => (Vec::new(), PLACEHOLDER_SESSION.to_string()),
         };
+        let outcome = match (cancelled, exhausted) {
+            (true, _) => TurnOutcome::Stopped,
+            (_, true) => TurnOutcome::Exhausted,
+            _ => TurnOutcome::Completed,
+        };
+        self.feed(thread_id, PortalInput::Finished { outcome, final_text: final_text.clone() }).await;
         self.emit(
             "coder://done",
             json!({
@@ -2557,6 +2699,7 @@ impl CoderService {
         };
         if should_emit {
             self.persist_thread(thread_id).await;
+            self.feed(thread_id, PortalInput::Title { title: title.into() }).await;
             self.emit(
                 "coder://title",
                 json!({ "thread_id": thread_id, "title": title }),
@@ -2575,6 +2718,75 @@ impl CoderService {
             }
         }
         None
+    }
+}
+
+impl CoderService {
+    /// The hub already holds the user message (and any rewrite); bring this transcript
+    /// to the same point and start the run.
+    async fn start_turn(&self, thread_id: &str, trigger: TurnTrigger, text: String) -> Result<(), String> {
+        let svc = self.service_arc()?;
+        let turn = match trigger {
+            TurnTrigger::Retry => {
+                self.prepare_retry(thread_id).await?;
+                AgentTurn::Retry
+            }
+            TurnTrigger::Edit => {
+                // The hub rewrote to `[..index, edited]` and nothing has run since.
+                let hub = self.hub.get().ok_or("thread hub not attached")?;
+                let snap = hub.snapshot(thread_id).await?.ok_or("thread not found")?;
+                let index = snap.messages.len().checked_sub(1).ok_or("thread has no messages")?;
+                self.prepare_edit_message(thread_id, index, text).await?;
+                AgentTurn::Send
+            }
+            // `Approve` is `ResolveApproval`'s, never a `StartTurn`.
+            _ => {
+                svc.prepare_send(thread_id, text).await?;
+                AgentTurn::Send
+            }
+        };
+        CoderService::spawn_run(svc, thread_id.to_string(), turn);
+        Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl ThreadEffects for CoderService {
+    async fn run(&self, thread_id: &str, effect: Effect) {
+        let started = match effect {
+            Effect::StartTurn { trigger, text } => self.start_turn(thread_id, trigger, text).await,
+            Effect::ResolveApproval { call_id, allow, remember, edited_pattern, edited_command } => {
+                let res = self
+                    .prepare_approve(thread_id, &call_id, allow, remember, edited_pattern, None, None)
+                    .await;
+                res.and_then(|()| {
+                    let turn = AgentTurn::Approve { call_id, approve: allow, edited_command };
+                    CoderService::spawn_run(self.service_arc()?, thread_id.to_string(), turn);
+                    Ok(())
+                })
+            }
+            // Idempotent: a repeated Stop lands here again, and `Finished` ends nothing twice.
+            Effect::Cancel => {
+                // No run in flight (parked on an approval, or Stop beat the run's start):
+                // nobody else will end the turn.
+                if !self.stop(thread_id).await {
+                    let done = PortalInput::Finished { outcome: TurnOutcome::Stopped, final_text: None };
+                    self.feed(thread_id, done).await;
+                }
+                Ok(())
+            }
+            Effect::DeliverHostResult { call_id, result } => {
+                let text = match result {
+                    Value::String(s) => s,
+                    other => other.to_string(),
+                };
+                self.submit_command_result(thread_id.to_string(), call_id, text).await
+            }
+        };
+        if let Err(e) = started {
+            eprintln!("coder: effect for {thread_id} failed: {e}");
+            self.feed(thread_id, PortalInput::Failed { error: e }).await;
+        }
     }
 }
 
@@ -2788,5 +3000,110 @@ mod search_format_tests {
         assert!(out.contains("Server-sent events."));
         assert!(out.contains("2. No snippet"));
         assert!(out.contains("42 estimated matches"));
+    }
+}
+
+#[cfg(test)]
+mod hub_tests {
+    use super::*;
+    use crate::domains::coder::types::PendingApproval;
+    use crate::domains::threads::{store, ThreadStatus};
+
+    #[derive(Debug)]
+    struct Null;
+    impl EventSink for Null {
+        fn emit_json(&self, _: &str, _: Value) -> bool {
+            true
+        }
+    }
+
+    async fn setup() -> (Arc<CoderService>, Arc<ThreadHub>, Arc<DatabaseManager>, String, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Arc::new(DatabaseManager::new(dir.path().to_path_buf()).await.unwrap());
+        let hub = ThreadHub::new(db.clone(), Arc::new(Null));
+        let svc = Arc::new(CoderService::new(db.clone(), Arc::new(VaultSession::default())).await);
+        svc.init_events(Arc::new(Null));
+        svc.attach_hub(hub.clone());
+        let id = svc.create_thread("/w".into(), None, None, None, None).await.id;
+        (svc, hub, db, id, dir)
+    }
+
+    async fn send(svc: &CoderService, id: &str, text: &str) {
+        let ack = svc.hub_command(id, ThreadCommand::Send { text: text.into() }, "local".into(), None).await.unwrap();
+        assert_eq!(ack.status, AckStatus::Accepted);
+    }
+
+    /// Roles, text and tool links; timestamps differ by design (each side stamps its own).
+    fn bare(messages: Vec<ChatMessage>) -> Vec<Value> {
+        messages
+            .into_iter()
+            .map(|m| serde_json::to_value(ChatMessage { timestamp: None, ..m }).unwrap())
+            .collect()
+    }
+
+    /// After a scripted Portal turn the hub's `thread_messages` equal `messages_json`.
+    #[tokio::test]
+    async fn parity_after_scripted_turn() {
+        let (svc, hub, db, id, _dir) = setup().await;
+        // What the Send effect does once the hub has appended the user message.
+        send(&svc, &id, "hi").await;
+        svc.prepare_send(&id, "hi".into()).await.unwrap();
+        // The run: streamed text, a tool call, its result, then `done` and `finish`.
+        let args = json!({ "path": "a.txt" });
+        let text = AgentEvent::TextDelta { text: "let me look".into(), parent_tool_use_id: None };
+        let call = AgentEvent::ToolCall { id: "c1".into(), name: "read_file".into(), input: args.clone(), parent_tool_use_id: None };
+        let result = AgentEvent::ToolResult { tool_use_id: "c1".into(), content: "text".into(), is_error: false };
+        for ev in [text, call, result] {
+            svc.feed_cmd(&id, ThreadCommand::Provider(ev)).await;
+        }
+        let mut last = ChatMessage::user("");
+        last.role = "assistant".into();
+        last.content = Some("done".into());
+        let messages = vec![
+            ChatMessage::system(SYSTEM_PROMPT),
+            ChatMessage::user("hi"),
+            ChatMessage::assistant_tool_call("c1", "read_file", &args, Some("let me look".into())),
+            ChatMessage::tool_result("c1", "text"),
+            last,
+        ];
+        let done = PlatformDone { title: "Hi".into(), messages, pending: None, final_text: Some("done".into()), context_usage: None, llm_usage: None };
+        svc.sync_thread_from_platform(&id, 1, &done, "hi").await;
+        svc.finish(&id, Some("done".into()), false, false).await;
+        hub.snapshot(&id).await.unwrap(); // the actor has drained everything above
+
+        let conn = db.get_connection();
+        let state = store::load(conn, &id).await.unwrap().unwrap();
+        let row = coder_thread::Entity::find_by_id(id.clone()).one(conn).await.unwrap().unwrap();
+        let legacy: Vec<ChatMessage> = serde_json::from_str(&row.messages_json).unwrap();
+        assert_eq!(legacy.len(), 5);
+        assert_eq!(bare(state.messages), bare(legacy));
+        assert_eq!(state.status, crate::domains::threads::ThreadStatus::Idle);
+    }
+
+    /// A run that returns on a pending approval leaves the turn Waiting, and Stop with no
+    /// run in flight ends it by itself; a repeated Stop changes nothing.
+    #[tokio::test]
+    async fn pending_keeps_turn_open_and_cancel_ends_it() {
+        let (svc, hub, _db, id, _dir) = setup().await;
+        send(&svc, &id, "hi").await;
+        let pending = PendingApproval {
+            call_id: "c1".into(),
+            tool: "run_command".into(),
+            arguments: json!({ "command": "ls" }),
+            suggested_rule: String::new(),
+            summary: "ls".into(),
+        };
+        svc.feed(&id, PortalInput::Pending(pending)).await;
+        let snap = hub.snapshot(&id).await.unwrap().unwrap();
+        assert_eq!(snap.state.status, ThreadStatus::Waiting);
+        assert_eq!(snap.state.approvals.len(), 1);
+
+        svc.hub_command(&id, ThreadCommand::Stop, "local".into(), None).await.unwrap();
+        for _ in 0..2 {
+            svc.run(&id, Effect::Cancel).await;
+            let s = hub.snapshot(&id).await.unwrap().unwrap().state;
+            assert_eq!(s.status, ThreadStatus::Idle);
+            assert!(!s.stopping && s.approvals.is_empty());
+        }
     }
 }

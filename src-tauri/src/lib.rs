@@ -309,6 +309,8 @@ pub fn run() {
             // itself for the runs the loop spawns.
             let coder_service = std::sync::Arc::new(coder_service);
             coder_service.init_events(sink.clone());
+            coder_service.attach_hub(thread_hub.clone());
+            thread_hub.register_portal_effects(coder_service.clone());
             app.manage(coder_service);
 
             // Agent-CLI integration domain (Claude Code today). Live runs
