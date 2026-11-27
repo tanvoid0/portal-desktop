@@ -99,3 +99,6 @@ src-tauri/.tauri-instance-*.conf.json
 
 # Fetched agent-platformd sidecar (scripts/fetch-agent-platformd.mjs)
 src-tauri/binaries/
+
+# Written by the release editor before it overwrites .portal/pipeline.yml
+.portal/*.bak

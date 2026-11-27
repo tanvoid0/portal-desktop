@@ -5,16 +5,6 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-  } from '$lib/components/ui/alert-dialog';
-  import {
     Card,
     CardContent,
     CardDescription,
@@ -40,6 +30,7 @@
   import type { ReleaseDescription, ReleaseRun } from '../types';
   import ReleaseEditor from './ReleaseEditor.svelte';
   import RunProgressBar from './RunProgressBar.svelte';
+  import ShipDialog from './ShipDialog.svelte';
 
   type Proposal = { yaml: string; source: 'scripts' | 'generated'; summary: string };
   type Issue = { level: 'error' | 'warn'; message: string };
@@ -149,10 +140,11 @@
     editError = 'Could not read .portal/pipeline.yml';
   }
 
-  async function start(command: 'release_rehearse' | 'release_ship') {
+  // Shipping lives in ShipDialog, shared with the project header's Release button.
+  async function rehearse() {
     busy = true;
     try {
-      const run = await invoke<{ id: string }>(command, { projectId });
+      const run = await invoke<{ id: string }>('release_rehearse', { projectId });
       goto(`/projects/${project.id}/pipelines/run/${run.id}`);
     } catch (e) {
       toast.error(String(e));
@@ -251,7 +243,7 @@
           variant="outline"
           size="sm"
           disabled={busy || !described.rehearse}
-          onclick={() => start('release_rehearse')}
+          onclick={rehearse}
         >
           <FlaskConical class="mr-2 h-4 w-4" /> Rehearse
         </Button>
@@ -336,19 +328,5 @@
     </CardContent>
   </Card>
 
-  <AlertDialog bind:open={confirmOpen}>
-    <AlertDialogContent>
-      <AlertDialogHeader>
-        <AlertDialogTitle>Ship {project.name}?</AlertDialogTitle>
-        <AlertDialogDescription>
-          This runs <code>{r.ship}</code> for real. It can deploy servers and publish builds, and killing
-          it midway does not undo what already went out.
-        </AlertDialogDescription>
-      </AlertDialogHeader>
-      <AlertDialogFooter>
-        <AlertDialogCancel>Cancel</AlertDialogCancel>
-        <AlertDialogAction onclick={() => start('release_ship')}>Ship</AlertDialogAction>
-      </AlertDialogFooter>
-    </AlertDialogContent>
-  </AlertDialog>
+  <ShipDialog {project} release={r} bind:open={confirmOpen} />
 {/if}

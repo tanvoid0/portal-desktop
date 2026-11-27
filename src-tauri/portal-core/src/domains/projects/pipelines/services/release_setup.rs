@@ -127,10 +127,11 @@ pub fn propose(root: &Path, modules: &[DetectedModule]) -> Result<Proposal, Stri
             .collect()
     };
     let (npm, script_files) = release_scripts(root);
-    let ship_npm = npm
+    // Exact names only: `release:prepare`, `release:verify` or `prepublishOnly` are
+    // helpers, and wrapping one ships the wrong thing and drops every gate.
+    let ship_npm = ["release", "ship", "publish", "deploy"]
         .iter()
-        .find(|(n, _)| n == "release")
-        .or_else(|| npm.first());
+        .find_map(|want| npm.iter().find(|(n, _)| n == want));
     // An existing release script already builds and gates everything; adding
     // per-module steps beside it would run the same work twice.
     let wrap_scripts = ship_npm.is_some();
@@ -484,6 +485,26 @@ mod tests {
         assert!(file.actions.contains_key("release-dry"));
         // A longRunning release step parks the run forever.
         assert!(file.actions.values().all(|a| !a.long_running));
+    }
+
+    #[test]
+    fn helper_scripts_are_not_mistaken_for_the_release() {
+        let dir = std::env::temp_dir().join(format!("portal-helpers-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("package.json"),
+            r#"{"scripts":{"release:prepare":"x","release:verify":"y","prepublishOnly":"z"}}"#,
+        )
+        .unwrap();
+
+        let p = propose(&dir, &[module("apps/web", "sveltekit", "app")]).unwrap();
+        let _ = fs::remove_dir_all(&dir);
+        assert_eq!(p.source, "generated");
+        assert!(pipeline_file::parse(&p.yaml)
+            .unwrap()
+            .actions
+            .contains_key("check-web"));
     }
 
     #[test]

@@ -303,6 +303,24 @@ async fn start_release(
         "No `rehearse` workflow declared; a rehearsal never runs the ship workflow".to_string()
     })?
     .to_string();
+    // One release run per project: two ships race the version bump, and a rehearsal
+    // beside a ship rewrites generated files under it. The lock makes check-then-start
+    // atomic; rows left by a crash are cleared at startup (`reconcile_interrupted`).
+    static STARTING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    let _starting = STARTING.lock().await;
+    if service
+        .get_release_executions(project_id, Some(10))
+        .await?
+        .iter()
+        .any(|r| {
+            matches!(
+                r["status"].as_str(),
+                Some("pending" | "queued" | "running")
+            )
+        })
+    {
+        return Err("A release run is already in progress for this project".to_string());
+    }
     variables.insert(
         "RELEASE_DRY_RUN".to_string(),
         if ship { "0" } else { "1" }.to_string(),

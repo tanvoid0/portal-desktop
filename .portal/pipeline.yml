@@ -1,0 +1,94 @@
+version: 1
+
+# Portal Desktop's own release. `ship` bumps the version, commits, tags vX.Y.Z and
+# pushes; .github/workflows/release.yml then builds and publishes the installers.
+# Gates mirror CI's release-smoke job plus the pre-push gates. Every step is chained:
+# pnpm and cargo steps fight over the same caches when run side by side.
+release:
+  kind: tauri
+  ship: ship
+  rehearse: rehearse
+  bump: patch
+
+actions:
+  preflight:
+    name: Preflight (main, clean, up to date)
+    run: node scripts/prepare-release.mjs --preflight
+  install:
+    name: Install (frozen lockfile)
+    run: pnpm install --frozen-lockfile
+  check:
+    name: Type check
+    run: pnpm check
+  lint:
+    name: Lint
+    run: pnpm lint
+  unit:
+    name: Unit tests
+    run: pnpm vitest run
+  build:
+    name: Build frontend
+    run: pnpm build
+  cargo-check:
+    name: Cargo check
+    run: cargo check --locked
+    cwd: src-tauri
+  cargo-test:
+    name: Cargo test (portal-core)
+    run: cargo test
+    cwd: src-tauri/portal-core
+  types:
+    # cargo test leaves the generated bindings unformatted; this puts them back, so a
+    # tree that is still dirty afterwards means the committed types are stale.
+    name: Regenerate types
+    run: pnpm gen:types
+  publish:
+    name: Bump, tag and push
+    run: node scripts/prepare-release.mjs --commit --push
+  publish-dry:
+    name: Bump, tag and push (dry run)
+    run: node scripts/prepare-release.mjs --commit --push --dry-run
+
+workflows:
+  ship:
+    name: Ship
+    steps:
+      - action: preflight
+      - action: install
+        needs: [preflight]
+      - action: check
+        needs: [install]
+      - action: lint
+        needs: [check]
+      - action: unit
+        needs: [lint]
+      - action: build
+        needs: [unit]
+      - action: cargo-check
+        needs: [build]
+      - action: cargo-test
+        needs: [cargo-check]
+      - action: types
+        needs: [cargo-test]
+      - action: publish
+        needs: [types]
+  rehearse:
+    name: Rehearse (no publish)
+    steps:
+      - action: install
+      - action: check
+        needs: [install]
+      - action: lint
+        needs: [check]
+      - action: unit
+        needs: [lint]
+      - action: build
+        needs: [unit]
+      - action: cargo-check
+        needs: [build]
+      - action: cargo-test
+        needs: [cargo-check]
+      - action: types
+        needs: [cargo-test]
+      - action: publish-dry
+        needs: [types]

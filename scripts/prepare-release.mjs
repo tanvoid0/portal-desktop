@@ -11,14 +11,18 @@
  *   node scripts/prepare-release.mjs major
  *   node scripts/prepare-release.mjs 1.2.3
  *   node scripts/prepare-release.mjs current
+ *   node scripts/prepare-release.mjs            (takes the bump from $BUMP)
  *
  * Flags:
- *   --dry-run     Print actions without writing files or creating tags
+ *   --dry-run     Print actions without writing files or creating tags (also $RELEASE_DRY_RUN=1)
+ *   --preflight   Only check that a release could be published now
+ *   --commit      Commit the version files and tag that commit
+ *   --push        --commit, then push main and the tag (what .portal/pipeline.yml ships with)
  *   --no-tag      Skip git tag creation
  *   --no-notes    Skip RELEASE_NOTES.md stub
  *   --message/-m  Custom one-line note for RELEASE_NOTES (repeatable)
  */
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,6 +36,36 @@ const FILES = {
   cargoLock: join(ROOT, 'src-tauri/Cargo.lock'),
   releaseNotes: join(ROOT, 'docs/status/RELEASE_NOTES.md'),
 };
+
+const BRANCH = 'main';
+
+// Everything a release commit may contain; nothing else is ever staged.
+const RELEASE_FILES = [
+  'package.json',
+  'src-tauri/tauri.conf.json',
+  'src-tauri/Cargo.toml',
+  'src-tauri/Cargo.lock',
+  'docs/status/RELEASE_NOTES.md',
+];
+
+/** @param {...string} args */
+function git(...args) {
+  return execFileSync('git', args, {
+    cwd: ROOT,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+}
+
+/** @param {...string} args */
+function gitSucceeds(...args) {
+  try {
+    git(...args);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /** @param {string} cmd */
 function run(cmd) {
@@ -162,6 +196,79 @@ function tagExists(tag) {
   }
 }
 
+/**
+ * Why publishing would be wrong right now, or null when it is safe.
+ *
+ * @param {string} version the version currently in the files
+ */
+function publishBlocker(version) {
+  const branch = git('branch', '--show-current');
+  if (branch !== BRANCH) return `on branch "${branch}"; releases go from ${BRANCH}`;
+
+  // .claude/ holds agent session notes, which are never part of a build.
+  const dirty = git('status', '--porcelain', '--', '.', ':(exclude).claude');
+  if (dirty) return `uncommitted changes:\n${dirty}`;
+
+  git('fetch', 'origin', BRANCH);
+  if (!gitSucceeds('merge-base', '--is-ancestor', `origin/${BRANCH}`, 'HEAD')) {
+    return `behind origin/${BRANCH}; pull first`;
+  }
+
+  const last = `v${version}`;
+  // Stopped between commit and tag: bumping again would skip a version.
+  if (!tagExists(last) && git('log', '-1', '--pretty=%s') === `release: ${last}`) {
+    return `HEAD is the ${last} release commit but has no tag; run: git tag -a ${last} -m "Portal Desktop ${last}", then git push --atomic origin ${BRANCH} ${last}`;
+  }
+  if (tagExists(last)) {
+    if (!git('ls-remote', '--tags', 'origin', `refs/tags/${last}`)) {
+      return `${last} is tagged here but not pushed; run: git push --atomic origin ${BRANCH} ${last}`;
+    }
+    if (git('rev-list', '--count', `${last}..HEAD`) === '0') return `nothing new since ${last}`;
+  }
+  return null;
+}
+
+/** @param {string} version @param {boolean} dryRun */
+function preflight(version, dryRun) {
+  const blocker = publishBlocker(version);
+  if (blocker && !dryRun) throw new Error(`Cannot release: ${blocker}`);
+  console.log(blocker ? `[dry-run] a real release would stop: ${blocker}` : 'Preflight OK');
+}
+
+/** @param {string} tag @param {boolean} dryRun */
+function commitRelease(tag, dryRun) {
+  if (dryRun) {
+    console.log(`[dry-run] would commit "release: ${tag}"`);
+    return;
+  }
+  git('add', '--', ...RELEASE_FILES);
+  // `current` can leave nothing to commit: HEAD is then already the release.
+  if (!gitSucceeds('diff', '--cached', '--quiet')) {
+    git('commit', '-m', `release: ${tag}`);
+    console.log(`Committed release: ${tag}`);
+  }
+}
+
+/** @param {string} tag @param {boolean} dryRun */
+function pushRelease(tag, dryRun) {
+  if (dryRun) {
+    console.log(`[dry-run] would push ${BRANCH} and ${tag} to origin`);
+    return;
+  }
+  try {
+    // --atomic: a tag without its commit (or the reverse) never reaches origin.
+    execFileSync('git', ['push', '--atomic', 'origin', BRANCH, `refs/tags/${tag}`], {
+      cwd: ROOT,
+      stdio: 'inherit',
+    });
+  } catch {
+    throw new Error(
+      `Push failed. ${tag} is committed and tagged locally; retry: git push --atomic origin ${BRANCH} ${tag}`
+    );
+  }
+  console.log(`Pushed ${tag}. GitHub Actions builds and publishes it.`);
+}
+
 /** @param {string} tag @param {string} version @param {boolean} dryRun */
 function createTag(tag, version, dryRun) {
   if (tagExists(tag)) {
@@ -182,6 +289,9 @@ function parseArgs(argv) {
     dryRun: false,
     noTag: false,
     noNotes: false,
+    preflight: false,
+    commit: false,
+    push: false,
     notes: [],
   };
 
@@ -192,6 +302,9 @@ function parseArgs(argv) {
     if (arg === '--dry-run') flags.dryRun = true;
     else if (arg === '--no-tag') flags.noTag = true;
     else if (arg === '--no-notes') flags.noNotes = true;
+    else if (arg === '--preflight') flags.preflight = true;
+    else if (arg === '--commit') flags.commit = true;
+    else if (arg === '--push') flags.push = flags.commit = true;
     else if (arg === '--message' || arg === '-m') {
       const value = argv[++i];
       if (!value) throw new Error(`${arg} requires a value`);
@@ -208,7 +321,17 @@ function parseArgs(argv) {
 
 function main() {
   const { flags, positional } = parseArgs(process.argv.slice(2));
-  const bumpArg = positional[0];
+  const bumpArg = positional[0] ?? process.env.BUMP;
+  if (process.env.RELEASE_DRY_RUN === '1') flags.dryRun = true;
+
+  if (flags.preflight) {
+    preflight(readVersions().packageJson, flags.dryRun);
+    return;
+  }
+
+  if (flags.commit && flags.noTag) {
+    throw new Error('--commit and --push always tag; drop --no-tag');
+  }
 
   if (!bumpArg) {
     console.error(`Usage: node scripts/prepare-release.mjs <patch|minor|major|x.y.z|current> [flags]
@@ -218,10 +341,11 @@ Examples:
   pnpm release:prepare 1.0.0 -m "New feature"
   pnpm release:prepare current --no-notes
 
-After running:
+After running without --push:
   git add -A
   git commit -m "release: vX.Y.Z"
-  git push origin main --tags
+  git tag -a vX.Y.Z -m "Portal Desktop vX.Y.Z"
+  git push --atomic origin main vX.Y.Z
 `);
     process.exit(1);
   }
@@ -249,6 +373,15 @@ After running:
 
   console.log(`Release target: ${fromVersion} -> ${nextVersion} (${tag})`);
 
+  // Both checks run before any file is touched, so a refusal leaves a clean tree.
+  if (flags.commit) preflight(fromVersion, flags.dryRun);
+  if (!flags.noTag && tagExists(tag)) throw new Error(`Git tag ${tag} already exists`);
+
+  if (flags.commit && flags.notes.length === 0 && tagExists(`v${fromVersion}`)) {
+    const log = git('log', `v${fromVersion}..HEAD`, '--no-merges', '--pretty=%s');
+    flags.notes = log.split('\n').filter(Boolean);
+  }
+
   if (nextVersion !== fromVersion) {
     if (flags.dryRun) {
       console.log('[dry-run] would update package.json, tauri.conf.json, Cargo.toml, Cargo.lock');
@@ -261,33 +394,41 @@ After running:
     console.log('Version files already at target version');
   }
 
+  let wroteNotes = false;
   if (!flags.noNotes) {
     if (flags.dryRun) {
       console.log('[dry-run] would prepend RELEASE_NOTES.md stub if missing');
+      wroteNotes = true;
     } else {
-      prependReleaseNotes(nextVersion, flags.notes);
+      wroteNotes = prependReleaseNotes(nextVersion, flags.notes);
     }
   }
 
-  if (!flags.noTag) {
-    createTag(tag, nextVersion, flags.dryRun);
+  if (flags.commit) commitRelease(tag, flags.dryRun);
+
+  // A tag marks a commit, so with uncommitted edits it would land on the previous one.
+  const changed = nextVersion !== fromVersion || wroteNotes;
+  const tagged = !flags.noTag && (flags.commit || !changed);
+  if (tagged) createTag(tag, nextVersion, flags.dryRun);
+
+  if (flags.push) {
+    pushRelease(tag, flags.dryRun);
+    return;
   }
 
-  const steps =
-    nextVersion !== fromVersion || !flags.noNotes
-      ? [
-          'Review docs/status/RELEASE_NOTES.md',
-          'git add -A',
-          `git commit -m "release: v${nextVersion}"`,
-        ]
-      : ['git add -A', `git commit -m "release: v${nextVersion}"`];
-  steps.push(
-    'pnpm release:verify  # runs the release-smoke job locally via act — fix before tagging'
-  );
-  if (flags.noTag || flags.dryRun) {
-    steps.push(`git tag -a ${tag} -m "Portal Desktop v${nextVersion}"`);
+  const steps = [];
+  if (!flags.commit) {
+    if (changed) {
+      steps.push('Review docs/status/RELEASE_NOTES.md', 'git add -A');
+      steps.push(`git commit -m "release: ${tag}"`);
+    }
+    steps.push(
+      'pnpm release:verify  # runs the release-smoke job locally via act — fix before tagging'
+    );
+    if (!tagged || flags.dryRun)
+      steps.push(`git tag -a ${tag} -m "Portal Desktop v${nextVersion}"`);
   }
-  steps.push('git push origin main --tags');
+  steps.push(`git push --atomic origin ${BRANCH} ${tag}`);
 
   console.log('');
   console.log('Next steps:');

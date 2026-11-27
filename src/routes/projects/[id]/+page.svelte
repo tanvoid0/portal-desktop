@@ -22,6 +22,7 @@
   import ProjectEnv from '$lib/domains/projects/components/ProjectEnv.svelte';
   import EnvBackupSection from '$lib/domains/projects/components/EnvBackupSection.svelte';
   import ProjectActionsPanel from '$lib/domains/actions/components/ProjectActionsPanel.svelte';
+  import ReleaseButton from '$lib/domains/actions/components/ReleaseButton.svelte';
   import { PageHeader, PageLoading, PageError, ResponsivePanel } from '$lib/components/shell';
   import { Badge } from '$lib/components/ui/badge';
   import ProjectHeaderActions from '$lib/domains/projects/components/ProjectHeaderActions.svelte';
@@ -62,6 +63,7 @@
         <ProjectSummary project={currentProject} />
       {/snippet}
       {#snippet actions()}
+        <ReleaseButton project={currentProject} />
         <ProjectHeaderActions
           starred={!!currentProject.starred}
           {githubUrl}

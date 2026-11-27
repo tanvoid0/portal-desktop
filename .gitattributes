@@ -8,3 +8,4 @@
 # eol=lf`, which would be correct but renormalizes every tracked file in the
 # repo and belongs in its own change.
 src/lib/domains/*/generated/** text eol=lf
+src-tauri/portal-core/bindings/** text eol=lf

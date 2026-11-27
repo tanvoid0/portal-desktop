@@ -173,6 +173,21 @@ workflows:
         assert_eq!(steps[1]["config"]["env"]["B"], "2");
     }
 
+    /// A typo in our own release file would otherwise surface on release day.
+    #[test]
+    fn this_repos_own_release_file_builds() {
+        let file = parse(include_str!("../../../../../../../.portal/pipeline.yml")).unwrap();
+        for (id, wf) in &file.workflows {
+            build_steps(&file, id).unwrap();
+            for need in wf.steps.iter().flat_map(|s| &s.needs) {
+                assert!(wf.steps.iter().any(|s| &s.action == need), "{id}: {need}");
+            }
+        }
+        // A rehearsal must never reach the real publish step.
+        let rehearse = &file.workflows[&file.release.as_ref().unwrap().rehearse.clone().unwrap()];
+        assert!(rehearse.steps.iter().all(|s| s.action != "publish"));
+    }
+
     #[test]
     fn rejects_release_naming_a_missing_workflow() {
         let bad = YML.replace("rehearse: ship-dry", "rehearse: nope");
