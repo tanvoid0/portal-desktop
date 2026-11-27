@@ -15,6 +15,6 @@ diff: string, recentSubjects: Array<string>,
  */
 fingerprint: string, 
 /**
- * On the push allowlist (set by `facts_for`).
+ * A sync would push this repository by itself (set by `facts_for`).
  */
 pushOk: boolean, };

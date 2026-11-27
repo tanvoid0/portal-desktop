@@ -390,8 +390,8 @@ impl SyncAllService {
             tokio::task::spawn_blocking(move || {
                 git_phase(&paths, &push_ok, &names, only.as_ref(), &cancel, &emit)
             })
-                .await
-                .map_err(|e| e.to_string())?
+            .await
+            .map_err(|e| e.to_string())?
         };
 
         // One writer, after the workers have joined.
@@ -585,32 +585,20 @@ fn pool(n: usize, f: &(dyn Fn(usize) + Sync)) {
     });
 }
 
-/// Runs every repo through `sync_repo` on a small worker pool. Unit of work is
-/// the git toplevel, so projects sharing a repo are synced once.
-fn git_phase(
-    paths: &[String],
-    push_ok: &[bool],
-    names: &[(i32, String)],
-    only: Option<&HashSet<i32>>,
-    cancel: &AtomicBool,
-    emit: &Emit,
-) -> (Vec<Group>, Vec<RepoOutcome>) {
-    let total = paths.len();
-    let done = AtomicUsize::new(0);
-
+/// Groups projects by git toplevel; a project with no repo is its own group. The
+/// member sitting at the toplevel leads (and its push_ok decides); without one the
+/// first member leads and every member must allow the push.
+fn group_repos(paths: &[String], push_ok: &[bool]) -> Vec<Group> {
     let tops: Vec<Mutex<Option<String>>> = paths.iter().map(|_| Mutex::new(None)).collect();
-    pool(total, &|i| {
+    pool(paths.len(), &|i| {
         let t = git::toplevel(Path::new(&paths[i])).map(|t| t.to_string_lossy().into_owned());
         *tops[i].lock().unwrap() = t;
     });
 
-    // Group by toplevel; a project with no repo is its own group. The member
-    // sitting at the toplevel leads (and its push_ok decides); without one the
-    // first member leads and every member must allow the push.
     let mut by_key: HashMap<String, usize> = HashMap::new();
     let mut groups: Vec<Group> = Vec::new();
     let mut at_top: Vec<bool> = Vec::new();
-    for i in 0..total {
+    for i in 0..paths.len() {
         let top = tops[i].lock().unwrap().clone();
         let key = top
             .as_deref()
@@ -638,6 +626,30 @@ fn git_phase(
             g.members.iter().all(|&m| push_ok[m])
         };
     }
+    groups
+}
+
+/// Whether a sync would push the repository `paths[i]` is in by itself.
+// ponytail: asks git about every project; cache the toplevels if a review feels slow.
+pub(super) fn push_allowed(paths: &[String], push_ok: &[bool], i: usize) -> bool {
+    group_repos(paths, push_ok)
+        .iter()
+        .any(|g| g.push_ok && g.members.contains(&i))
+}
+
+/// Runs every repo through `sync_repo` on a small worker pool. Unit of work is
+/// the git toplevel, so projects sharing a repo are synced once.
+fn git_phase(
+    paths: &[String],
+    push_ok: &[bool],
+    names: &[(i32, String)],
+    only: Option<&HashSet<i32>>,
+    cancel: &AtomicBool,
+    emit: &Emit,
+) -> (Vec<Group>, Vec<RepoOutcome>) {
+    let done = AtomicUsize::new(0);
+
+    let mut groups = group_repos(paths, push_ok);
 
     // Filtered after grouping, so a shared repository keeps the same leader and
     // push permission as in a full run.
@@ -836,6 +848,24 @@ mod tests {
             sh(&remote, &["rev-parse", "main"]),
             sh(&b, &["rev-parse", "HEAD"])
         );
+    }
+
+    #[test]
+    fn sync_all_push_needs_the_top_project_or_every_sharer() {
+        let (_t, _remote, a, _b) = fixture();
+        let (x, y) = (a.join("x"), a.join("y"));
+        std::fs::create_dir(&x).unwrap();
+        std::fs::create_dir(&y).unwrap();
+        // As git spells it: a CI temp dir can be an 8.3 short path.
+        let top = sh(&a, &["rev-parse", "--show-toplevel"]);
+        let path = |p: &Path| p.to_string_lossy().into_owned();
+
+        let subfolders = [path(&x), path(&y)];
+        assert!(!push_allowed(&subfolders, &[true, false], 0));
+        assert!(push_allowed(&subfolders, &[true, true], 0));
+        let with_top = [path(&x), top];
+        assert!(!push_allowed(&with_top, &[true, false], 0));
+        assert!(push_allowed(&with_top, &[false, true], 0));
     }
 
     #[test]

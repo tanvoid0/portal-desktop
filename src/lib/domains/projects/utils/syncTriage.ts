@@ -90,6 +90,11 @@ function knownFiles(named: unknown[], facts: SyncRepoFacts, taken: Set<string>):
   return out;
 }
 
+/** A `[...]` class in a `.gitignore` pattern. */
+const CLASS = /\[[!^]?\]?(\[:[a-z]+:\]|\\.|[^\]\\])*\]/g;
+/** `?*` and `[!x]*` hide nearly everything: a pattern has to spell out part of a name. */
+const namesSomething = (line: string) => /[\p{L}\p{N}]/u.test(line.replace(CLASS, ''));
+
 /** `null` when the reply has nothing usable. Reasoning models add prose around the JSON. */
 export function parseTriage(reply: string, facts: SyncRepoFacts): TriageReply | null {
   const answer = splitThinking(reply).answer;
@@ -120,7 +125,7 @@ export function parseTriage(reply: string, facts: SyncRepoFacts): TriageReply | 
     .map((c) => ({ message: text(c.message), files: knownFiles(list(c.files), facts, taken) }))
     .filter((c) => c.message && c.files.length);
   const ignore = [...new Set(list(raw.ignore).map(text))]
-    .filter((l) => l && !l.startsWith('!') && !/^[*/.]+$/.test(l))
+    .filter((l) => !l.startsWith('!') && namesSomething(l))
     .slice(0, 20);
 
   const summary = text(raw.summary).slice(0, 500);

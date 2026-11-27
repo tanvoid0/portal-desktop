@@ -96,8 +96,9 @@ class SyncAllState {
     });
     const e = p.project;
     if (!e) return;
-    const row = (this.live[e.id] ??= { id: e.id, name: e.name, steps: {} });
-    row.steps[e.step] = { step: e.step, status: e.status, detail: e.detail };
+    // Read back after `??=`: it hands back the plain object, not the $state proxy.
+    this.live[e.id] ??= { id: e.id, name: e.name, steps: {} };
+    this.live[e.id].steps[e.step] = { step: e.step, status: e.status, detail: e.detail };
   }
 
   private refreshQueries() {
@@ -193,7 +194,7 @@ class SyncAllState {
     try {
       const fresh = await syncAllProjects({ snapshotPassword: null, projectIds: [id] });
       if (fresh.envNote) toast.warning(fresh.envNote);
-      this.merge(fresh);
+      this.merge(fresh, id);
     } catch (err) {
       toast.error(`Could not sync: ${getErrorMessage(err)}`);
     } finally {
@@ -202,13 +203,15 @@ class SyncAllState {
   }
 
   /** A partial run updates its own rows and leaves the rest of the report alone. */
-  private merge(fresh: SyncAllReport) {
+  private merge(fresh: SyncAllReport, id: number) {
     const rows = new Map(this.report?.projects.map((p) => [p.id, p]));
     for (const p of fresh.projects) {
-      // Env could not run: keep what an earlier run said about it.
-      const env = fresh.envNote
-        ? (rows.get(p.id)?.steps.filter((s) => s.step === 'env') ?? [])
-        : [];
+      // Env could not run, or this row only shares `id`'s repository (env ran for
+      // `id` alone): keep what an earlier run said about it.
+      const env =
+        fresh.envNote || p.id !== id
+          ? (rows.get(p.id)?.steps.filter((s) => s.step === 'env') ?? [])
+          : [];
       rows.set(p.id, { ...p, steps: [...env, ...p.steps] });
     }
     this.report = { ...(this.report ?? fresh), projects: [...rows.values()] };

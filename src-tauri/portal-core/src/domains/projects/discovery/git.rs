@@ -267,6 +267,11 @@ pub fn busy(dir: &Path) -> Option<&'static str> {
         Some("rebase in progress")
     } else if gd.join("MERGE_HEAD").exists() {
         Some("merge in progress")
+    } else if ["CHERRY_PICK_HEAD", "REVERT_HEAD", "sequencer"]
+        .iter()
+        .any(|f| gd.join(f).exists())
+    {
+        Some("cherry-pick or revert in progress")
     } else if git(dir, &["branch", "--show-current"]).is_none() {
         Some("detached HEAD")
     } else {

@@ -1,7 +1,8 @@
 //! What "Sync all" leaves behind: the facts an AI reviews about unfinished work,
 //! and the one place a plan the user approved is applied. The model never runs
 //! anything — every path in a plan is checked against `git status`, and
-//! secret-looking files are neither sent to the model nor committed.
+//! secret-looking files are neither sent to the model nor committed. A project in
+//! a subfolder of a larger repository only ever sees and commits its own folder.
 
 use std::collections::{BTreeSet, HashSet};
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -13,13 +14,14 @@ use std::sync::LazyLock;
 
 use chrono::Utc;
 use regex::Regex;
-use sea_orm::{ActiveModelTrait, EntityTrait, Set, Unchanged};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, Unchanged};
 use serde::{Deserialize, Serialize};
 
 use crate::database::DatabaseManager;
 use crate::domains::projects::discovery::git::{self, GitProbe};
 use crate::domains::projects::move_lock;
 use crate::domains::projects::repositories::discovery_repository::apply_git_fields;
+use crate::domains::projects::sync_all;
 use crate::entities::project;
 use crate::process_ext::NoWindowExt;
 
@@ -30,22 +32,35 @@ const MAX_ARG_BYTES: usize = 20_000;
 const MAX_PREVIEWS: usize = 8;
 const PREVIEW_BYTES: u64 = 600;
 const SCAN_BYTES: u64 = 1_000_000;
+const HIDDEN: &str = "[line hidden: looks like a secret]";
+
+/// The first line of a PEM / PGP private key.
+const PEM_BEGIN: &str = r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----";
+static PEM_BEGIN_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(PEM_BEGIN).expect("pem begin regex"));
+static PEM_END_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"-----END [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----").expect("pem end regex")
+});
 
 /// Credentials with a shape of their own: finding one blocks a commit.
 static KEY_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"\b(sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,})|-----BEGIN [A-Z ]*PRIVATE KEY-----|_authToken=[^\s$]+",
-    )
+    Regex::new(&format!(
+        r"\b(sk-[A-Za-z0-9_-]{{20,}}|[sr]k_(?:live|test)_[A-Za-z0-9]{{16,}}|gh[pousr]_[A-Za-z0-9]{{30,}}|github_pat_[A-Za-z0-9_]{{30,}}|AKIA[0-9A-Z]{{16}}|xox[baprs]-[A-Za-z0-9-]{{10,}})|{PEM_BEGIN}|_authToken=[^\s$]+",
+    ))
     .expect("key regex")
 });
 
 /// Looser: only used to blank lines before they reach a model.
 static ASSIGN_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r#"(?i)(api[_-]?key|secret|passw(or)?d|token|authorization)[\w-]*["']?\s*[:=]\s*\S{6,}|://[^/\s:]+:[^@\s]+@"#,
+        r#"(?i)(key|secret|passw(or)?d|token|authorization)[\w-]*["']?\s*[:=]\s*\S{6,}|://[^/\s:]+:[^@\s]+@"#,
     )
     .expect("assignment regex")
 });
+
+/// A `[...]` class in a `.gitignore` pattern.
+static CLASS_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\[[!^]?\]?(\[:[a-z]+:\]|\\.|[^\]\\])*\]").expect("class regex"));
 
 #[derive(Debug, Clone, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "camelCase")]
@@ -76,7 +91,7 @@ pub struct SyncRepoFacts {
     pub recent_subjects: Vec<String>,
     /// Changes when the working tree does; `apply` checks it.
     pub fingerprint: String,
-    /// On the push allowlist (set by `facts_for`).
+    /// A sync would push this repository by itself (set by `facts_for`).
     pub push_ok: bool,
 }
 
@@ -127,12 +142,6 @@ struct Change {
     orig: Option<String>,
 }
 
-impl Change {
-    fn unmerged(&self) -> bool {
-        self.xy.contains('U') || self.xy == "AA" || self.xy == "DD"
-    }
-}
-
 fn git_cmd(top: &Path) -> Command {
     let mut c = Command::new("git");
     // `core.fsmonitor` in a repo's own config can run an arbitrary program.
@@ -174,20 +183,25 @@ fn run(top: &Path, args: &[&str], stdin: &str) -> Result<String, String> {
     Err(msg.chars().skip(skip).collect())
 }
 
-fn repo(dir: &Path) -> Result<PathBuf, String> {
+/// The repository holding `dir`, and `dir`'s place in it: empty at the top, else
+/// `sub/folder/`. Only changes under that place are reviewed and committed.
+fn repo(dir: &Path) -> Result<(PathBuf, String), String> {
     if !dir.is_dir() {
         return Err("folder not on this machine".into());
     }
     move_lock::ensure_unlocked(dir)?;
-    git::toplevel(dir).ok_or_else(|| "not a git repository".into())
+    let top = git::toplevel(dir).ok_or("not a git repository")?;
+    let scope = run(dir, &["rev-parse", "--show-prefix"], "")?;
+    Ok((top, scope.trim_end_matches(['\r', '\n']).to_string()))
 }
 
-fn changes(top: &Path) -> Result<Vec<Change>, String> {
-    let out = run(
-        top,
-        &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
-        "",
-    )?;
+/// Changed files under `scope`; paths stay relative to the repository root.
+fn changes(top: &Path, scope: &str) -> Result<Vec<Change>, String> {
+    let mut args = vec!["status", "--porcelain=v1", "-z", "--untracked-files=all"];
+    if !scope.is_empty() {
+        args.extend(["--", scope]);
+    }
+    let out = run(top, &args, "")?;
     let mut records = out.split('\0').filter(|s| !s.is_empty());
     let mut all = Vec::new();
     while let Some(rec) = records.next() {
@@ -212,24 +226,61 @@ pub fn looks_secret(path: &str) -> bool {
     let ends = |exts: &[&str]| exts.iter().any(|e| name.ends_with(e));
     if name == ".env" || name.starts_with(".env.") || name.ends_with(".env") {
         // `.env.example` and friends are meant to be committed.
-        return !ends(&[".example", ".sample", ".template", ".dist", ".tpl", ".defaults"]);
+        return !ends(&[
+            ".example",
+            ".sample",
+            ".template",
+            ".dist",
+            ".tpl",
+            ".defaults",
+        ]);
     }
-    ends(&[".pem", ".key", ".p12", ".pfx", ".keystore", ".jks", ".ppk", ".kdbx"])
-        || ["id_rsa", "id_ed25519", "id_ecdsa", ".netrc", ".pypirc", "credentials"]
-            .contains(&name.as_str())
+    ends(&[
+        ".pem",
+        ".key",
+        ".p12",
+        ".pfx",
+        ".keystore",
+        ".jks",
+        ".ppk",
+        ".kdbx",
+    ]) || [
+        "id_rsa",
+        "id_ed25519",
+        "id_ecdsa",
+        ".netrc",
+        ".pypirc",
+        "credentials",
+    ]
+    .contains(&name.as_str())
         || ((name.contains("secret")
             || name.contains("credential")
             || name.starts_with("service-account"))
             && ends(&[
-                ".json", ".yaml", ".yml", ".txt", ".toml", ".ini", ".properties",
+                ".json",
+                ".yaml",
+                ".yml",
+                ".txt",
+                ".toml",
+                ".ini",
+                ".properties",
             ]))
 }
 
 fn redact(text: &str) -> String {
+    let last = |re: &Regex, l: &str| re.find_iter(l).last().map(|m| m.start());
+    // A private key's body has no shape of its own: hidden from BEGIN through END.
+    let mut in_key = false;
     text.lines()
         .map(|l| {
-            if KEY_RE.is_match(l) || ASSIGN_RE.is_match(l) {
-                "[line hidden: looks like a secret]"
+            let (begin, end) = (last(&PEM_BEGIN_RE, l), last(&PEM_END_RE, l));
+            let hide = in_key || begin.is_some() || KEY_RE.is_match(l) || ASSIGN_RE.is_match(l);
+            // Whichever marker comes last on the line says where the next one stands.
+            if begin != end {
+                in_key = begin > end;
+            }
+            if hide {
+                HIDDEN
             } else {
                 l
             }
@@ -249,28 +300,52 @@ fn head_of(path: &Path, max: u64) -> Option<String> {
     (!buf.contains(&0)).then(|| String::from_utf8_lossy(&buf).into_owned())
 }
 
-/// Whether committing `c` would add something shaped like a key.
-fn adds_key(top: &Path, c: &Change) -> bool {
-    if c.xy == "??" {
-        return head_of(&top.join(&c.path), SCAN_BYTES).is_some_and(|t| KEY_RE.is_match(&t));
+/// A file left out of what the model sees altogether: a diff hunk can show a
+/// key's body without the BEGIN line `redact` looks for.
+fn holds_private_key(path: &Path) -> bool {
+    head_of(path, SCAN_BYTES).is_some_and(|t| PEM_BEGIN_RE.is_match(&t))
+}
+
+/// Whether committing `c` would add something shaped like a key. `Err` when that
+/// cannot be told, which stops the commit.
+fn adds_key(top: &Path, c: &Change) -> Result<bool, String> {
+    // Untracked, or no commit to diff against yet: the whole file gets added.
+    if c.xy == "??" || run(top, &["rev-parse", "--verify", "-q", "HEAD"], "").is_err() {
+        return Ok(head_of(&top.join(&c.path), SCAN_BYTES).is_some_and(|t| KEY_RE.is_match(&t)));
     }
     // Only added lines: a key already in history is not this commit's doing.
-    run(
+    let diff = run(
         top,
         &[
-            "diff", "HEAD", "-U0", "--no-ext-diff", "--no-textconv", "--no-color", "--", &c.path,
+            "diff",
+            "HEAD",
+            "-U0",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--no-color",
+            "--",
+            &c.path,
         ],
         "",
     )
-    .is_ok_and(|d| {
-        d.lines()
-            .any(|l| l.starts_with('+') && !l.starts_with("+++") && KEY_RE.is_match(l))
-    })
+    .map_err(|e| format!("cannot check {} for secrets: {e}", c.path))?;
+    Ok(diff
+        .lines()
+        .any(|l| l.starts_with('+') && !l.starts_with("+++") && KEY_RE.is_match(l)))
 }
 
-fn fingerprint(top: &Path, all: &[Change]) -> String {
+fn fingerprint(top: &Path, scope: &str, all: &[Change]) -> String {
     let mut h = DefaultHasher::new();
-    run(top, &["rev-parse", "HEAD"], "").ok().hash(&mut h);
+    // For a subfolder, its own committed tree: a commit elsewhere in the
+    // repository does not void the review.
+    let at = match scope.trim_end_matches('/') {
+        "" => "HEAD".to_string(),
+        folder => format!("HEAD:{folder}"),
+    };
+    run(top, &["branch", "--show-current"], "")
+        .ok()
+        .hash(&mut h);
+    run(top, &["rev-parse", &at], "").ok().hash(&mut h);
     for c in all {
         c.xy.hash(&mut h);
         c.path.hash(&mut h);
@@ -283,14 +358,14 @@ fn fingerprint(top: &Path, all: &[Change]) -> String {
 }
 
 pub fn facts(dir: &Path) -> Result<SyncRepoFacts, String> {
-    let top = repo(dir)?;
-    let all = changes(&top)?;
+    let (top, scope) = repo(dir)?;
+    let all = changes(&top, &scope)?;
     let hidden = |c: &Change| looks_secret(&c.path) || c.orig.as_deref().is_some_and(looks_secret);
 
     let mut bytes = 0;
     let tracked: Vec<&str> = all
         .iter()
-        .filter(|c| c.xy != "??" && !hidden(c))
+        .filter(|c| c.xy != "??" && !hidden(c) && !holds_private_key(&top.join(&c.path)))
         .map(|c| c.path.as_str())
         .take_while(|p| {
             bytes += p.len() + 3;
@@ -301,7 +376,12 @@ pub fn facts(dir: &Path) -> Result<SyncRepoFacts, String> {
     // With no paths `git diff HEAD --` would diff everything, secrets included.
     if !tracked.is_empty() {
         let mut args = vec![
-            "diff", "HEAD", "--no-ext-diff", "--no-textconv", "--no-color", "--",
+            "diff",
+            "HEAD",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--no-color",
+            "--",
         ];
         args.extend(&tracked);
         // Fails in a repository with no commit yet; the file list still serves.
@@ -309,7 +389,7 @@ pub fn facts(dir: &Path) -> Result<SyncRepoFacts, String> {
     }
     for c in all
         .iter()
-        .filter(|c| c.xy == "??" && !hidden(c))
+        .filter(|c| c.xy == "??" && !hidden(c) && !holds_private_key(&top.join(&c.path)))
         .take(MAX_PREVIEWS)
     {
         if let Some(text) = head_of(&top.join(&c.path), PREVIEW_BYTES) {
@@ -341,7 +421,7 @@ pub fn facts(dir: &Path) -> Result<SyncRepoFacts, String> {
             .lines()
             .map(str::to_string)
             .collect(),
-        fingerprint: fingerprint(&top, &all),
+        fingerprint: fingerprint(&top, &scope, &all),
         push_ok: false,
     })
 }
@@ -354,30 +434,43 @@ struct Commit {
     paths: BTreeSet<String>,
 }
 
-fn ignore_lines(raw: &[String]) -> Result<Vec<&str>, String> {
+/// `?*` and `[!x]*` hide nearly everything: a pattern has to spell out part of a name.
+fn names_something(pattern: &str) -> bool {
+    CLASS_RE
+        .replace_all(pattern, "")
+        .chars()
+        .any(char::is_alphanumeric)
+}
+
+fn ignore_lines(raw: &[String], scope: &str) -> Result<Vec<String>, String> {
     raw.iter()
         .map(|p| p.trim())
         .filter(|p| !p.is_empty())
         .map(|p| {
-            let too_broad = p.trim_matches(['*', '/', '.']).is_empty();
-            if p.contains(['\n', '\r']) || p.starts_with(['!', '#']) || too_broad {
+            // The model sees paths from the repository root; a folder's
+            // `.gitignore` reads them from the folder.
+            let line = match p.trim_start_matches('/').strip_prefix(scope) {
+                Some(rest) if !scope.is_empty() => format!("/{rest}"),
+                _ => p.to_string(),
+            };
+            if p.contains(['\n', '\r']) || p.starts_with(['!', '#']) || !names_something(&line) {
                 Err(format!("not a usable ignore pattern: {p}"))
             } else {
-                Ok(p)
+                Ok(line)
             }
         })
         .collect()
 }
 
 /// Appends the lines not already there. Returns whether anything was written.
-fn append_ignore(file: &Path, lines: &[&str]) -> Result<bool, String> {
+fn append_ignore(file: &Path, lines: &[String]) -> Result<bool, String> {
     let mut text = match std::fs::read_to_string(file) {
         Ok(t) => t,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
         Err(e) => return Err(format!("Cannot read .gitignore: {e}")),
     };
     let have: HashSet<String> = text.lines().map(|l| l.trim().to_string()).collect();
-    let fresh: Vec<&str> = lines.iter().copied().filter(|l| !have.contains(*l)).collect();
+    let fresh: Vec<&String> = lines.iter().filter(|l| !have.contains(*l)).collect();
     if fresh.is_empty() {
         return Ok(false);
     }
@@ -418,7 +511,7 @@ fn plan_commits(top: &Path, all: &[Change], plan: &SyncResolution) -> Result<Vec
                 if h.path.ends_with('/') {
                     return Err(format!("{} is a repository inside this one", h.path));
                 }
-                if looks_secret(&h.path) || adds_key(top, h) {
+                if looks_secret(&h.path) || adds_key(top, h)? {
                     return Err(format!("refusing to commit a likely secret: {}", h.path));
                 }
                 if !used.insert(h.path.clone()) {
@@ -455,7 +548,14 @@ fn commit_one(top: &Path, c: &Commit) -> Result<(), String> {
     }
     run(
         top,
-        &["commit", "-q", "-m", &c.message, FROM_STDIN[0], FROM_STDIN[1]],
+        &[
+            "commit",
+            "-q",
+            "-m",
+            &c.message,
+            FROM_STDIN[0],
+            FROM_STDIN[1],
+        ],
         &nul_list(&c.paths),
     )
     .map(|_| ())
@@ -464,28 +564,35 @@ fn commit_one(top: &Path, c: &Commit) -> Result<(), String> {
 /// Runs an approved plan: ignore lines, commits, rebase, push. Refuses outright
 /// (`Err`) before touching anything; a failure part way is in `error`.
 pub fn apply(dir: &Path, plan: &SyncResolution) -> Result<(SyncResolveResult, GitProbe), String> {
-    let top = repo(dir)?;
+    let (top, scope) = repo(dir)?;
     if let Some(why) = git::busy(&top) {
         return Err(format!("{why} — finish it first"));
     }
-    let all = changes(&top)?;
-    if all.iter().any(Change::unmerged) {
+    // Repository-wide: git commits nothing while any path is unmerged.
+    if !run(&top, &["ls-files", "--unmerged"], "")?.is_empty() {
         return Err("unresolved merge conflicts — finish them first".into());
     }
-    if let Some(seen) = &plan.fingerprint {
-        if *seen != fingerprint(&top, &all) {
+    let all = changes(&top, &scope)?;
+    match &plan.fingerprint {
+        Some(seen) if *seen != fingerprint(&top, &scope, &all) => {
             return Err("Files changed since this review — review again".into());
         }
+        // Rebase and push move commits that exist; anything new needs a review.
+        None if !plan.commits.is_empty() || !plan.ignore.is_empty() => {
+            return Err("These changes have not been reviewed — review first".into());
+        }
+        _ => {}
     }
-    let ignore = ignore_lines(&plan.ignore)?;
+    let ignore = ignore_lines(&plan.ignore, &scope)?;
     let mut commits = plan_commits(&top, &all, plan)?;
 
     let mut done = Vec::new();
-    if !ignore.is_empty() && append_ignore(&top.join(".gitignore"), &ignore)? {
+    let ignore_file = format!("{scope}.gitignore");
+    if !ignore.is_empty() && append_ignore(&top.join(&ignore_file), &ignore)? {
         done.push(format!("added to .gitignore: {}", ignore.join(", ")));
-        let planned = commits.iter().any(|c| c.paths.contains(".gitignore"));
-        if !planned && all.iter().all(|c| c.path != ".gitignore") {
-            let file = BTreeSet::from([".gitignore".to_string()]);
+        let planned = commits.iter().any(|c| c.paths.contains(&ignore_file));
+        if !planned && all.iter().all(|c| c.path != ignore_file) {
+            let file = BTreeSet::from([ignore_file]);
             commits.insert(
                 0,
                 Commit {
@@ -551,13 +658,25 @@ async fn project_row(db: &DatabaseManager, id: i32) -> Result<project::Model, St
 }
 
 pub async fn facts_for(db: &DatabaseManager, id: i32) -> Result<SyncRepoFacts, String> {
-    let row = project_row(db, id).await?;
-    let path = row.path;
-    let mut found = tokio::task::spawn_blocking(move || facts(Path::new(&path)))
+    let path = project_row(db, id).await?.path;
+    // The rows a sync groups: who shares the repository decides the push.
+    let rows = project::Entity::find()
+        .filter(project::Column::Archived.eq(false))
+        .all(db.get_connection())
         .await
-        .map_err(|e| e.to_string())??;
-    found.push_ok = row.push_ok;
-    Ok(found)
+        .map_err(|e| format!("Failed to load projects: {e}"))?;
+    tokio::task::spawn_blocking(move || {
+        let mut found = facts(Path::new(&path))?;
+        let paths: Vec<String> = rows.iter().map(|r| r.path.clone()).collect();
+        let allowed: Vec<bool> = rows.iter().map(|r| r.push_ok).collect();
+        found.push_ok = rows
+            .iter()
+            .position(|r| r.id == id)
+            .is_some_and(|i| sync_all::push_allowed(&paths, &allowed, i));
+        Ok(found)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 pub async fn apply_for(
@@ -605,8 +724,8 @@ mod tests {
         std::fs::write(p, text).unwrap();
     }
 
-    /// One commit holding `a.txt`, `gone.txt` and `old name.txt`.
-    fn fixture() -> tempfile::TempDir {
+    /// A repository with no commit yet.
+    fn unborn() -> tempfile::TempDir {
         let t = tempfile::tempdir().unwrap();
         let d = t.path();
         sh(d, &["init", "-b", "main"]);
@@ -618,6 +737,13 @@ mod tests {
         ] {
             sh(d, &["config", kv[0], kv[1]]);
         }
+        t
+    }
+
+    /// One commit holding `a.txt`, `gone.txt` and `old name.txt`.
+    fn fixture() -> tempfile::TempDir {
+        let t = unborn();
+        let d = t.path();
         for f in ["a.txt", "gone.txt", "old name.txt"] {
             write(d, f, &format!("{f}\nline\nline\nline\n"));
         }
@@ -636,6 +762,12 @@ mod tests {
         }
     }
 
+    /// The plan as the UI sends it: carrying the fingerprint of the review.
+    fn reviewed(dir: &Path, mut plan: SyncResolution) -> SyncResolution {
+        plan.fingerprint = Some(facts(dir).unwrap().fingerprint);
+        plan
+    }
+
     #[test]
     fn sync_resolve_commits_only_what_the_plan_names() {
         let t = fixture();
@@ -648,8 +780,10 @@ mod tests {
         write(d, "staged.txt", "staged, not in the plan\n");
         sh(d, &["add", "staged.txt"]);
 
-        let mut plan = commit_plan(&["a.txt", "gone.txt", "new name.txt", "src/"]);
-        plan.fingerprint = Some(facts(d).unwrap().fingerprint);
+        let plan = reviewed(
+            d,
+            commit_plan(&["a.txt", "gone.txt", "new name.txt", "src/"]),
+        );
         let (r, _) = apply(d, &plan).unwrap();
         assert_eq!(r.error, None);
 
@@ -663,7 +797,13 @@ mod tests {
         shipped.sort();
         assert_eq!(
             shipped,
-            ["a.txt", "gone.txt", "new name.txt", "old name.txt", "src/new.rs"]
+            [
+                "a.txt",
+                "gone.txt",
+                "new name.txt",
+                "old name.txt",
+                "src/new.rs"
+            ]
         );
         let left = sh(d, &["status", "--porcelain"]);
         assert!(left.contains("A  staged.txt"), "{left}");
@@ -675,12 +815,17 @@ mod tests {
         let t = fixture();
         let d = t.path();
         write(d, "app/.env", "API_KEY=hunter2hunter2\n");
-        write(d, "config.ts", &format!("const k = 'ghp_{}'\n", "a".repeat(36)));
+        write(
+            d,
+            "config.ts",
+            &format!("const k = 'ghp_{}'\n", "a".repeat(36)),
+        );
         write(d, "a.txt", "changed\n");
         let head = sh(d, &["rev-parse", "HEAD"]);
 
         for bad in ["app/.env", "app/", "config.ts", "nope.txt"] {
-            assert!(apply(d, &commit_plan(&["a.txt", bad])).is_err(), "{bad}");
+            let plan = reviewed(d, commit_plan(&["a.txt", bad]));
+            assert!(apply(d, &plan).is_err(), "{bad}");
         }
         assert_eq!(sh(d, &["rev-parse", "HEAD"]), head);
         assert_eq!(sh(d, &["diff", "--cached", "--name-only"]), "");
@@ -697,10 +842,18 @@ mod tests {
         let t = fixture();
         let d = t.path();
         write(d, "a.txt", "one\n");
-        let mut plan = commit_plan(&["a.txt"]);
-        plan.fingerprint = Some(facts(d).unwrap().fingerprint);
+        let plan = reviewed(d, commit_plan(&["a.txt"]));
         write(d, "a.txt", "two, edited after the review\n");
         assert!(apply(d, &plan).is_err());
+
+        // No fingerprint at all: nothing may be committed or ignored.
+        assert!(apply(d, &commit_plan(&["a.txt"])).is_err());
+        let ignore = SyncResolution {
+            ignore: vec!["build/".into()],
+            ..Default::default()
+        };
+        assert!(apply(d, &ignore).is_err());
+        assert!(!d.join(".gitignore").exists());
     }
 
     #[test]
@@ -712,16 +865,159 @@ mod tests {
             ignore: vec!["build/".into()],
             ..Default::default()
         };
-        let (r, _) = apply(d, &plan).unwrap();
+        let (r, _) = apply(d, &reviewed(d, plan)).unwrap();
         assert_eq!(r.error, None);
         assert_eq!(sh(d, &["status", "--porcelain"]), "");
-        for broad in ["*", "**/*", "!a.txt"] {
+        for broad in [
+            "*",
+            "**/*",
+            "!a.txt",
+            ".*",
+            "?*",
+            "**/?*",
+            "[!x]*",
+            "[!]x]*",
+            "[[:alpha:]]*",
+        ] {
             let plan = SyncResolution {
                 ignore: vec![broad.into()],
                 ..Default::default()
             };
-            assert!(apply(d, &plan).is_err(), "{broad}");
+            let refused = apply(d, &reviewed(d, plan)).unwrap_err();
+            assert!(refused.contains("ignore pattern"), "{broad}: {refused}");
         }
+        for fine in ["*.log", "[Bb]in/", "__pycache__"] {
+            assert!(names_something(fine), "{fine}");
+        }
+    }
+
+    #[test]
+    fn sync_resolve_private_key_body_never_reaches_the_model() {
+        // Assembled, so this file does not itself look like it holds a key.
+        let pem = |edge: &str| format!("-----{edge} {} KEY-----", "RSA PRIVATE");
+        let (begin, end) = (pem("BEGIN"), pem("END"));
+
+        let text = format!("a\n+{begin}\n+MIIBODY\n+{end}\nafter");
+        assert_eq!(
+            redact(&text),
+            format!("a\n{HIDDEN}\n{HIDDEN}\n{HIDDEN}\nafter")
+        );
+        let cut_off = redact(&format!("{begin}\nMIIBODY\nMIIMORE"));
+        assert!(!cut_off.contains("MII"), "{cut_off}");
+        let one_line = redact(&format!("\"{begin}\\nMIIBODY\\n{end}\"\nafter"));
+        assert_eq!(one_line, format!("{HIDDEN}\nafter"));
+
+        let t = fixture();
+        let d = t.path();
+        let body = "MIIBODY1\nMIIBODY2\nMIIBODY3\nMIIBODY4\nMIIBODY5";
+        write(d, "deploy.sh", &format!("{begin}\n{body}\n{end}\nrun\n"));
+        sh(d, &["add", "."]);
+        sh(d, &["commit", "-m", "deploy"]);
+        // The hunk around this edit holds the end of the key but not its BEGIN.
+        write(
+            d,
+            "deploy.sh",
+            &format!("{begin}\n{body}\n{end}\nrun --fast\n"),
+        );
+        write(d, "notes.txt", &format!("{begin}\nMIINEW\n"));
+        let f = facts(d).unwrap();
+        assert!(!f.diff.contains("MII"), "{}", f.diff);
+        assert!(!f.diff.contains("notes.txt"), "{}", f.diff);
+    }
+
+    #[test]
+    fn sync_resolve_stripe_keys_and_key_assignments() {
+        for prefix in ["sk_live_", "rk_live_", "sk_test_", "rk_test_"] {
+            let key = format!("{prefix}{}", "a1".repeat(12));
+            assert!(KEY_RE.is_match(&key), "{prefix}");
+        }
+        assert!(!KEY_RE.is_match("task_test_helpers_for_the_runner"));
+        for line in [
+            "STRIPE_KEY=abc123abc123",
+            "const stripeKey = 'abc123abc123';",
+        ] {
+            assert_eq!(redact(line), HIDDEN, "{line}");
+        }
+    }
+
+    #[test]
+    fn sync_resolve_subfolder_project_stays_in_its_folder() {
+        let t = fixture();
+        let d = t.path();
+        let app = d.join("app");
+        write(d, "app/main.rs", "fn main() {}\n");
+        write(d, "app/dist/out.js", "x");
+        write(d, "a.txt", "changed elsewhere\n");
+        write(d, "other/new.txt", "elsewhere\n");
+
+        let f = facts(&app).unwrap();
+        let listed: Vec<&str> = f.files.iter().map(|c| c.path.as_str()).collect();
+        assert_eq!(listed, ["app/dist/out.js", "app/main.rs"]);
+        assert_eq!(f.files_total, 2);
+        assert!(!f.diff.contains("elsewhere"), "{}", f.diff);
+        let outside = reviewed(&app, commit_plan(&["a.txt"]));
+        assert!(apply(&app, &outside).is_err());
+
+        // A sibling's commit does not make this review stale.
+        sh(d, &["commit", "-m", "sibling", "a.txt"]);
+        write(d, "a.txt", "still uncommitted\n");
+        let mut plan = commit_plan(&["app/main.rs"]);
+        plan.ignore = vec!["app/dist/".into()];
+        plan.fingerprint = Some(f.fingerprint);
+        let (r, _) = apply(&app, &plan).unwrap();
+        assert_eq!(r.error, None);
+
+        assert_eq!(
+            std::fs::read_to_string(app.join(".gitignore")).unwrap(),
+            "/dist/\n"
+        );
+        assert!(!d.join(".gitignore").exists());
+        let shipped = sh(d, &["log", "-2", "--name-only", "--format="]);
+        let mut shipped: Vec<&str> = shipped.lines().filter(|l| !l.is_empty()).collect();
+        shipped.sort();
+        assert_eq!(shipped, ["app/.gitignore", "app/main.rs"]);
+        let left = sh(d, &["status", "--porcelain", "--untracked-files=all"]);
+        assert!(left.contains("M a.txt"), "{left}");
+        assert!(left.contains("?? other/new.txt"), "{left}");
+        assert!(!left.contains("app/"), "{left}");
+    }
+
+    #[test]
+    fn sync_resolve_first_commit_is_scanned_for_keys() {
+        let t = unborn();
+        let d = t.path();
+        write(
+            d,
+            "config.ts",
+            &format!("const k = 'ghp_{}'\n", "a".repeat(36)),
+        );
+        sh(d, &["add", "."]);
+        let refused = apply(d, &reviewed(d, commit_plan(&["config.ts"])));
+        assert!(refused.unwrap_err().contains("secret"));
+    }
+
+    #[test]
+    fn sync_resolve_refuses_during_a_cherry_pick() {
+        let t = fixture();
+        let d = t.path();
+        sh(d, &["checkout", "-qb", "other"]);
+        write(d, "a.txt", "theirs\n");
+        sh(d, &["commit", "-am", "theirs"]);
+        sh(d, &["checkout", "-q", "main"]);
+        write(d, "a.txt", "mine\n");
+        sh(d, &["commit", "-am", "mine"]);
+        // Conflicts (so `sh` would panic); resolved but not yet continued.
+        Command::new("git")
+            .arg("-C")
+            .arg(d)
+            .args(["cherry-pick", "other"])
+            .output()
+            .unwrap();
+        write(d, "a.txt", "resolved\n");
+        sh(d, &["add", "a.txt"]);
+
+        let plan = reviewed(d, commit_plan(&["a.txt"]));
+        assert!(apply(d, &plan).unwrap_err().contains("cherry-pick"));
     }
 
     #[test]

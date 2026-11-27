@@ -46,6 +46,12 @@ describe('parseTriage', () => {
     ]);
   });
 
+  it('drops ignore lines that name nothing', () => {
+    const ignore = ['?*', '**/?*', '[!x]*', '[!]x]*', '[[:alpha:]]*', '*.log', '[Bb]in/'];
+    const parsed = parseTriage(JSON.stringify({ summary: 's', ignore }), facts);
+    expect(parsed?.ignore).toEqual(['*.log', '[Bb]in/']);
+  });
+
   it('rejects a reply with nothing usable', () => {
     expect(parseTriage('I cannot help', facts)).toBeNull();
     expect(parseTriage('{"commits": "all"}', facts)).toBeNull();

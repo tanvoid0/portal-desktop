@@ -64,6 +64,10 @@ class SyncTriageState {
   items = $state<Record<number, Triage>>({});
   auto = $state(readAuto());
   applyingAll = $state(false);
+  /** An apply writes to a working tree; a sync must not start over it. */
+  applying = $derived(
+    this.applyingAll || Object.values(this.items).some((t) => t.status === 'applying')
+  );
   private queue: number[] = [];
   private working = false;
 
@@ -86,8 +90,10 @@ class SyncTriageState {
   /** A full sync, then (by default) a review of whatever is left over. */
   async run(snapshotPassword: string | null) {
     if (syncAll.running) return;
+    // A refused or failed sync leaves the reviews as they were.
+    if (!(await syncAll.start(snapshotPassword))) return;
     this.reset();
-    if ((await syncAll.start(snapshotPassword)) && this.auto) this.reviewAll();
+    if (this.auto) this.reviewAll();
   }
 
   reset() {
@@ -108,8 +114,14 @@ class SyncTriageState {
     }
   }
 
+  /** The reactive entry: `??=` hands back the plain object, whose writes nothing sees. */
+  private entry(id: number): Triage {
+    this.items[id] ??= blank();
+    return this.items[id];
+  }
+
   review(id: number) {
-    const item = (this.items[id] ??= blank());
+    const item = this.entry(id);
     if (item.status === 'reviewing' || item.status === 'applying') return;
     item.status = 'queued';
     item.message = '';
@@ -133,7 +145,7 @@ class SyncTriageState {
 
   /** Skip the model: one commit of everything safe, still behind Apply. */
   async planEverything(id: number) {
-    const item = (this.items[id] ??= blank());
+    const item = this.entry(id);
     let facts: SyncRepoFacts;
     try {
       // Fresh: the fingerprint has to match the tree as it is now.

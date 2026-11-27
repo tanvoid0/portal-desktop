@@ -140,7 +140,10 @@
       {#if syncAll.running}
         <Button variant="outline" onclick={() => syncAll.cancel()}>Cancel</Button>
       {:else}
-        <Button disabled={syncStatus.isPending || syncTriage.applyingAll} onclick={start}>
+        <Button
+          disabled={syncStatus.isPending || syncTriage.applying || syncAll.busy.length > 0}
+          onclick={start}
+        >
           <RefreshCw class="mr-2 h-4 w-4" /> Sync all
         </Button>
       {/if}
