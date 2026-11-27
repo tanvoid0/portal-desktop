@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Progress } from '$lib/components/ui/progress';
   import { goto } from '$app/navigation';
   import {
     Card,
@@ -188,14 +189,12 @@
               </span>
             </div>
             {#if (overview?.task_stats.total ?? 0) > 0}
-              <div class="mt-2 h-2 w-full rounded-full bg-secondary">
-                <div
-                  class="h-2 rounded-full bg-status-success transition-all"
-                  style="width: {((overview?.task_stats.completed ?? 0) /
-                    (overview?.task_stats.total ?? 1)) *
-                    100}%"
-                ></div>
-              </div>
+              <Progress
+                value={((overview?.task_stats.completed ?? 0) / (overview?.task_stats.total ?? 1)) *
+                  100}
+                class="mt-2 bg-secondary"
+                indicatorClass="bg-status-success"
+              />
             {/if}
           </div>
         </CardContent>

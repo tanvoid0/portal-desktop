@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Progress } from '$lib/components/ui/progress';
   import { onMount } from 'svelte';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
@@ -392,12 +393,7 @@
         </div>
 
         {#if pct(job.progress) !== undefined}
-          <div class="h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              class="h-full rounded-full bg-primary transition-[width]"
-              style="width: {pct(job.progress)}%"
-            ></div>
-          </div>
+          <Progress value={pct(job.progress)} class="bg-muted" />
         {/if}
         {#if progressLine(job.progress)}
           <p class="text-xs text-muted-foreground">{progressLine(job.progress)}</p>

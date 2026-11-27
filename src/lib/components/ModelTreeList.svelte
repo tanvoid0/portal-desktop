@@ -1,4 +1,6 @@
 <script lang="ts">
+  import LoadingSpinner from '$lib/components/ui/loading-spinner.svelte';
+  import { Progress } from '$lib/components/ui/progress';
   import { Button } from './ui/button';
   import { Input } from './ui/input';
   import { Badge } from './ui/badge';
@@ -89,7 +91,7 @@
 
 {#if loading}
   <div class="flex items-center justify-center p-8">
-    <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+    <LoadingSpinner size="lg" class="text-primary" />
     <span class="ml-2">Loading models...</span>
   </div>
 {:else if error}
@@ -233,12 +235,11 @@
                           <div class="text-xs text-blue-600">
                             {installationStatus}
                           </div>
-                          <div class="mt-1 h-1.5 w-full rounded-full bg-blue-200">
-                            <div
-                              class="h-1.5 rounded-full bg-blue-600 transition-all duration-300"
-                              style="width: {installationProgress}%"
-                            ></div>
-                          </div>
+                          <Progress
+                            value={installationProgress}
+                            class="mt-1 h-1.5 bg-blue-200"
+                            indicatorClass="bg-blue-600"
+                          />
                         </div>
                         {#if onCancel}
                           <Button

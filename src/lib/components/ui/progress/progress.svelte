@@ -7,8 +7,12 @@
     class: className,
     max = 100,
     value,
+    indicatorClass,
     ...restProps
-  }: WithoutChildrenOrChild<ProgressPrimitive.RootProps> = $props();
+  }: WithoutChildrenOrChild<ProgressPrimitive.RootProps> & { indicatorClass?: string } = $props();
+
+  // Local addition: re-apply after `shadcn update`.
+  const percent = $derived(Math.min(100, Math.max(0, (100 * (value ?? 0)) / (max || 1))));
 </script>
 
 <ProgressPrimitive.Root
@@ -21,7 +25,7 @@
 >
   <div
     data-slot="progress-indicator"
-    class="h-full w-full flex-1 bg-primary transition-all"
-    style="transform: translateX(-{100 - (100 * (value ?? 0)) / (max ?? 1)}%)"
+    class={cn('h-full w-full flex-1 rounded-full bg-primary transition-all', indicatorClass)}
+    style="transform: translateX(-{100 - percent}%)"
   ></div>
 </ProgressPrimitive.Root>

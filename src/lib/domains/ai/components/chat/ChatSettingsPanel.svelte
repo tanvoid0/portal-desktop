@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as Collapsible from '$lib/components/ui/collapsible';
   import type { Snippet } from 'svelte';
   import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
   import { Textarea } from '$lib/components/ui/textarea';
@@ -87,14 +88,14 @@
 )}
   <div class="space-y-1.5">
     <div class="flex items-center justify-between gap-2">
-      <label class="flex items-center gap-2 text-xs">
+      <Label class="text-xs font-normal">
         <Checkbox
           checked={value != null}
           onCheckedChange={(on) => set(on ? fallback : null)}
           class="h-3.5 w-3.5"
         />
         {label}
-      </label>
+      </Label>
       <Input
         type="number"
         {min}
@@ -116,17 +117,19 @@
 {/snippet}
 
 {#snippet section(title: string, body: Snippet)}
-  <details class="group/sec border-b border-border/60 last:border-0" open>
-    <summary
-      class="flex cursor-pointer list-none items-center justify-between py-2.5 text-xs font-medium text-muted-foreground marker:content-none hover:text-foreground"
+  <Collapsible.Root open class="border-b border-border/60 last:border-0">
+    <Collapsible.Trigger
+      class="group/sec flex w-full cursor-pointer items-center justify-between py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground"
     >
       {title}
-      <ChevronDown class="h-3.5 w-3.5 transition-transform group-open/sec:rotate-180" />
-    </summary>
-    <div class="space-y-4 pb-4">
+      <ChevronDown
+        class="h-3.5 w-3.5 transition-transform group-data-[state=open]/sec:rotate-180"
+      />
+    </Collapsible.Trigger>
+    <Collapsible.Content class="space-y-4 pb-4">
       {@render body()}
-    </div>
-  </details>
+    </Collapsible.Content>
+  </Collapsible.Root>
 {/snippet}
 
 <ScrollArea class="min-h-0 flex-1">
@@ -159,10 +162,10 @@
 
       <div class="space-y-1.5">
         <div class="flex items-center justify-between gap-2">
-          <label class="flex items-center gap-2 text-xs">
+          <Label class="text-xs font-normal">
             <Checkbox bind:checked={settings.limitResponseLength} class="h-3.5 w-3.5" />
             Limit Response Length
-          </label>
+          </Label>
           <Input
             type="number"
             min={64}

@@ -86,12 +86,7 @@
               {cpuPercent.toFixed(1)}% used
             </p>
           {:else}
-            <div class="h-2 rounded-full bg-muted">
-              <div
-                class="h-full rounded-full bg-blue-500"
-                style="width: {Math.min(cpuPercent, 100)}%"
-              ></div>
-            </div>
+            <Progress value={cpuPercent} class="bg-muted" indicatorClass="bg-blue-500" />
           {/if}
         </div>
       {/if}
@@ -114,12 +109,7 @@
               {memoryPercent.toFixed(1)}% used
             </p>
           {:else}
-            <div class="h-2 rounded-full bg-muted">
-              <div
-                class="h-full rounded-full bg-green-500"
-                style="width: {Math.min(memoryPercent, 100)}%"
-              ></div>
-            </div>
+            <Progress value={memoryPercent} class="bg-muted" indicatorClass="bg-green-500" />
           {/if}
         </div>
       {/if}

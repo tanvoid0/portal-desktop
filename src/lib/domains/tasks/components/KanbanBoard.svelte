@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
   import * as Tooltip from '$lib/components/ui/tooltip';
   import { taskActions } from '../stores/taskStore';
@@ -131,9 +132,9 @@
         {:else}
           <h3 class="text-sm font-semibold text-foreground">{column.title}</h3>
         {/if}
-        <span class="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
+        <Badge variant="secondary" class="border-0 bg-muted py-1 font-normal text-muted-foreground">
           {column.tasks.length}
-        </span>
+        </Badge>
       </div>
 
       <!-- Each column scrolls on its own, so the board never outgrows the viewport. -->

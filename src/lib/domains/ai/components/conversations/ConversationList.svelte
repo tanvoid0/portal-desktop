@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as Collapsible from '$lib/components/ui/collapsible';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import Plus from '~icons/fa6-solid/plus';
@@ -159,44 +160,45 @@
   {#each groups as group (group.name ?? '__ungrouped')}
     {#if group.name !== null}
       {@const folderName = group.name}
-      <details
+      <Collapsible.Root
+        open
         class="group/folder rounded-md {dropTarget === folderName
           ? 'bg-primary/10 ring-1 ring-primary/40'
           : ''}"
-        open
         ondragover={(e) => handleDragOver(e, folderName)}
         ondragleave={() => (dropTarget = undefined)}
         ondrop={(e) => handleDrop(e, folderName)}
       >
-        <summary
-          class="flex cursor-pointer list-none items-center gap-1 rounded-md px-2 py-1.5 text-xs text-muted-foreground marker:content-none hover:bg-muted/60 hover:text-foreground"
+        <div
+          class="flex items-center gap-1 rounded-md pr-2 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
         >
-          <ChevronRight
-            class="h-3.5 w-3.5 shrink-0 transition-transform group-open/folder:rotate-90"
-          />
-          <span class="min-w-0 flex-1 truncate">{folderName}</span>
+          <Collapsible.Trigger
+            class="group/trigger flex min-w-0 flex-1 cursor-pointer items-center gap-1 py-1.5 pl-2 text-left"
+          >
+            <ChevronRight
+              class="h-3.5 w-3.5 shrink-0 transition-transform group-data-[state=open]/trigger:rotate-90"
+            />
+            <span class="min-w-0 flex-1 truncate">{folderName}</span>
+          </Collapsible.Trigger>
           <Button
             size="icon"
             variant="ghost"
-            class="hidden h-5 w-5 shrink-0 group-hover/folder:flex hover:text-destructive"
+            class="hidden h-5 w-5 shrink-0 group-focus-within/folder:flex group-hover/folder:flex hover:text-destructive"
             title="Delete folder (keeps its chats)"
-            onclick={(e) => {
-              e.preventDefault();
-              folders = removeFolder(folders, folderName);
-            }}
+            onclick={() => (folders = removeFolder(folders, folderName))}
           >
             <X class="h-3 w-3" />
           </Button>
-        </summary>
-        <div class="space-y-0.5 pl-3">
+        </div>
+        <Collapsible.Content class="space-y-0.5 pl-3">
           {#each group.items as conversation (conversation.id)}
             {@render row(conversation)}
           {/each}
           {#if group.items.length === 0}
             <p class="px-2 py-1 text-[11px] text-muted-foreground">Folder is empty</p>
           {/if}
-        </div>
-      </details>
+        </Collapsible.Content>
+      </Collapsible.Root>
     {:else}
       <div
         class="min-h-8 space-y-0.5 rounded-md {dropTarget === null

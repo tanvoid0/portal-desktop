@@ -1,6 +1,7 @@
 <!-- Analytics (#192): usage, tool calls and outcomes aggregated in SQL over agent_events,
      honoring the overview's backend filter. Deferred: Sankey, agent_workflows ingest (4b). -->
 <script lang="ts">
+  import * as Table from '$lib/components/ui/table';
   import { createQuery } from '@tanstack/svelte-query';
   import { BarChart } from 'layerchart';
   import { PageLoading, PageError } from '$lib/components/shell';
@@ -76,19 +77,21 @@
         {:else}
           <!-- ChartContainer only to scope the family colour vars to the swatches. -->
           <ChartContainer config={FAMILY_CONFIG} class="block aspect-auto overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="text-left text-xs text-muted-foreground">
-                <tr>
-                  <th class="py-1 font-normal">Model</th>
-                  <th class="py-1 text-right font-normal">Tokens</th>
-                  <th class="py-1 text-right font-normal">Cache</th>
-                  <th class="py-1 text-right font-normal">Cost</th>
-                </tr>
-              </thead>
-              <tbody class="tabular-nums">
+            <Table.Root>
+              <Table.Header
+                class="text-xs [&_th]:h-auto [&_th]:px-1 [&_th]:py-1 [&_th]:font-normal [&_th]:text-muted-foreground"
+              >
+                <Table.Row class="hover:bg-transparent">
+                  <Table.Head>Model</Table.Head>
+                  <Table.Head class="text-right">Tokens</Table.Head>
+                  <Table.Head class="text-right">Cache</Table.Head>
+                  <Table.Head class="text-right">Cost</Table.Head>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body class="tabular-nums [&_td]:px-1 [&_td]:py-1">
                 {#each byModel as [model, r] (model)}
-                  <tr class="border-t">
-                    <td class="py-1">
+                  <Table.Row class="border-t border-b-0 hover:bg-transparent">
+                    <Table.Cell>
                       <span class="flex min-w-0 items-center gap-2">
                         <span
                           class="size-2.5 shrink-0 rounded-[2px]"
@@ -96,14 +99,14 @@
                         ></span>
                         <span class="truncate">{model}</span>
                       </span>
-                    </td>
-                    <td class="py-1 text-right">{compact.format(r.tokens)}</td>
-                    <td class="py-1 text-right">{compact.format(r.cache)}</td>
-                    <td class="py-1 text-right">{money.format(r.cost)}</td>
-                  </tr>
+                    </Table.Cell>
+                    <Table.Cell class="text-right">{compact.format(r.tokens)}</Table.Cell>
+                    <Table.Cell class="text-right">{compact.format(r.cache)}</Table.Cell>
+                    <Table.Cell class="text-right">{money.format(r.cost)}</Table.Cell>
+                  </Table.Row>
                 {/each}
-              </tbody>
-            </table>
+              </Table.Body>
+            </Table.Root>
           </ChartContainer>
         {/if}
       </section>

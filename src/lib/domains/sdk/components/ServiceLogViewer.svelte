@@ -4,6 +4,7 @@
 -->
 
 <script lang="ts">
+  import LoadingSpinner from '$lib/components/ui/loading-spinner.svelte';
   import { onMount, onDestroy } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import {
@@ -265,7 +266,7 @@
     <ScrollArea class="flex-1 p-4">
       {#if loading}
         <div class="flex items-center justify-center py-8">
-          <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+          <LoadingSpinner size="lg" class="text-primary" />
           <span class="ml-2">Loading logs...</span>
         </div>
       {:else if filteredLogs.length === 0}

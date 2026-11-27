@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LoadingSpinner from '$lib/components/ui/loading-spinner.svelte';
   import { onMount } from 'svelte';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
@@ -154,7 +155,7 @@
   {#if waitingFor}
     <Card.Root>
       <Card.Header class="items-center text-center">
-        <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+        <LoadingSpinner size="lg" class="text-primary" />
         <Card.Title>Waiting for {waitingFor}</Card.Title>
         <Card.Description>
           Approve the request on {waitingFor}'s screen — it's asking there as {deviceName ||

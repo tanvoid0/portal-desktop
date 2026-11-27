@@ -4,6 +4,7 @@
 -->
 
 <script lang="ts">
+  import LoadingSpinner from '$lib/components/ui/loading-spinner.svelte';
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
@@ -237,7 +238,7 @@
     <!-- Loading State -->
     {#if loading}
       <div class="flex items-center gap-2 text-sm text-muted-foreground">
-        <div class="h-4 w-4 animate-spin rounded-full border-b-2 border-primary"></div>
+        <LoadingSpinner size="sm" class="text-primary" />
         Checking health...
       </div>
     {/if}

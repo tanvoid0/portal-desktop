@@ -3,6 +3,7 @@
 -->
 
 <script lang="ts">
+  import { Skeleton } from '$lib/components/ui/skeleton';
   import { onMount } from 'svelte';
   import { Label } from '$lib/components/ui/label';
   import { Switch } from '$lib/components/ui/switch';
@@ -145,7 +146,7 @@
       <div class="space-y-2">
         <Label>Current Autonomy Level</Label>
         {#if autonomyLevel === null}
-          <div class="h-10 animate-pulse rounded-md border border-input bg-muted"></div>
+          <Skeleton class="h-10 border border-input bg-muted" />
         {:else}
           {#each levelOptions as option}
             {#if option.value === autonomyLevel}
@@ -183,7 +184,7 @@
             disabled={!autonomyEnabled || isLoading}
           />
         {:else}
-          <div class="h-10 animate-pulse rounded-md border border-input bg-muted"></div>
+          <Skeleton class="h-10 border border-input bg-muted" />
         {/if}
         {#if autonomyLevel !== null}
           <div class="rounded-md bg-muted p-3 text-sm text-muted-foreground">

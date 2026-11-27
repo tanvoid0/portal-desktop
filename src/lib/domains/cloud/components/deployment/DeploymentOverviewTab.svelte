@@ -1,5 +1,6 @@
 <!-- Deployment overview: info, replica progress bars, labels -->
 <script lang="ts">
+  import { Progress } from '$lib/components/ui/progress';
   import type { ICloudResource } from '$lib/domains/cloud/core/types';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import InfoCard from '../InfoCard.svelte';
@@ -46,12 +47,11 @@
               <span class="text-sm">{bar.label}</span>
               <span class="font-medium">{bar.value || 0}/{desired || 0}</span>
             </div>
-            <div class="h-2 w-full rounded-full bg-muted">
-              <div
-                class="h-2 rounded-full {bar.color} transition-all"
-                style="width: {desired ? (bar.value / desired) * 100 : 0}%"
-              ></div>
-            </div>
+            <Progress
+              value={desired ? (bar.value / desired) * 100 : 0}
+              class="bg-muted"
+              indicatorClass={bar.color}
+            />
           </div>
         {/each}
       </div>

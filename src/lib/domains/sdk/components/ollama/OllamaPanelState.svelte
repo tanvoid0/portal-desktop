@@ -1,5 +1,6 @@
 <!-- Loading spinner / error + Retry / content, shared by the Ollama tabs. -->
 <script lang="ts">
+  import LoadingSpinner from '$lib/components/ui/loading-spinner.svelte';
   import type { Snippet } from 'svelte';
   import { Button } from '$lib/components/ui/button';
 
@@ -15,7 +16,7 @@
 
 {#if loading}
   <div class="flex items-center justify-center p-8">
-    <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+    <LoadingSpinner size="lg" class="text-primary" />
     <span class="ml-2">{loadingText}</span>
   </div>
 {:else if error}

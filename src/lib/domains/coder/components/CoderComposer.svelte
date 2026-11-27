@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Badge } from '$lib/components/ui/badge';
   import { onMount, type Snippet } from 'svelte';
 
   import { Button } from '$lib/components/ui/button';
@@ -248,9 +249,9 @@
 
             <span>Agent changes</span>
 
-            <span class="rounded-full bg-amber-500 px-1.5 font-mono text-xs text-white">
+            <Badge class="border-0 bg-amber-500 px-1.5 py-0 font-mono text-white">
               {pendingChangeCount}
-            </span>
+            </Badge>
           </Button>
         {/if}
 

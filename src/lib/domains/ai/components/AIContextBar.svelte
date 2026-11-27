@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Progress } from '$lib/components/ui/progress';
   import * as Popover from '$lib/components/ui/popover/index.js';
   import { cn } from '$lib/utils.js';
   import type { ContextUsage, LlmUsage } from '../types/index.js';
@@ -81,12 +82,7 @@
         >
           Context
         </span>
-        <div class="relative h-1.5 min-w-[72px] flex-1 overflow-hidden rounded-full bg-primary/20">
-          <div
-            class={cn('absolute inset-y-0 left-0 rounded-full transition-all', barColor)}
-            style="width: {percent}%"
-          ></div>
-        </div>
+        <Progress value={percent} class="h-1.5 min-w-[72px] flex-1" indicatorClass={barColor} />
         <span class="shrink-0 text-[10px] text-muted-foreground tabular-nums">
           {percent.toFixed(0)}%
         </span>

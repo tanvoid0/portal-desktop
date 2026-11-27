@@ -1,5 +1,7 @@
 <!-- Catalog tab of Actions: source filter, catalog warnings, workflow and action cards with Run. -->
 <script lang="ts">
+  import * as Collapsible from '$lib/components/ui/collapsible';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { Checkbox } from '$lib/components/ui/checkbox';
@@ -76,17 +78,22 @@
   </div>
 
   {#if warnings.length > 0}
-    <details class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-sm">
-      <summary class="cursor-pointer text-amber-700 select-none dark:text-amber-400">
+    <Collapsible.Root
+      class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-sm"
+    >
+      <Collapsible.Trigger
+        class="group/warn flex w-full cursor-pointer items-center gap-1.5 text-left text-amber-700 select-none dark:text-amber-400"
+      >
+        <ChevronRight class="h-3 w-3 transition-transform group-data-[state=open]/warn:rotate-90" />
         {warnings.length}
         {warnings.length === 1 ? 'source unavailable' : 'sources unavailable'}
-      </summary>
-      <div class="space-y-1 py-1.5">
+      </Collapsible.Trigger>
+      <Collapsible.Content class="space-y-1 py-1.5">
         {#each warnings as warning (warning)}
           <p>{warning}</p>
         {/each}
-      </div>
-    </details>
+      </Collapsible.Content>
+    </Collapsible.Root>
   {/if}
 
   {#if loading}

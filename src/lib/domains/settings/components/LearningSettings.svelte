@@ -3,6 +3,7 @@
 -->
 
 <script lang="ts">
+  import { Skeleton } from '$lib/components/ui/skeleton';
   import { onMount } from 'svelte';
   import { Label } from '$lib/components/ui/label';
   import { Switch } from '$lib/components/ui/switch';
@@ -184,7 +185,7 @@
       <div>
         <Label class="text-sm text-muted-foreground">Current Intensity</Label>
         {#if mlIntensity === null}
-          <div class="mt-1 h-6 animate-pulse rounded bg-muted"></div>
+          <Skeleton class="mt-1 h-6 rounded bg-muted" />
         {:else}
           {@const Icon = intensityIcons[mlIntensity]}
           <div class="mt-1 flex items-center gap-2">
@@ -226,7 +227,7 @@
           disabled={!mlEnabled || isLoading}
         />
       {:else}
-        <div class="h-10 animate-pulse rounded-md border border-input bg-muted"></div>
+        <Skeleton class="h-10 border border-input bg-muted" />
       {/if}
       {#if mlIntensity !== null}
         <p class="text-sm text-muted-foreground">

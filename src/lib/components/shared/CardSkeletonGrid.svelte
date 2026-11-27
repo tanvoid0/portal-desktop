@@ -1,5 +1,6 @@
 <!-- Grid of pulsing placeholder cards shown while a card list loads -->
 <script lang="ts">
+  import { Skeleton } from '$lib/components/ui/skeleton';
   import { Card, CardContent, CardHeader } from '$lib/components/ui/card';
   import { cn } from '$lib/utils';
 
@@ -14,13 +15,13 @@
   {#each Array(count) as _}
     <Card>
       <CardHeader>
-        <div class="h-4 animate-pulse rounded bg-muted"></div>
-        <div class="h-3 w-2/3 animate-pulse rounded bg-muted"></div>
+        <Skeleton class="h-4 rounded bg-muted" />
+        <Skeleton class="h-3 w-2/3 rounded bg-muted" />
       </CardHeader>
       <CardContent>
         <div class="space-y-2">
-          <div class="h-3 animate-pulse rounded bg-muted"></div>
-          <div class="h-3 w-1/2 animate-pulse rounded bg-muted"></div>
+          <Skeleton class="h-3 rounded bg-muted" />
+          <Skeleton class="h-3 w-1/2 rounded bg-muted" />
         </div>
       </CardContent>
     </Card>

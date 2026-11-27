@@ -10,6 +10,7 @@
 	nothing to authenticate into any more, so it just gets turned away.
 -->
 <script lang="ts">
+  import LoadingSpinner from '$lib/components/ui/loading-spinner.svelte';
   import { onMount } from 'svelte';
   import { isTauriEnvironment } from '$lib/utils/tauri';
   import { InvokeClient } from '$lib/utils/invokeClient';
@@ -28,7 +29,7 @@
 
 {#if !ready}
   <div class="flex min-h-screen items-center justify-center">
-    <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+    <LoadingSpinner size="lg" class="text-primary" />
   </div>
 {:else if allowed}
   {@render children()}

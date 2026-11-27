@@ -1,5 +1,7 @@
 <!-- The AI review of one repository's uncommitted work: questions, or a plan to apply. -->
 <script lang="ts">
+  import * as Collapsible from '$lib/components/ui/collapsible';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Checkbox } from '$lib/components/ui/checkbox';
@@ -104,15 +106,20 @@
             aria-label="Commit message {i + 1}"
             class="max-w-3xl"
           />
-          <details class="text-xs text-muted-foreground">
-            <summary class="cursor-pointer">
+          <Collapsible.Root class="text-xs text-muted-foreground">
+            <Collapsible.Trigger class="group/files flex cursor-pointer items-center gap-1.5">
+              <ChevronRight
+                class="h-3 w-3 transition-transform group-data-[state=open]/files:rotate-90"
+              />
               {commit.files.length}
               {commit.files.length === 1 ? 'file' : 'files'} in this commit
-            </summary>
-            <ul class="max-h-40 overflow-y-auto pl-4 font-mono">
-              {#each commit.files as file (file)}<li class="wrap-anywhere">{file}</li>{/each}
-            </ul>
-          </details>
+            </Collapsible.Trigger>
+            <Collapsible.Content>
+              <ul class="max-h-40 overflow-y-auto pl-4 font-mono">
+                {#each commit.files as file (file)}<li class="wrap-anywhere">{file}</li>{/each}
+              </ul>
+            </Collapsible.Content>
+          </Collapsible.Root>
         </div>
       {/each}
       {#if item.plan.ignore.length}
