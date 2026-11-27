@@ -14,7 +14,7 @@
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use chrono::{DateTime, Utc};
 use sea_orm::{
@@ -138,16 +138,27 @@ fn scan(root: &Path) -> Vec<(String, PathBuf, SystemTime)> {
     out
 }
 
+/// A jsonl no row knows, created more recently than this, waits for a later sweep:
+/// a forking `--resume` writes it before the pump records the new backend id, and
+/// importing it in that gap duplicates the session (#2066).
+const SETTLE: Duration = Duration::from_secs(10);
+
+/// Time since the file appeared (since its last write where the OS has no birth time).
+fn age(path: &Path) -> Option<Duration> {
+    let meta = std::fs::metadata(path).ok()?;
+    meta.created().or_else(|_| meta.modified()).ok()?.elapsed().ok()
+}
+
 /// One sweep. Returns the ids of the sessions that were (re)imported, for the caller
 /// to refresh their threads.
 pub async fn sync_claude_transcripts(db: &DatabaseManager) -> Result<Vec<String>, String> {
     let Some(root) = claude_projects_dir() else {
         return Ok(Vec::new());
     };
-    sync_from(db, &root).await
+    sync_from(db, &root, SETTLE).await
 }
 
-async fn sync_from(db: &DatabaseManager, root: &Path) -> Result<Vec<String>, String> {
+async fn sync_from(db: &DatabaseManager, root: &Path, settle: Duration) -> Result<Vec<String>, String> {
     let conn = db.get_connection();
     let root = root.to_path_buf();
     let mut files = tokio::task::spawn_blocking(move || scan(&root))
@@ -195,6 +206,7 @@ async fn sync_from(db: &DatabaseManager, root: &Path) -> Result<Vec<String>, Str
             {
                 continue
             }
+            None if age(&path).is_some_and(|a| a < settle) => continue,
             _ => {}
         }
         let parsed = tokio::task::spawn_blocking(move || {
@@ -306,8 +318,8 @@ mod tests {
             std::fs::create_dir(root.path().join(proj)).unwrap();
             std::fs::write(root.path().join(proj).join("sid1.jsonl"), line).unwrap();
         }
-        assert_eq!(sync_from(&db, root.path()).await.unwrap(), ["sid1"]);
-        assert!(sync_from(&db, root.path()).await.unwrap().is_empty()); // unchanged
+        assert_eq!(sync_from(&db, root.path(), Duration::ZERO).await.unwrap(), ["sid1"]);
+        assert!(sync_from(&db, root.path(), Duration::ZERO).await.unwrap().is_empty()); // unchanged
         let rows = agent_session::Entity::find().all(db.get_connection()).await.unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].backend_session_id.as_deref(), Some("sid1"));
@@ -315,7 +327,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(50));
         let grown = format!("{line}\n{}", r#"{"type":"assistant","message":{"content":[{"type":"text","text":"yo"}]}}"#);
         std::fs::write(root.path().join("a").join("sid1.jsonl"), grown).unwrap();
-        assert_eq!(sync_from(&db, root.path()).await.unwrap(), ["sid1"]);
+        assert_eq!(sync_from(&db, root.path(), Duration::ZERO).await.unwrap(), ["sid1"]);
         let msgs = agent_message::Entity::find().all(db.get_connection()).await.unwrap();
         assert_eq!(msgs.len(), 2);
 
@@ -325,7 +337,7 @@ mod tests {
         am.ended_at = Set(None);
         am.update(db.get_connection()).await.unwrap();
         std::fs::write(root.path().join("a").join("sid1.jsonl"), line).unwrap();
-        assert!(sync_from(&db, root.path()).await.unwrap().is_empty());
+        assert!(sync_from(&db, root.path(), Duration::ZERO).await.unwrap().is_empty());
         assert_eq!(agent_message::Entity::find().all(db.get_connection()).await.unwrap().len(), 2);
 
         // Flipped to running after the sweep loaded it: store itself leaves it alone.
@@ -333,6 +345,20 @@ mod tests {
         assert!(!store(&db, "sid1", "cwd", &p, Utc::now(), true).await.unwrap());
         assert_eq!(agent_message::Entity::find().all(db.get_connection()).await.unwrap().len(), 2);
         assert_eq!(agent_session::Entity::find().one(db.get_connection()).await.unwrap().unwrap().status, "running");
+    }
+
+    /// #2066: a file that just appeared may be a fork whose id isn't recorded yet.
+    #[tokio::test]
+    async fn sweep_leaves_a_just_created_unknown_file() {
+        let data = tempfile::tempdir().unwrap();
+        let db = DatabaseManager::new(data.path().to_path_buf()).await.unwrap();
+        let root = tempfile::tempdir().unwrap();
+        std::fs::create_dir(root.path().join("p")).unwrap();
+        let line = r#"{"type":"user","cwd":"D:\\p","message":{"content":"hi"}}"#;
+        std::fs::write(root.path().join("p").join("fork.jsonl"), line).unwrap();
+        let hour = Duration::from_secs(3600);
+        assert!(sync_from(&db, root.path(), hour).await.unwrap().is_empty());
+        assert_eq!(sync_from(&db, root.path(), Duration::ZERO).await.unwrap(), ["fork"]);
     }
 
     /// Forked resumes (#1976) and deleted sessions (#2019) are not imported.
@@ -346,7 +372,7 @@ mod tests {
         std::fs::create_dir(&proj).unwrap();
         let line = r#"{"type":"user","cwd":"D:\\p","timestamp":"2026-11-11T00:00:00Z","message":{"content":"hi"}}"#;
         let write = |sid: &str| std::fs::write(proj.join(format!("{sid}.jsonl")), line).unwrap();
-        let sweep = || async { sync_from(&db, root.path()).await.unwrap() };
+        let sweep = || async { sync_from(&db, root.path(), Duration::ZERO).await.unwrap() };
 
         write("live");
         assert_eq!(sweep().await, ["live"]);
