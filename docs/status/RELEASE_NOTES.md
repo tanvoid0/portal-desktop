@@ -1,5 +1,13 @@
 # Portal Desktop - Release Notes
 
+## Version 0.26.1
+
+### Highlights
+
+- Windows installer: stop agent-platformd before writing files, fixing "Installation Aborted" on update
+
+---
+
 ## Version 0.26.0
 
 ### Highlights
