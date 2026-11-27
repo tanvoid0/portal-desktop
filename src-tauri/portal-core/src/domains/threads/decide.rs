@@ -117,7 +117,7 @@ fn first_wins(state: &ThreadState, call_id: &str) -> Reject {
 }
 
 /// Same message, ignoring its timestamp (the platform's list carries none).
-pub(crate) fn same(a: &ChatMessage, b: &ChatMessage) -> bool {
+fn same(a: &ChatMessage, b: &ChatMessage) -> bool {
     a.role == b.role
         && a.content.as_deref().unwrap_or("") == b.content.as_deref().unwrap_or("")
         && a.tool_calls == b.tool_calls

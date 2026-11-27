@@ -1,22 +1,25 @@
 //! Idempotent startup importer of `coder_threads` / `agent_sessions` into the thread
 //! log (design section 6), plus the startup reconcile of threads a dead process left
-//! open. Runs before any service can submit to the hub, so nothing else is writing.
+//! open. Runs before any service can submit to the hub, so the import is the only
+//! writer; the reconcile goes through the hub like any other command.
 //!
 //! Projections only: `threads` + `thread_messages` (`seq` 0), `last_seq` 0, no
 //! synthetic events. The old tables are never written. Agent sessions are folded with
 //! `decide`/`apply`, the same fold the hub runs live (mirrors `detailToLog`).
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
-    QueryFilter, QueryOrder, TransactionTrait,
+    PaginatorTrait, QueryFilter, QueryOrder, TransactionTrait,
 };
 
 use super::apply::apply;
-use super::decide::{decide, same};
+use super::decide::decide;
 use super::entities::{thread, thread_message};
+use super::hub::ThreadHub;
 use super::store;
 use super::types::*;
 use crate::domains::agents::entities::{agent_event, agent_message, agent_session};
@@ -38,10 +41,14 @@ fn err(what: &str, e: impl std::fmt::Display) -> String {
     format!("threads: legacy import: {what} failed: {e}")
 }
 
-pub async fn run(db: &DatabaseConnection) -> Result<Report, String> {
+/// Import, then reconcile through the hub (the single writer). A failed import is
+/// logged and never blocks the reconcile; the next startup retries it.
+pub async fn run(db: &DatabaseConnection, hub: &Arc<ThreadHub>) -> Result<Report, String> {
     let mut report = Report::default();
-    import(db, &mut report).await?;
-    report.reconciled = reconcile(db).await?;
+    if let Err(e) = import(db, &mut report).await {
+        eprintln!("{e}");
+    }
+    report.reconciled = reconcile(db, hub).await?;
     Ok(report)
 }
 
@@ -50,7 +57,6 @@ struct Known {
     last_seq: i64,
     created_at: String,
     updated_at: String,
-    message_count: i64,
 }
 
 enum Action {
@@ -78,44 +84,17 @@ async fn import(db: &DatabaseConnection, report: &mut Report) -> Result<(), Stri
         .await
         .map_err(|e| err("list threads", e))?
         .into_iter()
-        .map(|t| (t.id, Known { last_seq: t.last_seq, created_at: t.created_at, updated_at: t.updated_at, message_count: t.message_count }))
+        .map(|t| (t.id, Known { last_seq: t.last_seq, created_at: t.created_at, updated_at: t.updated_at }))
         .collect();
 
+    // A bad row is logged and skipped; the rest still import.
     for row in coder_thread::Entity::find().all(db).await.map_err(|e| err("list coder_threads", e))? {
-        let mut messages: Vec<ChatMessage> = serde_json::from_str(&row.messages_json).unwrap_or_default();
-        for m in &mut messages {
-            // `None` serializes as `""` and reads back `Some("")`: store that form.
-            m.content = Some(m.content.take().unwrap_or_default());
-        }
-        let n = messages.len() as i64;
-        match action(known.get(&row.id), &row.updated_at, |k| k.message_count < n) {
-            Action::Skip => {}
-            Action::Import => {
-                let meta = ThreadMeta {
-                    provider: "portal".into(),
-                    model: row.model.clone(),
-                    llm_provider: row.llm_provider.clone(),
-                    workspace_root: row.workspace_root.clone(),
-                    project_id: row.project_id.map(i64::from),
-                    kind: row.thread_kind.clone(),
-                    title: row.title.clone(),
-                };
-                let state = ThreadState { meta, ..Default::default() };
-                write_whole(db, &row.id, state, messages, &row.created_at, &row.updated_at).await?;
-                report.imported += 1;
-            }
-            Action::Prepend => {
-                // The hub's log is authoritative: only when it holds a tail of the legacy
-                // transcript can the part before it be put in front.
-                let have = load_rows(db, &row.id).await?;
-                if have.iter().any(|r| r.seq == 0) {
-                    continue;
-                }
-                let mine = decode(&have)?;
-                let k = messages.len() - mine.len();
-                if mine.iter().zip(&messages[k..]).all(|(a, b)| same(a, b)) && prepend(db, &row.id, &messages[..k], have).await? {
-                    report.prepended += 1;
-                }
+        // Portal threads are never prepended: the hub only creates one from a row this
+        // loop has already imported (`Create`, then a `Reconcile` of the whole transcript).
+        if matches!(action(known.get(&row.id), &row.updated_at, |_| false), Action::Import) {
+            match import_portal(db, &row).await {
+                Ok(()) => report.imported += 1,
+                Err(e) => eprintln!("{e} (coder thread {})", row.id),
             }
         }
     }
@@ -124,30 +103,99 @@ async fn import(db: &DatabaseConnection, report: &mut Report) -> Result<(), Stri
         // ponytail: ended_at/started_at stand in for "last activity"; a session that
         // gains messages without either moving is picked up when it next settles.
         let stamp = s.ended_at.clone().unwrap_or_else(|| s.started_at.clone());
-        match action(known.get(&s.id), &stamp, |k| s.started_at < k.created_at) {
-            Action::Skip => {}
-            Action::Import => {
-                let state = fold_session(db, &s.id, session_log(db, &s.id, None).await?).await?;
-                let msgs = state.messages.clone();
-                write_whole(db, &s.id, state, msgs, &s.started_at, &stamp).await?;
-                report.imported += 1;
-            }
-            Action::Prepend => {
-                let have = load_rows(db, &s.id).await?;
-                if have.iter().any(|r| r.seq == 0) {
-                    continue;
-                }
-                // ponytail: cutoff is the hub's `Created` time; an event persisted in the
-                // few ms between its submit and `Created` could land on both sides.
-                let log = session_log(db, &s.id, Some(&known[&s.id].created_at)).await?;
-                let state = fold_session(db, &s.id, log).await?;
-                if prepend(db, &s.id, &state.messages, have).await? {
-                    report.prepended += 1;
-                }
-            }
+        let known = known.get(&s.id);
+        let done = match action(known, &stamp, |k| s.started_at < k.created_at) {
+            Action::Skip => continue,
+            Action::Import => import_session(db, &s.id, &s.started_at, &stamp).await.map(|()| true),
+            Action::Prepend => prepend_session(db, &s.id, &known.map_or_else(String::new, |k| k.created_at.clone())).await,
+        };
+        match done {
+            Ok(true) if known.is_none_or(|k| k.last_seq == 0) => report.imported += 1,
+            Ok(true) => report.prepended += 1,
+            Ok(false) => {}
+            Err(e) => eprintln!("{e} (agent session {})", s.id),
         }
     }
     Ok(())
+}
+
+async fn import_portal(db: &DatabaseConnection, row: &coder_thread::Model) -> Result<(), String> {
+    let mut messages: Vec<ChatMessage> = serde_json::from_str(&row.messages_json).unwrap_or_default();
+    for m in &mut messages {
+        // `None` serializes as `""` and reads back `Some("")`: store that form.
+        m.content = Some(m.content.take().unwrap_or_default());
+    }
+    let meta = ThreadMeta {
+        provider: "portal".into(),
+        model: row.model.clone(),
+        llm_provider: row.llm_provider.clone(),
+        workspace_root: row.workspace_root.clone(),
+        project_id: row.project_id.map(i64::from),
+        kind: row.thread_kind.clone(),
+        title: row.title.clone(),
+    };
+    let state = ThreadState { meta, ..Default::default() };
+    write_whole(db, &row.id, state, messages, &row.created_at, &row.updated_at).await
+}
+
+async fn import_session(db: &DatabaseConnection, id: &str, started_at: &str, stamp: &str) -> Result<(), String> {
+    let state = fold_session(db, id, session_log(db, id, None).await?).await?;
+    let msgs = state.messages.clone();
+    write_whole(db, id, state, msgs, started_at, stamp).await
+}
+
+/// A thread the hub created for a run that already had history (a resume of a session
+/// that predates the log). True when something was prepended.
+///
+/// The legacy prompt is persisted before the hub ever sees it, so every hub-created
+/// thread has legacy rows just before its `Created`; the longest tail of the legacy
+/// fold that equals the start of the hub's own messages is that overlap and is dropped.
+///
+/// The prepend shifts `idx` but, by design, adds no event and leaves `last_seq` alone:
+/// a client holding a pre-restart snapshot gets no reset from `events_since` and keeps
+/// a list without the prefix, so clients must re-snapshot after a hub restart (S4).
+async fn prepend_session(db: &DatabaseConnection, id: &str, created_at: &str) -> Result<bool, String> {
+    // Cheap indexed checks first: already prepended, or nothing beyond the prompt.
+    let marked = thread_message::Entity::find()
+        .filter(thread_message::Column::ThreadId.eq(id))
+        .filter(thread_message::Column::Seq.eq(0))
+        .count(db)
+        .await
+        .map_err(|e| err("count marker", e))?;
+    if marked > 0 {
+        return Ok(false);
+    }
+    let before = agent_event::Entity::find()
+        .filter(agent_event::Column::SessionId.eq(id))
+        .filter(agent_event::Column::CreatedAt.lt(created_at))
+        .count(db)
+        .await
+        .map_err(|e| err("count events", e))?
+        + agent_message::Entity::find()
+            .filter(agent_message::Column::SessionId.eq(id))
+            .filter(agent_message::Column::CreatedAt.lt(created_at))
+            .count(db)
+            .await
+            .map_err(|e| err("count messages", e))?;
+    // ponytail: one earlier row is taken to be just the launching prompt; a resume of a
+    // session whose whole history was a single row loses it. Fold always if that matters.
+    if before <= 1 {
+        return Ok(false);
+    }
+    // ponytail: cutoff is the hub's `Created` time; an event persisted in the few ms
+    // between its submit and `Created` could land on both sides (the overlap trim covers
+    // messages, not other events).
+    let log = session_log(db, id, Some(&created_at.to_string())).await?;
+    let mut prefix = fold_session(db, id, log).await?.messages;
+    let have = load_rows(db, id).await?;
+    let mine = decode(&have)?;
+    let eq = |a: &ChatMessage, b: &ChatMessage| a.role == b.role && a.content == b.content;
+    let overlap = (0..=prefix.len().min(mine.len()))
+        .rev()
+        .find(|&j| prefix[prefix.len() - j..].iter().zip(&mine[..j]).all(|(a, b)| eq(a, b)))
+        .unwrap_or(0);
+    prefix.truncate(prefix.len() - overlap);
+    prepend(db, id, &prefix, have).await
 }
 
 /// Events plus message rows with no event at their seq (user turns, imported
@@ -304,13 +352,13 @@ async fn prepend(db: &DatabaseConnection, id: &str, prefix: &[ChatMessage], have
     Ok(true)
 }
 
-/// Close every turn a dead process left open, as a real event at `last_seq + 1`.
-/// A CLI run (`running` or `waiting`) is gone with its process, so it ends as `Exited`
-/// (TurnEnded interrupted, approvals cleared). A Portal `running` run ends the same
-/// way; a Portal `waiting` thread stays, because the platform still holds the pending
-/// call. Imported rows are never open (`fold_session` closes them), so none has
-/// `last_seq = 0` here.
-async fn reconcile(db: &DatabaseConnection) -> Result<usize, String> {
+/// Close every turn a dead process left open, as a real event at `last_seq + 1`,
+/// through the hub (the single writer). A CLI run (`running` or `waiting`) is gone with
+/// its process, so it ends as `Exited` (TurnEnded interrupted, approvals cleared). A
+/// Portal `running` run ends the same way; a Portal `waiting` thread stays, because the
+/// platform still holds the pending call. Neither command has a `react` effect, so no
+/// run starts. Imported rows are never open (`fold_session` closes them).
+async fn reconcile(db: &DatabaseConnection, hub: &Arc<ThreadHub>) -> Result<usize, String> {
     let open = thread::Entity::find()
         .filter(thread::Column::Status.is_in(["running", "waiting"]))
         .all(db)
@@ -318,42 +366,15 @@ async fn reconcile(db: &DatabaseConnection) -> Result<usize, String> {
         .map_err(|e| err("list open threads", e))?;
     let mut n = 0;
     for row in open {
-        let portal = row.provider == "portal";
-        if portal && row.status == "waiting" {
-            continue;
-        }
-        let Some(mut state) = store::load(db, &row.id).await? else { continue };
-        let cmd = if portal {
-            ThreadCommand::Portal(PortalInput::Finished { outcome: TurnOutcome::Interrupted, final_text: None })
-        } else {
-            ThreadCommand::Provider(AgentEvent::Exited { code: None })
+        let cmd = match (row.provider == "portal", row.status.as_str()) {
+            (true, "waiting") => continue,
+            (true, _) => ThreadCommand::Portal(PortalInput::Finished { outcome: TurnOutcome::Interrupted, final_text: None }),
+            (false, _) => ThreadCommand::Provider(AgentEvent::Exited { code: None }),
         };
-        let at = chrono::Utc::now().to_rfc3339();
-        let ctx = Ctx { now: at.clone(), actor: "system".into(), thinking: String::new(), queue_id: String::new() };
-        let events = decide(&state, &cmd, &ctx).map_err(|r| err("reconcile", format!("{r:?}")))?;
-        let (base, prev) = (state.last_seq, state.messages.len());
-        let frames: Vec<ThreadEventFrame> = events
-            .into_iter()
-            .enumerate()
-            .map(|(i, event)| {
-                apply(&mut state, &event, "system");
-                ThreadEventFrame {
-                    thread_id: row.id.clone(),
-                    provider: row.provider.clone(),
-                    seq: base + 1 + i as i64,
-                    at: at.clone(),
-                    actor: "system".into(),
-                    command_id: None,
-                    event,
-                }
-            })
-            .collect();
-        if frames.is_empty() {
-            continue;
+        let ack = hub.command(&row.id, Envelope { cmd, actor: "system".into(), command_id: None }).await?;
+        if matches!(ack.status, AckStatus::Accepted) {
+            n += 1;
         }
-        state.last_seq = base + frames.len() as i64;
-        store::commit(db, &row.id, prev, &state, &frames).await?;
-        n += 1;
     }
     Ok(n)
 }
@@ -496,7 +517,6 @@ mod tests {
         // Legacy rows.
         coder(db, "c1", &full).await;
         coder(db, "c-empty", &[]).await;
-        coder(db, "c-hub", &full).await;
         session(db, "s1", "claude-code").await;
         message(db, "s1", 0, "user", "build it", OLD).await;
         message(db, "s1", 2, "assistant", "hello", OLD).await; // same seq as the event below
@@ -521,10 +541,9 @@ mod tests {
 
         // Threads the hub created itself.
         let hub = ThreadHub::new(dbm.clone(), Arc::new(NoopSink));
-        for id in ["p-run", "p-wait", "c-hub"] {
+        for id in ["p-run", "p-wait"] {
             hub.submit(id, ThreadCommand::Create(portal_meta()));
         }
-        hub.submit("c-hub", ThreadCommand::Portal(PortalInput::Reconcile { messages: full[2..].to_vec(), title: None }));
         for id in ["p-run", "p-wait"] {
             hub.submit(id, ThreadCommand::Send { text: "go".into() });
         }
@@ -533,7 +552,7 @@ mod tests {
         hub.submit("k-run", ThreadCommand::Provider(AgentEvent::TextDelta { text: "t".into(), parent_tool_use_id: None }));
         hub.submit("k-wait", ThreadCommand::Provider(AgentEvent::PermissionRequest { request_id: "r".into(), tool_name: "Bash".into(), tool_input: json!({}), suggestions: vec![] }));
         hub.submit("s4", ThreadCommand::Provider(msg("assistant", "new")));
-        for id in ["p-run", "p-wait", "c-hub", "k-run", "k-wait", "s4"] {
+        for id in ["p-run", "p-wait", "k-run", "k-wait", "s4"] {
             hub.snapshot(id).await.unwrap().unwrap(); // the mailbox is ordered: the commands are committed
         }
         let status = |id: &'static str| async move { store::summary(db, id).await.unwrap().unwrap().status };
@@ -545,16 +564,14 @@ mod tests {
         let (p_run_seq, p_wait_seq) = (seq("p-run").await, seq("p-wait").await);
 
         // First run.
-        let r = run(db).await.unwrap();
+        let startup = ThreadHub::new(dbm.clone(), Arc::new(NoopSink)); // a restart: no live actors
+        let r = run(db, &startup).await.unwrap();
         // p-run, k-run, k-wait, and s4 (its "new" message opened a turn) are reconciled.
-        assert_eq!(r, Report { imported: 5, prepended: 2, reconciled: 4 });
+        assert_eq!(r, Report { imported: 5, prepended: 1, reconciled: 4 });
 
         let t = |role: &str, text: &str, seq: i64| (role.to_string(), text.to_string(), seq);
         assert_eq!(texts(db, "c1").await.len(), 4);
         assert_eq!(texts(db, "c-empty").await.len(), 0);
-        let c_hub = texts(db, "c-hub").await;
-        assert_eq!(c_hub.iter().map(|m| m.1.as_str()).collect::<Vec<_>>(), ["hi", "hello", "q2", "a2"]);
-        assert_eq!(c_hub.iter().map(|m| m.2 == 0).collect::<Vec<_>>(), [true, true, false, false]);
         let s1 = texts(db, "s1").await;
         assert_eq!(
             s1.iter().map(|m| (m.0.as_str(), m.1.as_str())).collect::<Vec<_>>(),
@@ -589,7 +606,7 @@ mod tests {
 
         // Second run changes nothing.
         let before = dump(db).await;
-        assert_eq!(run(db).await.unwrap(), Report::default());
+        assert_eq!(run(db, &startup).await.unwrap(), Report::default());
         assert_eq!(dump(db).await, before);
 
         // A fresh hub serves an imported thread: snapshot, no events, no reset.
@@ -598,5 +615,45 @@ mod tests {
         assert_eq!((snap.seq, snap.messages.len(), snap.thread.message_count), (0, 4, 4));
         let page = hub.events_since("s1", 0).await.unwrap();
         assert!(page.events.is_empty() && !page.reset && page.head_seq == 0);
+    }
+
+    /// The agents service persists the prompt before the hub sees it, so the prompt is in
+    /// both places: start order must not duplicate it, resume order keeps the old history.
+    #[tokio::test]
+    async fn hub_created_threads_keep_one_prompt() {
+        let dir = tempfile::tempdir().unwrap();
+        let dbm = Arc::new(DatabaseManager::new(dir.path().to_path_buf()).await.unwrap());
+        let db = dbm.get_connection();
+        let done = || ThreadCommand::Provider(AgentEvent::TurnDone { final_text: None, is_error: false });
+
+        // start_run: prompt row (seq 0) and an event row, then the hub's own copy of the prompt.
+        session(db, "start", "claude-code").await;
+        event(db, "start", 1, OLD, AgentEvent::SessionStarted { session_id: "b".into() }).await;
+        message(db, "start", 0, "user", "go", OLD).await;
+        // resume_session: old history, then the resume prompt, then the hub's copy of it.
+        session(db, "resume", "claude-code").await;
+        message(db, "resume", 0, "user", "old q", OLD).await;
+        event(db, "resume", 1, OLD, msg("assistant", "old a")).await;
+        message(db, "resume", 2, "user", "again", OLD).await;
+
+        let hub = ThreadHub::new(dbm.clone(), Arc::new(NoopSink));
+        for (id, prompt, reply) in [("start", "go", "reply"), ("resume", "again", "ok")] {
+            hub.submit(id, ThreadCommand::Provider(msg("user", prompt)));
+            hub.submit(id, ThreadCommand::Provider(msg("assistant", reply)));
+            hub.submit(id, done());
+            hub.snapshot(id).await.unwrap().unwrap();
+        }
+
+        let startup = ThreadHub::new(dbm.clone(), Arc::new(NoopSink));
+        assert_eq!(run(db, &startup).await.unwrap(), Report { imported: 0, prepended: 1, reconciled: 0 });
+        let start = texts(db, "start").await;
+        assert_eq!(start.iter().map(|m| m.1.as_str()).collect::<Vec<_>>(), ["go", "reply"]);
+        let resume = texts(db, "resume").await;
+        assert_eq!(resume.iter().map(|m| m.1.as_str()).collect::<Vec<_>>(), ["old q", "old a", "again", "ok"]);
+        assert_eq!(resume.iter().map(|m| m.2 == 0).collect::<Vec<_>>(), [true, true, false, false]);
+
+        let before = dump(db).await;
+        assert_eq!(run(db, &startup).await.unwrap(), Report::default());
+        assert_eq!(dump(db).await, before);
     }
 }

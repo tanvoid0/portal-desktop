@@ -332,6 +332,7 @@ pub fn run() {
             // open. After the settle above, before any service can submit.
             match tauri::async_runtime::block_on(domains::threads::legacy_import::run(
                 db_manager_arc.get_connection(),
+                &thread_hub,
             )) {
                 Ok(r) if r != Default::default() => log_info!(
                     "Threads",
