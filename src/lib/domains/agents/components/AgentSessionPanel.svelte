@@ -145,6 +145,16 @@
     }
   }
 
+  async function removeQueued(index: number) {
+    const queueId = thread?.queue[index]?.queue_id;
+    if (!sessionId || !queueId) return;
+    try {
+      await agentRuns.removeQueued(sessionId, queueId);
+    } catch (e) {
+      toast.error(String(e));
+    }
+  }
+
   async function send() {
     const id = sessionId;
     const text = draft.trim();
@@ -277,6 +287,7 @@
             messages={thread?.messages ?? []}
             streamingText={thread?.streamingText ?? ''}
             {running}
+            error={thread?.error}
             pending={firstPending}
             showRemember={caps.rememberRule}
             onDecision={(approve) =>
@@ -302,6 +313,7 @@
         {running}
         canStop={running || !!firstPending}
         queuedMessages={thread?.queue.map((q) => q.text) ?? []}
+        onRemoveQueued={removeQueued}
         workspaceRoot={detail?.session.cwd ?? ''}
         queue={caps.queue}
         class="pt-0"

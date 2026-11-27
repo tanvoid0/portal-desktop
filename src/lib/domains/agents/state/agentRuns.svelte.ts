@@ -244,6 +244,10 @@ class AgentRunsState {
     return agentsApi.sendUser(sessionId, text);
   }
 
+  removeQueued(sessionId: string, queueId: string): Promise<void> {
+    return agentsApi.removeQueued(sessionId, queueId);
+  }
+
   decide(sessionId: string, requestId: string, allow: boolean): Promise<void> {
     return agentsApi.decidePermission(sessionId, requestId, allow);
   }

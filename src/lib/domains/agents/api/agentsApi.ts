@@ -58,6 +58,15 @@ export const agentsApi = {
     return invokeClient.post<void>('agents_send_user', { runId, text, commandId: commandId() });
   },
 
+  /** Drops a message from the hub's queue; an unknown id is an error. */
+  removeQueued(runId: string, queueId: string): Promise<void> {
+    return invokeClient.post<void>('agents_remove_queued', {
+      runId,
+      queueId,
+      commandId: commandId(),
+    });
+  },
+
   decidePermission(runId: string, requestId: string, allow: boolean): Promise<void> {
     return invokeClient.post<void>('agents_decide_permission', {
       runId,

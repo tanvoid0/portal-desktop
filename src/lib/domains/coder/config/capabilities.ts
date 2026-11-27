@@ -38,7 +38,7 @@ export function agentCapabilities(_backend: string): CoderCapabilities {
     agentModes: false,
     permissionModes: false,
     modelPicker: 'launch-only',
-    queue: false,
+    queue: true,
     contextUsage: false,
     cost: true,
     agentChanges: false,
