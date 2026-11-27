@@ -109,6 +109,9 @@ class AgentRunsState {
     try {
       this.runningIds = new Set(await agentsApi.listRunning());
       this.runningKnown = true;
+      // The global approval stack reads pending approvals off every running session (#769):
+      // attach them all (not awaited: attach awaits init), also after a retry.
+      for (const id of this.runningIds) void this.attach(id);
     } catch (e) {
       console.error('agents: listRunning failed', e);
       if (attempt < 3) setTimeout(() => void this.loadRunning(attempt + 1), 2000 * 2 ** attempt);
@@ -129,12 +132,6 @@ class AgentRunsState {
         this.invalidateSessions();
       }
     });
-
-    // The global approval stack reads pending approvals off every running
-    // session, but `append` drops events for unattached ones — so after a
-    // reload off the agents page it showed nothing (#769). Attach them all;
-    // not awaited (attach awaits this init).
-    for (const id of this.runningIds) void this.attach(id);
   }
 
   private append(sessionId: string, item: AgentEventSeq) {

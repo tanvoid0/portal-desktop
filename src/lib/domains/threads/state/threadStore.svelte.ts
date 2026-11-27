@@ -67,6 +67,7 @@ class ThreadStore {
         threadApi.onEvent((event) => this.feed(event.thread_id, { event })),
         threadApi.onDelta((delta) => this.feed(delta.thread_id, { delta })),
         threadApi.onHeartbeat((hb) => this.heartbeat(hb)),
+        threadApi.onReset((id) => void this.resnapshot(id)), // no-op when not subscribed
         threadApi.onLagged(() => this.catchUpAll()),
         threadApi.onConnection((connected) => connected && this.catchUpAll()),
       ]);

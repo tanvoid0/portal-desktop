@@ -1,8 +1,9 @@
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { notify, initNotify, dismissNotification } from '$lib/utils/notify';
+import { notify, initNotify } from '$lib/utils/notify';
 import { permissionFact, pipelineFacts } from '$lib/domains/notifications/utils/facts';
 import { agentsApi } from '$lib/domains/agents/api/agentsApi';
 import { agentRuns } from '$lib/domains/agents/state/agentRuns.svelte.js';
+import { toastActions } from '$lib/domains/shared/stores/toastStore';
 import { threadApi } from '$lib/domains/threads/api/threadApi';
 import { PORTAL_ENGINE_TAB, agentTabPath } from '$lib/config/agents-tabs';
 import type { PipelineExecution } from '$lib/domains/projects/pipelines';
@@ -78,18 +79,27 @@ export function startAppNotifications(): () => void {
   // One alert per approval, for the Portal coder and every CLI agent alike: the thread log's
   // `approval_requested` is the single source (the legacy `agents://event` one is not used).
   // Keyed per thread (call ids restart per thread); a re-request of the same call is not a new
-  // ask, and the entry goes (with its toast) once the call is resolved. Value = the route.
-  const openApprovals = new Map<string, string>();
+  // ask. The entry goes, with its toast, when the call is resolved or the turn/process ends (the
+  // hub clears approvals there without an `approval_resolved`). Value = the toast id, if one showed.
+  const openApprovals = new Map<string, string | undefined>();
+  const close = (key: string) => {
+    const toastId = openApprovals.get(key);
+    if (toastId) toastActions.dismiss(toastId);
+    openApprovals.delete(key);
+  };
   threadApi
     .onEvent((f) => {
       const e = f.event;
+      if (e.type === 'turn_ended' || e.type === 'process_exited') {
+        for (const key of [...openApprovals.keys()])
+          if (key.startsWith(`${f.thread_id}:`)) close(key);
+        return;
+      }
       if (e.type !== 'approval_requested' && e.type !== 'approval_resolved') return;
       const callId = e.type === 'approval_requested' ? e.approval.call_id : e.call_id;
       const key = `${f.thread_id}:${callId}`;
       if (e.type === 'approval_resolved') {
-        const route = openApprovals.get(key);
-        if (route) dismissNotification(route);
-        openApprovals.delete(key);
+        close(key);
         return;
       }
       if (openApprovals.has(key)) return;
@@ -98,8 +108,7 @@ export function startAppNotifications(): () => void {
       const route = portal
         ? `${PORTAL_ENGINE_TAB.url}?id=${f.thread_id}`
         : `${agentTabPath(f.provider)}?session=${f.thread_id}`;
-      openApprovals.set(key, route);
-      notify({
+      const toastId = notify({
         route,
         source: 'agent',
         runId: f.thread_id,
@@ -110,6 +119,7 @@ export function startAppNotifications(): () => void {
         requestId: a.call_id,
         facts: permissionFact(a.tool, a.arguments),
       });
+      openApprovals.set(key, toastId);
     })
     .then(keep);
 

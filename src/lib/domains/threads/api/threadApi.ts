@@ -39,6 +39,10 @@ export const threadApi = {
   onHeartbeat(cb: (f: ThreadHeartbeatFrame) => void): Promise<UnlistenFn> {
     return listen<ThreadHeartbeatFrame>('coder://thread-heartbeat', (e) => cb(e.payload));
   },
+  /** Live-only: the hub rewrote this thread's projection without events; re-snapshot it. */
+  onReset(cb: (threadId: string) => void): Promise<UnlistenFn> {
+    return listen<{ thread_id: string }>('coder://thread-reset', (e) => cb(e.payload.thread_id));
+  },
   /** Socket-wide: this client missed frames, so every open thread must catch up. */
   onLagged(cb: () => void): Promise<UnlistenFn> {
     return listen('events://lagged', () => cb());

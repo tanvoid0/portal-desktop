@@ -38,14 +38,8 @@ export interface NotifyPayload extends NotificationContext {
   duration?: number;
 }
 
-/** Closes the toast `notify` left for this route, e.g. once the ask is answered elsewhere. */
-export function dismissNotification(route: string): void {
-  const id = toastByRoute.get(route);
-  if (id) toastActions.dismiss(id);
-  toastByRoute.delete(route);
-}
-
-export function notify(p: NotifyPayload): void {
+/** Returns the toast's id (undefined when the page is already open on the route). */
+export function notify(p: NotifyPayload): string | undefined {
   const focused = document.hasFocus();
   // Routes may carry a query (`?session=`): the page counts as open on the full path+query,
   // or on the bare path for a route that has none.
@@ -87,8 +81,7 @@ export function notify(p: NotifyPayload): void {
     desktopNotifications: true,
     soundEnabled: true,
   };
-  if (isMobileShell || !n.enabled || !n.desktopNotifications) return;
-  if (focused) return;
+  if (isMobileShell || !n.enabled || !n.desktopNotifications || focused) return toastId;
 
   try {
     sendNotification({
@@ -102,6 +95,7 @@ export function notify(p: NotifyPayload): void {
   } catch (err) {
     log.error('Failed to send native notification', err);
   }
+  return toastId;
 }
 
 export async function initNotify(): Promise<() => void> {
