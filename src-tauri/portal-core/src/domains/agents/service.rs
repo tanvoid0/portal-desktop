@@ -5,7 +5,7 @@
 //! its full raw event log in `agent_events` — see
 //! `src-tauri/portal-core/src/migrations/m20261111_000048_create_agent_tables.rs`.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -256,6 +256,26 @@ pub struct AgentRunService {
     db: Arc<DatabaseManager>,
     /// Observes every pumped event; set once at startup via `attach_thread_hub`.
     thread_hub: std::sync::OnceLock<Arc<ThreadHub>>,
+    /// Sessions a resume is starting right now (see `StartGuard`).
+    starting: std::sync::Mutex<HashSet<String>>,
+}
+
+/// Marks a session as starting until dropped (after its `runs` entry exists, or on error).
+struct StartGuard<'a>(&'a std::sync::Mutex<HashSet<String>>, String);
+
+impl<'a> StartGuard<'a> {
+    fn new(set: &'a std::sync::Mutex<HashSet<String>>, id: &str) -> Result<Self, String> {
+        if !set.lock().unwrap_or_else(|e| e.into_inner()).insert(id.to_string()) {
+            return Err("session is already starting".to_string());
+        }
+        Ok(Self(set, id.to_string()))
+    }
+}
+
+impl Drop for StartGuard<'_> {
+    fn drop(&mut self) {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).remove(&self.1);
+    }
 }
 
 impl AgentRunService {
@@ -267,6 +287,7 @@ impl AgentRunService {
             sink: Mutex::new(None),
             db,
             thread_hub: std::sync::OnceLock::new(),
+            starting: std::sync::Mutex::new(HashSet::new()),
         }
     }
 
@@ -401,6 +422,8 @@ impl AgentRunService {
         by: Option<(&str, Option<String>)>,
     ) -> Result<String, String> {
         let conn = self.db.get_connection();
+        // Two clients resuming at once would start two CLIs on one session.
+        let _starting = StartGuard::new(&self.starting, session_id)?;
         let (row, backend_session_id) = self.resumable(session_id).await?;
 
         let backend = self
@@ -540,8 +563,9 @@ impl AgentRunService {
                     hub.submit(&rid, ThreadCommand::Provider(event.clone()));
                 }
                 if exited {
-                    // Before the persists below: a send in that window must resume, not
-                    // write to a dead stdin.
+                    // Before the persists below: a send in that window gets an error
+                    // ("already running", until the session end commits; the UI keeps the
+                    // draft) instead of writing to a dead stdin.
                     if let Some(e) = svc.runs.lock().await.get_mut(&rid) {
                         e.exited = true;
                     }
@@ -605,9 +629,7 @@ impl AgentRunService {
         if !self.is_live(run_id).await {
             return self.resume_session(run_id, text, Some((actor, command_id))).await;
         }
-        // Before the send, so the log orders it ahead of the reply's events.
-        self.record_user(run_id, &text, actor, command_id).await;
-        self.send_live(run_id, text).await?;
+        self.send_live(run_id, text, Some((actor, command_id))).await?;
         Ok(run_id.to_string())
     }
 
@@ -637,13 +659,19 @@ impl AgentRunService {
     // each call below just forwards a quick stdin write/HTTP-decision, so
     // holding it for the await is cheap. Split per-run if a slow backend ever
     // makes that untrue.
-    async fn send_live(&self, run_id: &str, text: String) -> Result<(), String> {
+    /// `by` as in `resume_session`. Recorded only once the backend took the text, and under
+    /// the `runs` lock: the pump needs it to submit reply events, so the user's turn
+    /// lands in the log first. (The hub actor never takes `runs`, so this cannot deadlock.)
+    async fn send_live(&self, run_id: &str, text: String, by: Option<(&str, Option<String>)>) -> Result<(), String> {
         let seq = {
             let mut runs = self.runs.lock().await;
             let entry = runs.get_mut(run_id).ok_or("run not found")?;
             let seq = entry.next_seq;
             entry.next_seq += 1;
             entry.control.send_user(text.clone()).await?;
+            if let Some((actor, command_id)) = by {
+                self.record_user(run_id, &text, actor, command_id).await;
+            }
             seq
         };
         self.persist_message(run_id, seq, "user", &text, None).await;
@@ -1170,7 +1198,7 @@ impl ThreadEffects for Arc<AgentRunService> {
         let starts_turn = matches!(effect, Effect::StartTurn { .. });
         let result = match effect {
             // The turn is already in the log; deliver it, resuming a finished run.
-            Effect::StartTurn { text, .. } if self.is_live(thread_id).await => self.send_live(thread_id, text).await,
+            Effect::StartTurn { text, .. } if self.is_live(thread_id).await => self.send_live(thread_id, text, None).await,
             // A Stop landing while this is still starting the process finds no run and is
             // lost; a second Stop works once the entry is inserted.
             Effect::StartTurn { text, .. } => self.resume_session(thread_id, text, None).await.map(|_| ()),
@@ -1353,12 +1381,17 @@ mod tests {
         sent: Vec<String>,
         decided: Vec<(String, bool)>,
         interrupts: usize,
+        fail_send: bool,
     }
     struct RecControl(Arc<std::sync::Mutex<Calls>>);
     #[async_trait::async_trait]
     impl RunControl for RecControl {
         async fn send_user(&self, text: String) -> Result<(), String> {
-            self.0.lock().unwrap().sent.push(text);
+            let mut c = self.0.lock().unwrap();
+            if c.fail_send {
+                return Err("a Cursor turn is still running".into());
+            }
+            c.sent.push(text);
             Ok(())
         }
         async fn decide_permission(&self, id: String, allow: bool) -> Result<(), String> {
@@ -1460,6 +1493,22 @@ mod tests {
         let texts: Vec<_> = snap.messages.iter().map(|m| m.content.clone().unwrap_or_default()).collect();
         assert_eq!(texts, ["go", "next", "ok"]);
         assert_eq!(snap.seq, page.head_seq);
+    }
+
+    /// A send the backend refuses leaves nothing in the log (the user re-sends); a second
+    /// resume of a session already starting is refused.
+    #[tokio::test]
+    async fn failed_send_records_nothing_and_resume_is_single_flight() {
+        let (svc, hub, calls, _dir) = hub_service().await;
+        feed(&hub, vec![user("go")]);
+        calls.lock().unwrap().fail_send = true;
+        svc.send_user("run-1", "x".into(), "local", None).await.unwrap_err();
+        let snap = hub.snapshot("run-1").await.unwrap().unwrap();
+        assert_eq!(snap.messages.len(), 1, "only the first prompt");
+
+        svc.starting.lock().unwrap().insert("sess-9".into());
+        let err = svc.resume_session("sess-9", "go".into(), None).await.unwrap_err();
+        assert!(err.contains("already starting"), "got: {err}");
     }
 
     /// A Stop while stopping fires the interrupt again; one with nothing to stop is fine.
