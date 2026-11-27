@@ -309,11 +309,11 @@ impl AgentRunService {
         *self.sink.lock().await = Some(sink);
     }
 
-    async fn emit(&self, run_id: &str, seq: i64, event: &AgentEvent) {
+    async fn emit(&self, run_id: &str, provider: &str, seq: i64, event: &AgentEvent) {
         if let Some(sink) = self.sink.lock().await.as_ref() {
             sink.emit(
                 "agents://event",
-                json!({ "run_id": run_id, "seq": seq, "event": event }),
+                json!({ "run_id": run_id, "provider": provider, "seq": seq, "event": event }),
             );
         }
     }
@@ -336,7 +336,7 @@ impl AgentRunService {
     }
 
     /// Start a run. Returns immediately once the backend process is up; the
-    /// conversation streams via `agents://event` (`{run_id, seq, event}`).
+    /// conversation streams via `agents://event` (`{run_id, provider, seq, event}`).
     pub async fn start_run(
         self: &Arc<Self>,
         backend_id: &str,
@@ -387,7 +387,7 @@ impl AgentRunService {
             self.record_user(&run_id, &params.prompt, actor, command_id).await;
         }
 
-        self.spawn_pump(run_id.clone(), rx, permit);
+        self.spawn_pump(run_id.clone(), backend_id.to_string(), rx, permit);
         Ok(run_id)
     }
 
@@ -480,7 +480,7 @@ impl AgentRunService {
             self.record_user(session_id, &text, actor, command_id).await;
         }
 
-        self.spawn_pump(session_id.to_string(), rx, permit);
+        self.spawn_pump(session_id.to_string(), backend.id().to_string(), rx, permit);
         Ok(session_id.to_string())
     }
 
@@ -519,6 +519,7 @@ impl AgentRunService {
     fn spawn_pump(
         self: &Arc<Self>,
         run_id: String,
+        provider: String,
         mut rx: mpsc::UnboundedReceiver<AgentEvent>,
         permit: tokio::sync::OwnedSemaphorePermit,
     ) {
@@ -542,7 +543,7 @@ impl AgentRunService {
                         e.next_seq - 1
                     });
                     if let Some(seq) = seq {
-                        svc.emit(&rid, seq, &AgentEvent::Exited { code: None }).await;
+                        svc.emit(&rid, &provider, seq, &AgentEvent::Exited { code: None }).await;
                     }
                     break;
                 };
@@ -573,7 +574,7 @@ impl AgentRunService {
                     })
                     .unwrap_or(0);
                 drop(runs);
-                svc.emit(&rid, seq, &event).await;
+                svc.emit(&rid, &provider, seq, &event).await;
                 if let Some(hub) = svc.thread_hub.get() {
                     hub.submit(&rid, ThreadCommand::Provider(event.clone()));
                 }
@@ -1569,10 +1570,11 @@ mod tests {
         assert_eq!(svc.list_running().await, ["run-1"]);
         let (tx, rx) = mpsc::unbounded_channel::<AgentEvent>();
         let permit = Arc::clone(&svc.semaphore).acquire_owned().await.unwrap();
-        svc.spawn_pump("run-1".into(), rx, permit);
+        svc.spawn_pump("run-1".into(), "codex".into(), rx, permit);
         drop(tx);
         until(|| seen.lock().unwrap().len() == 1).await;
         assert_eq!(seen.lock().unwrap()[0]["event"]["type"], "exited");
+        assert_eq!(seen.lock().unwrap()[0]["provider"], "codex");
         until(|| svc.runs.try_lock().is_ok_and(|r| r["run-1"].exited)).await;
         assert!(svc.list_running().await.is_empty());
     }

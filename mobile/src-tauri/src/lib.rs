@@ -414,7 +414,10 @@ fn alert_for(event: &str, payload: &Value) -> Option<Alert> {
     match event {
         "agents://event" => {
             let run_id = payload["run_id"].as_str()?;
-            let route = format!("/ai/coder/claude-code?session={run_id}");
+            // `provider` is the backend id the desktop's tab route uses; desktops that
+            // predate the field only ran claude-code here.
+            let provider = payload["provider"].as_str().unwrap_or("claude-code");
+            let route = format!("/ai/coder/{provider}?session={run_id}");
             match payload["event"]["type"].as_str()? {
                 // Wording below matches app-shell.svelte's in-app toast for the same
                 // event (#642) — the two surfaces shouldn't read differently.
@@ -854,13 +857,17 @@ mod tests {
 
     #[test]
     fn alert_for_agent_events() {
-        let permission = json!({
+        let mut permission = json!({
             "run_id": "r1", "seq": 1,
             "event": { "type": "permission_request", "request_id": "p1", "tool_name": "Bash", "tool_input": {}, "suggestions": [] }
         });
+        // No provider (older desktop) -> claude-code; otherwise the run's own tab.
         let a = alert_for("agents://event", &permission).unwrap();
         assert_eq!(a.route, "/ai/coder/claude-code?session=r1");
         assert!(a.body.contains("Bash"));
+        permission["provider"] = json!("codex");
+        let a = alert_for("agents://event", &permission).unwrap();
+        assert_eq!(a.route, "/ai/coder/codex?session=r1");
 
         let finished = json!({
             "run_id": "r1", "seq": 2,
@@ -868,6 +875,10 @@ mod tests {
         });
         let a = alert_for("agents://event", &finished).unwrap();
         assert_eq!(a.body, "done");
+        assert_eq!(a.route, "/ai/coder/claude-code?session=r1");
+        let mut codex_done = finished.clone();
+        codex_done["provider"] = json!("codex");
+        assert_eq!(alert_for("agents://event", &codex_done).unwrap().route, "/ai/coder/codex?session=r1");
 
         let finished_no_text = json!({
             "run_id": "r1", "seq": 2,
@@ -916,7 +927,7 @@ mod tests {
 
         // CLI threads alert from agents://event; a frame without a provider is skipped.
         let mut cli = approval.clone();
-        cli["provider"] = json!("claude-code");
+        cli["provider"] = json!("codex");
         assert!(alert_for("coder://thread-event", &cli).is_none());
         let mut bare = approval;
         bare.as_object_mut().unwrap().remove("provider");

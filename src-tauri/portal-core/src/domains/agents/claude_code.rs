@@ -425,7 +425,15 @@ async fn permission_hook_handler(
     });
 
     let decision = tokio::time::timeout(PERMISSION_HOLD, rx).await;
-    state.pending.lock().await.remove(&request_id);
+    // Still pending = nobody answered (timeout, or the run dropped the sender):
+    // close the approval so a late answer is rejected. `decide_permission`
+    // already removed it and emitted on the normal path.
+    if state.pending.lock().await.remove(&request_id).is_some() {
+        let _ = state.events_tx.send(AgentEvent::PermissionResolved {
+            request_id,
+            allowed: false,
+        });
+    }
     match decision {
         Ok(Ok(value)) => Json(value),
         _ => Json(json!({})),
