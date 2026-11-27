@@ -556,6 +556,10 @@ impl CoderService {
                     return None; // not ready: the next call tries again
                 }
             }
+            // Sub-agents from before the first feed, once per process (apply overwrites by id).
+            for sa in self.sub_agents.lock().await.values().filter(|s| s.coordinator_thread_id == thread_id) {
+                hub.submit(thread_id, ThreadCommand::SubAgentUpdated { sub_agent: sa.clone() });
+            }
             ready.insert(thread_id.to_string());
         }
         Some(Arc::clone(hub))
@@ -844,6 +848,20 @@ impl CoderService {
         }
     }
 
+    /// The legacy `coder://change` event, plus the same fact in the thread log.
+    async fn emit_change(&self, change: &FileChange) {
+        self.emit("coder://change", json!({ "change": change }));
+        let status = serde_json::to_value(change.status).ok().and_then(|v| v.as_str().map(String::from)).unwrap_or_default();
+        let cmd = ThreadCommand::ChangeRecorded { change_id: change.id.clone(), path: change.path.clone(), status };
+        self.feed_cmd(&change.thread_id, cmd).await;
+    }
+
+    /// The legacy `coder://subagent-*` payload is the same sub-agent; the log keeps it on the coordinator.
+    async fn feed_sub_agent(&self, sub_agent: &CoderSubAgent) {
+        let cmd = ThreadCommand::SubAgentUpdated { sub_agent: sub_agent.clone() };
+        self.feed_cmd(&sub_agent.coordinator_thread_id, cmd).await;
+    }
+
     async fn load_from_db(&self) {
         let conn = self.db.get_connection();
 
@@ -957,7 +975,7 @@ impl CoderService {
         };
         self.changes.lock().await.push(change.clone());
         self.persist_change(&change).await;
-        self.emit("coder://change", json!({ "change": change }));
+        self.emit_change(&change).await;
     }
 
     // ---- change review (public) ---------------------------------------
@@ -1045,7 +1063,7 @@ impl CoderService {
             let snapshot = c.clone();
             drop(changes);
             self.persist_change(&snapshot).await;
-            self.emit("coder://change", json!({ "change": snapshot }));
+            self.emit_change(&snapshot).await;
         }
         Ok(())
     }
@@ -1073,7 +1091,7 @@ impl CoderService {
         };
         self.rewrite_from_hunks(&snapshot, &root).await?;
         self.persist_change(&snapshot).await;
-        self.emit("coder://change", json!({ "change": snapshot }));
+        self.emit_change(&snapshot).await;
         Ok(())
     }
 
@@ -1320,7 +1338,16 @@ impl CoderService {
         })
     }
 
-    pub async fn delete_thread(&self, id: &str) -> bool {
+    pub async fn delete_thread(&self, id: &str) -> Result<bool, String> {
+        if self.active_runs.lock().await.contains_key(id) {
+            return Err("cannot delete a thread that is currently running".to_string());
+        }
+        let busy = self.sub_agents.lock().await.values().any(|s| {
+            s.coordinator_thread_id == id && matches!(s.status, CoderSubAgentStatus::Pending | CoderSubAgentStatus::Running)
+        });
+        if busy {
+            return Err("cannot delete a thread whose sub-agents are still running".to_string());
+        }
         // Unknown first, so a late feed finds no thread to re-create in the hub.
         let removed = self.threads.lock().await.remove(id).is_some();
         self.hub_ready.lock().await.remove(id);
@@ -1340,7 +1367,7 @@ impl CoderService {
                 let _ = hub.delete(id).await;
             }
         }
-        removed
+        Ok(removed)
     }
 
     /// Change the model / backend provider for an existing thread (mid-session switching).
@@ -1563,6 +1590,7 @@ impl CoderService {
                 updated_at: now,
             };
             self.upsert_sub_agent(sub_agent.clone()).await;
+            self.feed_sub_agent(&sub_agent).await;
             self.emit(
                 "coder://subagent-started",
                 json!({
@@ -1764,6 +1792,7 @@ impl CoderService {
             sub_agent.clone()
         };
         self.persist_sub_agent(&snapshot).await;
+        self.feed_sub_agent(&snapshot).await;
         self.emit(
             "coder://subagent-progress",
             json!({
@@ -3330,5 +3359,57 @@ mod hub_tests {
             assert_eq!(s.status, ThreadStatus::Idle);
             assert!(!s.stopping && s.approvals.is_empty());
         }
+    }
+
+    /// #1845: a live run blocks the delete; once it ends the thread goes.
+    #[tokio::test]
+    async fn delete_thread_refuses_while_running() {
+        let (svc, _hub, _db, id, _dir) = setup().await;
+        let cancel = svc.begin_run(&id).await;
+        assert!(svc.delete_thread(&id).await.unwrap_err().contains("currently running"));
+        assert!(svc.get_thread(&id).await.is_some());
+        svc.end_run(&id, &cancel).await;
+        assert_eq!(svc.delete_thread(&id).await, Ok(true));
+    }
+
+    fn test_sub_agent(coordinator: &str, child: &str) -> CoderSubAgent {
+        CoderSubAgent {
+            id: "sa1".into(),
+            coordinator_thread_id: coordinator.into(),
+            child_thread_id: child.into(),
+            title: "t".into(),
+            workspace_root: "/w".into(),
+            branch: "b".into(),
+            status: CoderSubAgentStatus::Running,
+            github_owner: None,
+            github_repo: None,
+            github_issue_number: None,
+            github_issue_url: None,
+            result_summary: None,
+            error: None,
+            created_at: now_iso(),
+            updated_at: now_iso(),
+        }
+    }
+
+    /// #1845: a coordinator with a live sub-agent cannot be deleted.
+    #[tokio::test]
+    async fn delete_coordinator_refuses_with_live_sub_agents() {
+        let (svc, _hub, _db, id, _dir) = setup().await;
+        svc.upsert_sub_agent(test_sub_agent(&id, "c")).await;
+        assert!(svc.delete_thread(&id).await.unwrap_err().contains("sub-agents"));
+        svc.mark_sub_agent_status("sa1", CoderSubAgentStatus::Cancelled, None, None).await.unwrap();
+        assert_eq!(svc.delete_thread(&id).await, Ok(true));
+    }
+
+    /// #2005: sub-agent updates land in the hub's state.
+    #[tokio::test]
+    async fn sub_agent_updates_reach_the_hub() {
+        let (svc, hub, _db, id, _dir) = setup().await;
+        let sa = test_sub_agent(&id, "c");
+        svc.feed_sub_agent(&sa).await;
+        let s = hub.snapshot(&id).await.unwrap().unwrap();
+        assert_eq!(s.state.sub_agents.len(), 1);
+        assert_eq!(s.state.sub_agents[0].status, CoderSubAgentStatus::Running);
     }
 }

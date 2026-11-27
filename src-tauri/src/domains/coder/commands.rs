@@ -69,7 +69,7 @@ pub async fn coder_delete_thread(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
 ) -> Result<bool, String> {
-    Ok(service.delete_thread(&thread_id).await)
+    service.delete_thread(&thread_id).await
 }
 
 #[portal_rpc_macro::rpc(cap = "coder")]

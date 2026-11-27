@@ -328,7 +328,7 @@ export class CoderPanelState {
       await coderSession.removeThread(t);
       toast.success('Session deleted');
     } catch (e) {
-      toast.error(`Failed to delete session: ${e}`);
+      toast.error(`Failed to delete session: ${errorText(e)}`);
     }
   };
 
@@ -344,7 +344,7 @@ export class CoderPanelState {
       await coderSession.removeThreads(threads);
       toast.success('Chat history deleted');
     } catch (e) {
-      toast.error(`Failed to delete chat history: ${e}`);
+      toast.error(`Failed to delete chat history: ${errorText(e)}`);
     }
   };
 

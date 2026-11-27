@@ -873,10 +873,17 @@ class CoderSessionState {
   }
 
   async removeThreads(threads: CoderThread[]) {
+    // One refusal (the backend will not delete a live run) must not stop the rest.
+    const failed: { title: string; reason: string }[] = [];
     try {
       // ponytail: one invoke per thread; add a bulk command if histories reach hundreds.
       for (const t of threads) {
-        await coderService.deleteThread(t.id);
+        try {
+          await coderService.deleteThread(t.id);
+        } catch (e) {
+          failed.push({ title: t.title, reason: errorText(e) });
+          continue;
+        }
         delete this.runtimes[t.id];
         coderTerminalStore.clearThread(t.id);
         if (this.activeThreadId === t.id) this.newSession();
@@ -885,6 +892,14 @@ class CoderSessionState {
       // Also after a partial failure, so the list shows what is really left.
       this.touchRuntime();
       await this.refreshThreads();
+    }
+    // Callers toast a thrown error.
+    if (failed.length) {
+      // One thread asked for: the bare reason, no "Deleted 0 of 1" wrapper.
+      if (threads.length === 1) throw new Error(failed[0].reason);
+      throw new Error(
+        `Deleted ${threads.length - failed.length} of ${threads.length}; ${failed.map((f) => `"${f.title}": ${f.reason}`).join('; ')}`
+      );
     }
   }
 
