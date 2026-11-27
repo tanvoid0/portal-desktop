@@ -311,7 +311,7 @@ pub fn run() {
             coder_service.init_events(sink.clone());
             coder_service.attach_hub(thread_hub.clone());
             thread_hub.register_portal_effects(coder_service.clone());
-            app.manage(coder_service);
+            app.manage(coder_service.clone());
 
             // Agent-CLI integration domain (Claude Code today). Live runs
             // stay in-memory (ring buffer); sessions/messages/events are
@@ -346,6 +346,8 @@ pub fn run() {
                 Ok(_) => {}
                 Err(e) => log_warn!("Threads", "Legacy thread import failed: {}", e),
             }
+            // Sub-agents the load settle failed, now that the import is done writing.
+            tauri::async_runtime::block_on(coder_service.report_restart_settle());
             // Surface Claude Code sessions Portal didn't start (terminal,
             // desktop app) from ~/.claude/projects; 30s poll, mtime-gated.
             {

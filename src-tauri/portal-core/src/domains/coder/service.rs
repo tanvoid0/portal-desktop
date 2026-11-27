@@ -139,9 +139,24 @@ const SYSTEM_PROMPT: &str = concat!(
     "- When done, give a short summary of what you changed and why."
 );
 
+/// `begin_run` hands a copy back; the run gives it to `end_run`.
+#[derive(Clone)]
 struct RunHandle {
     cancel: Arc<AtomicBool>,
+    /// This run is the sub-agent's own work: its end changes the sub-agent's status.
+    owned: bool,
 }
+
+/// How a run ended, as far as the sub-agent is concerned.
+enum RunOutcome {
+    /// Returned on a pending approval: the sub-agent is still working.
+    Parked,
+    Done,
+    Failed(String),
+}
+
+/// Proof that the lifecycle lock is held (it is not reentrant: only entry points take it).
+type Lifecycle<'a> = tokio::sync::MutexGuard<'a, ()>;
 
 struct PendingCommand {
     tx: oneshot::Sender<String>,
@@ -186,6 +201,15 @@ pub struct CoderService {
     /// Messages to prepend after an edit that rewinds the platform thread.
     edit_prefix: Mutex<HashMap<String, Vec<ChatMessage>>>,
     multitask_semaphore: Arc<Semaphore>,
+    /// Every check-and-act on a sub-agent's status, its permit and its run holds this, and
+    /// nothing else: never across `advance_platform`, `hub_command*` or a user wait.
+    /// ponytail: one global lock; per-thread locks if it ever shows in a profile.
+    lifecycle: Mutex<()>,
+    /// A sub-agent's parallel-limit permit by child thread id: held while the sub-agent is live
+    /// (a run parked on an approval keeps its slot), freed by `release_if_done`.
+    child_permits: std::sync::Mutex<HashMap<String, tokio::sync::OwnedSemaphorePermit>>,
+    /// Sub-agents the restart settle failed, for `report_restart_settle` to tell the hub.
+    settled_on_load: std::sync::Mutex<Vec<String>>,
     /// The server-owned thread log; set once at startup. Unset, nothing is fed to it.
     hub: OnceLock<Arc<ThreadHub>>,
     /// Threads known to exist in the hub (created or confirmed once per process).
@@ -222,6 +246,9 @@ impl CoderService {
             pending_commands: Mutex::new(HashMap::new()),
             edit_prefix: Mutex::new(HashMap::new()),
             multitask_semaphore: Arc::new(Semaphore::new(DEFAULT_MAX_PARALLEL_SUBAGENTS)),
+            lifecycle: Mutex::new(()),
+            child_permits: Default::default(),
+            settled_on_load: Default::default(),
             hub: OnceLock::new(),
             hub_ready: Mutex::new(Default::default()),
             remote_threads: Default::default(),
@@ -528,6 +555,18 @@ impl CoderService {
         let _ = self.hub.set(hub);
     }
 
+    /// Tell the hub which sub-agents the restart settle failed. After `legacy_import`, which is
+    /// the only hub writer until then.
+    pub async fn report_restart_settle(&self) {
+        let ids = std::mem::take(&mut *self.settled_on_load.lock().unwrap_or_else(|e| e.into_inner()));
+        for id in ids {
+            let sa = self.sub_agents.lock().await.get(&id).cloned();
+            if let Some(sa) = sa {
+                self.feed_sub_agent(&sa).await;
+            }
+        }
+    }
+
     /// The hub, once this thread exists in it: a thread with no `threads` row yet
     /// (made before the hub, or by a build that predates it) is created and seeded
     /// from the in-memory transcript. `None` while no hub is attached.
@@ -589,6 +628,17 @@ impl CoderService {
         actor: String,
         command_id: Option<String>,
     ) -> Result<CommandAck, String> {
+        // A sub-agent's first turn is the spawn task's; a user turn before it would be mistaken for it.
+        if matches!(cmd, ThreadCommand::Send { .. } | ThreadCommand::Retry | ThreadCommand::EditMessage { .. })
+            // The sub-agent decides; the thread kind only for a child whose row is not there yet
+            // (the kind is user-changeable, so it cannot be what lets a Pending child through).
+            && match self.sub_agent_of(thread_id).await {
+                Some(s) => s.status == CoderSubAgentStatus::Pending,
+                None => self.threads.lock().await.get(thread_id).is_some_and(|t| t.thread_kind == CoderThreadKind::SubAgent),
+            }
+        {
+            return Err("sub-agent has not started yet".into());
+        }
         let remote = crate::domains::credentials::services::REMOTE_CALLER.try_with(|_| ()).is_ok();
         self.hub_command_as(thread_id, cmd, actor, command_id, remote).await
     }
@@ -659,21 +709,97 @@ impl CoderService {
 
     /// Register the run's cancel flag before anything can ask to stop it, so a Stop
     /// that lands before the run task starts still reaches it.
-    async fn begin_run(&self, thread_id: &str) -> Arc<AtomicBool> {
-        let cancel = Arc::new(AtomicBool::new(false));
-        let handle = RunHandle { cancel: cancel.clone() };
-        if let Some(old) = self.active_runs.lock().await.insert(thread_id.to_string(), handle) {
+    async fn begin_run(&self, _g: &Lifecycle<'_>, thread_id: &str, owned: bool) -> RunHandle {
+        let handle = RunHandle { cancel: Arc::new(AtomicBool::new(false)), owned };
+        if let Some(old) = self.active_runs.lock().await.insert(thread_id.to_string(), handle.clone()) {
             old.cancel.store(true, Ordering::SeqCst);
         }
-        cancel
+        handle
     }
 
-    /// Drop the run's handle, unless a newer run already replaced it.
-    async fn end_run(&self, thread_id: &str, cancel: &Arc<AtomicBool>) {
-        let mut runs = self.active_runs.lock().await;
-        if runs.get(thread_id).is_some_and(|h| Arc::ptr_eq(&h.cancel, cancel)) {
-            runs.remove(thread_id);
+    /// The one place a run ends. Drops the handle (unless a newer run replaced it), moves an
+    /// owned run's sub-agent to its final status, then frees the permit if nothing holds it.
+    /// Returns whether the run was stopped: its flag is set and it was still the current run
+    /// (a newer `begin_run` sets the old flag too, which is not a stop).
+    async fn end_run(&self, g: &Lifecycle<'_>, thread_id: &str, token: &RunHandle, outcome: RunOutcome) -> bool {
+        let current = {
+            let mut runs = self.active_runs.lock().await;
+            let current = runs.get(thread_id).is_some_and(|h| Arc::ptr_eq(&h.cancel, &token.cancel));
+            if current {
+                runs.remove(thread_id);
+            }
+            current
+        };
+        let stopped = current && token.cancel.load(Ordering::SeqCst);
+        if token.owned {
+            let cancelled = Some("Cancelled by user.".to_string());
+            match outcome {
+                _ if stopped => self.sync_sub_agent_from_thread(g, thread_id, CoderSubAgentStatus::Cancelled, cancelled).await,
+                RunOutcome::Parked => {}
+                RunOutcome::Done => self.sync_sub_agent_from_thread(g, thread_id, CoderSubAgentStatus::Completed, None).await,
+                RunOutcome::Failed(e) => {
+                    self.sync_sub_agent_from_thread(g, thread_id, CoderSubAgentStatus::Failed, Some(e)).await
+                }
+            }
         }
+        self.release_if_done(g, thread_id).await;
+        stopped
+    }
+
+    async fn sub_agent_of(&self, child_thread_id: &str) -> Option<CoderSubAgent> {
+        self.sub_agents.lock().await.values().find(|s| s.child_thread_id == child_thread_id).cloned()
+    }
+
+    /// Free the child's permit once its sub-agent is over (or it has none) and no run is left.
+    async fn release_if_done(&self, _g: &Lifecycle<'_>, thread_id: &str) {
+        let over = self.sub_agent_of(thread_id).await.is_none_or(|s| s.status.is_terminal());
+        if over && !self.active_runs.lock().await.contains_key(thread_id) {
+            self.child_permits.lock().unwrap_or_else(|e| e.into_inner()).remove(thread_id);
+        }
+    }
+
+    /// End a live sub-agent by the user's hand: Cancelled at once, its own run flagged (it ends
+    /// through `end_run`), or, with no run, its parked or not-yet-started turn closed. A plain run
+    /// in the child is the user's and is left alone. False: no live sub-agent, nothing done.
+    async fn cancel_sub_agent(&self, g: &Lifecycle<'_>, thread_id: &str) -> bool {
+        if self.sub_agent_of(thread_id).await.is_none_or(|s| s.status.is_terminal()) {
+            return false;
+        }
+        let run = self.active_runs.lock().await.get(thread_id).map(|h| (h.cancel.clone(), h.owned));
+        self.sync_sub_agent_from_thread(g, thread_id, CoderSubAgentStatus::Cancelled, Some("Cancelled by user.".into())).await;
+        match run {
+            Some((cancel, true)) => {
+                cancel.store(true, Ordering::SeqCst);
+                self.cancel_pending_commands(thread_id).await;
+                self.emit("coder://running", json!({ "thread_id": thread_id, "running": false }));
+            }
+            Some((_, false)) => {}
+            None => self.feed(thread_id, PortalInput::Finished { outcome: TurnOutcome::Stopped, final_text: None }).await,
+        }
+        self.release_if_done(g, thread_id).await;
+        true
+    }
+
+    /// The spawn task's permit step: Pending keeps the permit, anything else (cancelled while it
+    /// waited for a slot) drops it. False: nothing may start.
+    async fn adopt_permit(&self, sub_agent_id: &str, child_thread_id: &str, permit: tokio::sync::OwnedSemaphorePermit) -> bool {
+        let _g = self.lifecycle.lock().await;
+        let pending = self.sub_agents.lock().await.get(sub_agent_id).is_some_and(|s| s.status == CoderSubAgentStatus::Pending);
+        if pending {
+            self.child_permits.lock().unwrap_or_else(|e| e.into_inner()).insert(child_thread_id.to_string(), permit);
+        }
+        pending
+    }
+
+    /// Pending -> Failed, and only from Pending (compare-and-set under the lock).
+    async fn fail_pending(&self, sub_agent_id: &str, error: String) {
+        let g = self.lifecycle.lock().await;
+        let sa = self.sub_agents.lock().await.get(sub_agent_id).cloned();
+        let Some(sa) = sa.filter(|s| s.status == CoderSubAgentStatus::Pending) else {
+            return;
+        };
+        self.sync_sub_agent_from_thread(&g, &sa.child_thread_id, CoderSubAgentStatus::Failed, Some(error)).await;
+        self.release_if_done(&g, &sa.child_thread_id).await;
     }
 
     fn service_arc(&self) -> Result<Arc<Self>, String> {
@@ -912,6 +1038,33 @@ impl CoderService {
             let mut sub_agents = self.sub_agents.lock().await;
             for row in rows {
                 sub_agents.insert(row.id.clone(), self.sub_agent_from_row(row));
+            }
+        }
+        self.settle_sub_agents_after_restart().await;
+    }
+
+    /// No run survives a restart: Pending and Running sub-agents end as failed, except a
+    /// Running one with an open approval in its hub thread, which is genuinely parked.
+    async fn settle_sub_agents_after_restart(&self) {
+        let g = self.lifecycle.lock().await;
+        let live: Vec<CoderSubAgent> = self.sub_agents.lock().await.values().filter(|s| !s.status.is_terminal()).cloned().collect();
+        for sa in live {
+            let parked = sa.status == CoderSubAgentStatus::Running
+                && matches!(
+                    crate::domains::threads::store::load(self.db.get_connection(), &sa.child_thread_id).await,
+                    Ok(Some(st)) if st.turn_open() && !st.approvals.is_empty()
+                );
+            if parked {
+                // ponytail: re-take a slot if one is free; past the limit a parked child runs unlimited once approved.
+                if let Ok(permit) = Arc::clone(&self.multitask_semaphore).try_acquire_owned() {
+                    self.child_permits.lock().unwrap_or_else(|e| e.into_inner()).insert(sa.child_thread_id.clone(), permit);
+                }
+            } else {
+                let _ = self
+                    .mark_sub_agent_status(&g, &sa.id, CoderSubAgentStatus::Failed, None, Some("interrupted by restart".into()))
+                    .await;
+                // No hub yet: `report_restart_settle` tells it.
+                self.settled_on_load.lock().unwrap_or_else(|e| e.into_inner()).push(sa.id.clone());
             }
         }
     }
@@ -1339,14 +1492,19 @@ impl CoderService {
     }
 
     pub async fn delete_thread(&self, id: &str) -> Result<bool, String> {
-        if self.active_runs.lock().await.contains_key(id) {
-            return Err("cannot delete a thread that is currently running".to_string());
-        }
-        let busy = self.sub_agents.lock().await.values().any(|s| {
-            s.coordinator_thread_id == id && matches!(s.status, CoderSubAgentStatus::Pending | CoderSubAgentStatus::Running)
-        });
-        if busy {
-            return Err("cannot delete a thread whose sub-agents are still running".to_string());
+        {
+            let g = self.lifecycle.lock().await;
+            if self.active_runs.lock().await.contains_key(id) {
+                return Err("cannot delete a thread that is currently running".to_string());
+            }
+            let busy = self.sub_agents.lock().await.values().any(|s| {
+                s.coordinator_thread_id == id && !s.status.is_terminal()
+            });
+            if busy {
+                return Err("cannot delete a thread whose sub-agents are still running".to_string());
+            }
+            // A child with a live sub-agent (parked or not started) ends it, freeing its permit.
+            self.cancel_sub_agent(&g, id).await;
         }
         // Unknown first, so a late feed finds no thread to re-create in the hub.
         let removed = self.threads.lock().await.remove(id).is_some();
@@ -1606,42 +1764,25 @@ impl CoderService {
             let sub_agent_id = sub_agent.id.clone();
             let semaphore = Arc::clone(&semaphore);
             tokio::spawn(async move {
-                let Ok(_permit) = semaphore.acquire_owned().await else {
-                    let _ = svc
-                        .mark_sub_agent_status(
-                            &sub_agent_id,
-                            CoderSubAgentStatus::Failed,
-                            None,
-                            Some("parallel limiter unavailable".into()),
-                        )
-                        .await;
+                let Ok(permit) = semaphore.acquire_owned().await else {
+                    svc.fail_pending(&sub_agent_id, "parallel limiter unavailable".into()).await;
                     return;
                 };
-                let _ = svc
-                    .mark_sub_agent_status(
-                        &sub_agent_id,
-                        CoderSubAgentStatus::Running,
-                        Some("Starting agent run.".into()),
-                        None,
-                    )
-                    .await;
-                // Through the hub, so the child's user message and turn are in the log.
+                if !svc.adopt_permit(&sub_agent_id, &child_thread_id, permit).await {
+                    return;
+                }
+                // Through the hub, so the child's user message and turn are in the log. The
+                // `subagent:<id>` actor is how its StartTurn effect knows this turn is the sub-agent's.
+                let actor = format!("subagent:{sub_agent_id}");
                 let sent = svc
-                    .hub_command_as(&child_thread_id, ThreadCommand::Send { text: prompt }, "system".into(), None, remote)
+                    .hub_command_as(&child_thread_id, ThreadCommand::Send { text: prompt }, actor, None, remote)
                     .await
                     .and_then(|ack| match ack.status {
                         AckStatus::Rejected => Err(ack.code.unwrap_or_else(|| "rejected".into())),
                         _ => Ok(()),
                     });
                 if let Err(e) = sent {
-                    let _ = svc
-                        .mark_sub_agent_status(
-                            &sub_agent_id,
-                            CoderSubAgentStatus::Failed,
-                            None,
-                            Some(e),
-                        )
-                        .await;
+                    svc.fail_pending(&sub_agent_id, e).await;
                 }
             });
             started.push(sub_agent);
@@ -1656,14 +1797,9 @@ impl CoderService {
     ) -> Result<Vec<CoderSubAgent>, String> {
         let targets = self.cancel_targets(&request).await?;
         for sub_agent in &targets {
-            self.stop(&sub_agent.child_thread_id).await;
-            self.mark_sub_agent_status(
-                &sub_agent.id,
-                CoderSubAgentStatus::Cancelled,
-                None,
-                Some("Cancelled by user.".into()),
-            )
-            .await?;
+            // A target that already ended is skipped inside.
+            let g = self.lifecycle.lock().await;
+            self.cancel_sub_agent(&g, &sub_agent.child_thread_id).await;
         }
         Ok(self.list_sub_agents(&request.coordinator_thread_id).await)
     }
@@ -1769,18 +1905,23 @@ impl CoderService {
             .await
     }
 
+    /// The only writer of a sub-agent's status. A final status is final: `Ok(false)` when refused.
     async fn mark_sub_agent_status(
         &self,
+        _g: &Lifecycle<'_>,
         sub_agent_id: &str,
         status: CoderSubAgentStatus,
         summary: Option<String>,
         error: Option<String>,
-    ) -> Result<(), String> {
+    ) -> Result<bool, String> {
         let snapshot = {
             let mut sub_agents = self.sub_agents.lock().await;
             let sub_agent = sub_agents
                 .get_mut(sub_agent_id)
                 .ok_or("sub-agent not found")?;
+            if sub_agent.status.is_terminal() {
+                return Ok(false);
+            }
             sub_agent.status = status;
             sub_agent.updated_at = now_iso();
             if let Some(summary) = summary {
@@ -1800,23 +1941,17 @@ impl CoderService {
                 "subagent": snapshot,
             }),
         );
-        Ok(())
+        Ok(true)
     }
 
     async fn sync_sub_agent_from_thread(
         &self,
+        g: &Lifecycle<'_>,
         child_thread_id: &str,
         status: CoderSubAgentStatus,
         error: Option<String>,
     ) {
-        let sub_agent = {
-            let sub_agents = self.sub_agents.lock().await;
-            sub_agents
-                .values()
-                .find(|s| s.child_thread_id == child_thread_id)
-                .cloned()
-        };
-        let Some(sub_agent) = sub_agent else {
+        let Some(sub_agent) = self.sub_agent_of(child_thread_id).await else {
             return;
         };
 
@@ -1829,16 +1964,11 @@ impl CoderService {
                 .and_then(|m| m.content.clone())
         });
 
-        let _ = self
-            .mark_sub_agent_status(&sub_agent.id, status, summary, error)
+        let marked = self
+            .mark_sub_agent_status(g, &sub_agent.id, status, summary, error)
             .await;
 
-        if matches!(
-            status,
-            CoderSubAgentStatus::Completed
-                | CoderSubAgentStatus::Failed
-                | CoderSubAgentStatus::Cancelled
-        ) {
+        if matches!(marked, Ok(true)) && status.is_terminal() {
             let finished = self.sub_agents.lock().await.get(&sub_agent.id).cloned();
             self.emit(
                 "coder://subagent-finished",
@@ -1848,14 +1978,7 @@ impl CoderService {
                 }),
             );
             let subagents = self.list_sub_agents(&sub_agent.coordinator_thread_id).await;
-            let all_done = subagents.iter().all(|item| {
-                matches!(
-                    item.status,
-                    CoderSubAgentStatus::Completed
-                        | CoderSubAgentStatus::Failed
-                        | CoderSubAgentStatus::Cancelled
-                )
-            });
+            let all_done = subagents.iter().all(|item| item.status.is_terminal());
             if all_done {
                 self.emit(
                     "coder://multitask-complete",
@@ -1919,12 +2042,10 @@ impl CoderService {
     // ---- run / resume --------------------------------------------------
 
     /// Spawn the agent loop in the background. Returns immediately; progress
-    /// streams via `coder://*` events.
-    /// `cancel` is the flag from `begin_run`.
-    pub fn spawn_run(self: Arc<Self>, thread_id: String, turn: AgentTurn, cancel: Arc<AtomicBool>) {
+    /// streams via `coder://*` events. `token` is from `begin_run`.
+    fn spawn_run(self: Arc<Self>, thread_id: String, turn: AgentTurn, token: RunHandle) {
         let svc = Arc::clone(&self);
         let tid = thread_id.clone();
-        let stopped = cancel.clone();
         // tokio::spawn drops task-locals: carry the remote-caller mark into the run so a
         // remote-started agent cannot pop the desktop vault prompt. A run started by an
         // effect has no task-local either; `hub_command` recorded the mark per thread.
@@ -1936,49 +2057,35 @@ impl CoderService {
                 "coder://running",
                 json!({ "thread_id": tid, "running": true }),
             );
-            svc.sync_sub_agent_from_thread(&tid, CoderSubAgentStatus::Running, None)
-                .await;
 
-            let result = svc.advance_platform(&tid, turn, Some(cancel)).await;
+            // Its own task, so a panic in the loop still reaches `end_run` instead of
+            // stranding the run handle and the permit.
+            let work = {
+                let (svc, tid, cancel) = (Arc::clone(&svc), tid.clone(), token.cancel.clone());
+                async move { svc.advance_platform(&tid, turn, Some(cancel)).await }
+            };
+            let step = if remote {
+                tokio::spawn(crate::domains::credentials::services::REMOTE_CALLER.scope((), work))
+            } else {
+                tokio::spawn(work)
+            };
+            let result = step.await.unwrap_or_else(|e| Err(format!("run panicked: {e}")));
 
-            svc.end_run(&tid, &stopped).await;
+            let outcome = match &result {
+                Ok(r) if r.pending.is_some() => RunOutcome::Parked,
+                Ok(_) => RunOutcome::Done,
+                Err(e) => RunOutcome::Failed(e.clone()),
+            };
+            let stopped = {
+                let g = svc.lifecycle.lock().await;
+                svc.end_run(&g, &tid, &token, outcome).await
+            };
             svc.emit(
                 "coder://running",
                 json!({ "thread_id": tid, "running": false }),
             );
 
-            if let Err(e) = result {
-                eprintln!("coder: run failed for {tid}: {e}");
-                svc.sync_sub_agent_from_thread(&tid, CoderSubAgentStatus::Failed, Some(e.clone()))
-                    .await;
-                svc.reconcile(&tid).await;
-                // A stop that surfaces as an error is still a stop.
-                let input = if stopped.load(Ordering::SeqCst) {
-                    PortalInput::Finished { outcome: TurnOutcome::Stopped, final_text: None }
-                } else {
-                    PortalInput::Failed { error: e.clone() }
-                };
-                svc.feed(&tid, input).await;
-                svc.emit("coder://error", json!({ "thread_id": tid, "error": e }));
-            } else {
-                // A Stop that landed after the run parked on an approval ends the turn here:
-                // nothing else will, and the UI hides Stop while it is stopping.
-                if stopped.load(Ordering::SeqCst) {
-                    svc.feed(&tid, PortalInput::Finished { outcome: TurnOutcome::Stopped, final_text: None }).await;
-                }
-                let cancelled = {
-                    let sub_agents = svc.sub_agents.lock().await;
-                    sub_agents
-                        .values()
-                        .find(|s| s.child_thread_id == tid)
-                        .map(|s| matches!(s.status, CoderSubAgentStatus::Cancelled))
-                        .unwrap_or(false)
-                };
-                if !cancelled {
-                    svc.sync_sub_agent_from_thread(&tid, CoderSubAgentStatus::Completed, None)
-                        .await;
-                }
-            }
+            svc.report_run_end(&tid, result, stopped).await;
         };
         if remote {
             tokio::spawn(crate::domains::credentials::services::REMOTE_CALLER.scope((), run));
@@ -1987,7 +2094,33 @@ impl CoderService {
         }
     }
 
-    /// Cancel an in-flight run for a thread, if any.
+    /// What a run's exit tells the hub and the UI.
+    async fn report_run_end(&self, tid: &str, result: Result<CoderRunResult, String>, stopped: bool) {
+        match result {
+            Err(e) => {
+                eprintln!("coder: run failed for {tid}: {e}");
+                self.reconcile(tid).await;
+                // A stop that surfaces as an error is still a stop.
+                let input = if stopped {
+                    PortalInput::Finished { outcome: TurnOutcome::Stopped, final_text: None }
+                } else {
+                    PortalInput::Failed { error: e.clone() }
+                };
+                self.feed(tid, input).await;
+                self.emit("coder://error", json!({ "thread_id": tid, "error": e }));
+            }
+            // A Stop that landed after the run parked on an approval ends the turn here: nothing
+            // else will, and the UI hides Stop while it is stopping. Any other `Ok` already ended
+            // its turn in `finish`; a second `Finished` would close the turn a queued message opened.
+            Ok(r) if stopped && r.pending.is_some() => {
+                self.feed(tid, PortalInput::Finished { outcome: TurnOutcome::Stopped, final_text: None }).await;
+            }
+            Ok(_) => {}
+        }
+    }
+
+    /// Cancel an in-flight run for a thread, if any. Never touches a sub-agent's status:
+    /// that is `cancel_sub_agent`'s, or `end_run`'s via the flag this sets.
     pub async fn stop(&self, thread_id: &str) -> bool {
         let had_run = if let Some(h) = self.active_runs.lock().await.get(thread_id) {
             h.cancel.store(true, Ordering::SeqCst);
@@ -2001,12 +2134,6 @@ impl CoderService {
                 "coder://running",
                 json!({ "thread_id": thread_id, "running": false }),
             );
-            self.sync_sub_agent_from_thread(
-                thread_id,
-                CoderSubAgentStatus::Cancelled,
-                Some("Cancelled by user.".into()),
-            )
-            .await;
         }
         had_run || had_pending
     }
@@ -2879,9 +3006,28 @@ impl CoderService {
     /// The hub already holds the user message (and any rewrite); bring this transcript
     /// to the same point and start the run. The run is registered first, so a Stop
     /// during the prepare step still reaches it.
-    async fn start_turn(&self, thread_id: &str, trigger: TurnTrigger, text: String) -> Result<(), String> {
+    async fn start_turn(&self, thread_id: &str, trigger: TurnTrigger, text: String, actor: &str) -> Result<(), String> {
         let svc = self.service_arc()?;
-        let cancel = self.begin_run(thread_id).await;
+        let token = {
+            let g = self.lifecycle.lock().await;
+            let sa = self.sub_agent_of(thread_id).await;
+            // Only the spawn task's own Send, tagged with the sub-agent's id, starts the sub-agent.
+            // Every other turn (a user's, a queued message) is a plain thread turn.
+            match sa.filter(|s| actor == format!("subagent:{}", s.id)) {
+                Some(s) if s.status == CoderSubAgentStatus::Pending => {
+                    let _ = self
+                        .mark_sub_agent_status(&g, &s.id, CoderSubAgentStatus::Running, Some("Starting agent run.".into()), None)
+                        .await;
+                    self.begin_run(&g, thread_id, true).await
+                }
+                // Cancelled before its turn started: close the turn the Send opened.
+                Some(_) => {
+                    self.feed(thread_id, PortalInput::Finished { outcome: TurnOutcome::Stopped, final_text: None }).await;
+                    return Ok(());
+                }
+                None => self.begin_run(&g, thread_id, false).await,
+            }
+        };
         let prepared = async {
             Ok::<_, String>(match trigger {
                 TurnTrigger::Retry => {
@@ -2907,11 +3053,12 @@ impl CoderService {
         self.prepared(thread_id, &prepared.as_ref().map(|_| ()).map_err(String::clone));
         match prepared {
             Ok(turn) => {
-                CoderService::spawn_run(svc, thread_id.to_string(), turn, cancel);
+                CoderService::spawn_run(svc, thread_id.to_string(), turn, token);
                 Ok(())
             }
             Err(e) => {
-                self.end_run(thread_id, &cancel).await;
+                let g = self.lifecycle.lock().await;
+                self.end_run(&g, thread_id, &token, RunOutcome::Failed(e.clone())).await;
                 Err(e)
             }
         }
@@ -2928,18 +3075,44 @@ impl CoderService {
         edited_pattern: Option<String>,
         edited_command: Option<String>,
     ) -> Result<(), String> {
+        self.approve_run(thread_id, call_id, approve, remember, edited_pattern, edited_command, false).await
+    }
+
+    /// `hub_effect`: the approval came through the hub, whose turn a Cancel may have closed
+    /// since (the effects are unordered): then nothing runs.
+    async fn approve_run(
+        &self,
+        thread_id: &str,
+        call_id: String,
+        approve: bool,
+        remember: bool,
+        edited_pattern: Option<String>,
+        edited_command: Option<String>,
+        hub_effect: bool,
+    ) -> Result<(), String> {
         let svc = self.service_arc()?;
-        let cancel = self.begin_run(thread_id).await;
+        let token = {
+            let g = self.lifecycle.lock().await;
+            // The Cancel's `Finished` is in the actor's mailbox before this snapshot request.
+            if hub_effect && self.hub_state(thread_id).await.is_some_and(|s| !s.turn_open()) {
+                self.prepared(thread_id, &Err("turn was stopped".into()));
+                return Ok(());
+            }
+            // A Running sub-agent's parked turn resumes as its own work; anything else is the user's own turn.
+            let owned = self.sub_agent_of(thread_id).await.is_some_and(|s| s.status == CoderSubAgentStatus::Running);
+            self.begin_run(&g, thread_id, owned).await
+        };
         let res = self
             .prepare_approve(thread_id, &call_id, approve, remember, edited_pattern, None, None)
             .await;
         self.prepared(thread_id, &res);
         if let Err(e) = res {
-            self.end_run(thread_id, &cancel).await;
+            let g = self.lifecycle.lock().await;
+            self.end_run(&g, thread_id, &token, RunOutcome::Failed(e.clone())).await;
             return Err(e);
         }
         let turn = AgentTurn::Approve { call_id, approve, edited_command };
-        CoderService::spawn_run(svc, thread_id.to_string(), turn, cancel);
+        CoderService::spawn_run(svc, thread_id.to_string(), turn, token);
         Ok(())
     }
 }
@@ -2959,15 +3132,22 @@ impl ThreadEffects for CoderService {
                         set.insert(thread_id.to_string());
                     }
                 }
-                self.start_turn(thread_id, trigger, text).await
+                self.start_turn(thread_id, trigger, text, &actor).await
             }
             Effect::ResolveApproval { call_id, allow, remember, edited_pattern, edited_command } => {
-                self.resume_approve(thread_id, call_id, allow, remember, edited_pattern, edited_command).await
+                self.approve_run(thread_id, call_id, allow, remember, edited_pattern, edited_command, true).await
             }
             // Idempotent: a repeated Stop lands here again, and `Finished` ends nothing twice.
             Effect::Cancel => {
-                // No run in flight (parked on an approval): nobody else will end the turn.
-                if !self.stop(thread_id).await {
+                let g = self.lifecycle.lock().await;
+                // The sub-agent's own run (or its parked / not-yet-started turn) ends the
+                // sub-agent; a plain run, or a thread with none, is a plain stop.
+                let own = match self.active_runs.lock().await.get(thread_id).map(|h| h.owned) {
+                    Some(owned) => owned,
+                    None => self.sub_agent_of(thread_id).await.is_some_and(|s| !s.status.is_terminal()),
+                };
+                if !(own && self.cancel_sub_agent(&g, thread_id).await) && !self.stop(thread_id).await {
+                    // No run in flight (parked on an approval): nobody else will end the turn.
                     let done = PortalInput::Finished { outcome: TurnOutcome::Stopped, final_text: None };
                     self.feed(thread_id, done).await;
                 }
@@ -2986,7 +3166,6 @@ impl ThreadEffects for CoderService {
             // What the legacy run exit did, so its UI recovers too.
             self.reconcile(thread_id).await;
             self.feed(thread_id, PortalInput::Failed { error: e.clone() }).await;
-            self.sync_sub_agent_from_thread(thread_id, CoderSubAgentStatus::Failed, Some(e.clone())).await;
             self.emit("coder://running", json!({ "thread_id": thread_id, "running": false }));
             self.emit("coder://error", json!({ "thread_id": thread_id, "error": e }));
         }
@@ -3365,10 +3544,14 @@ mod hub_tests {
     #[tokio::test]
     async fn delete_thread_refuses_while_running() {
         let (svc, _hub, _db, id, _dir) = setup().await;
-        let cancel = svc.begin_run(&id).await;
+        let g = svc.lifecycle.lock().await;
+        let token = svc.begin_run(&g, &id, false).await;
+        drop(g);
         assert!(svc.delete_thread(&id).await.unwrap_err().contains("currently running"));
         assert!(svc.get_thread(&id).await.is_some());
-        svc.end_run(&id, &cancel).await;
+        let g = svc.lifecycle.lock().await;
+        svc.end_run(&g, &id, &token, RunOutcome::Done).await;
+        drop(g);
         assert_eq!(svc.delete_thread(&id).await, Ok(true));
     }
 
@@ -3398,7 +3581,9 @@ mod hub_tests {
         let (svc, _hub, _db, id, _dir) = setup().await;
         svc.upsert_sub_agent(test_sub_agent(&id, "c")).await;
         assert!(svc.delete_thread(&id).await.unwrap_err().contains("sub-agents"));
-        svc.mark_sub_agent_status("sa1", CoderSubAgentStatus::Cancelled, None, None).await.unwrap();
+        let g = svc.lifecycle.lock().await;
+        svc.mark_sub_agent_status(&g, "sa1", CoderSubAgentStatus::Cancelled, None, None).await.unwrap();
+        drop(g);
         assert_eq!(svc.delete_thread(&id).await, Ok(true));
     }
 
@@ -3411,5 +3596,611 @@ mod hub_tests {
         let s = hub.snapshot(&id).await.unwrap().unwrap();
         assert_eq!(s.state.sub_agents.len(), 1);
         assert_eq!(s.state.sub_agents[0].status, CoderSubAgentStatus::Running);
+    }
+
+    // ---- sub-agent lifecycle -------------------------------------------
+
+    /// A coordinator thread already in the hub, so children's sub-agents land under it.
+    async fn coordinator(svc: &CoderService) -> String {
+        let id = svc.create_thread("/w".into(), None, None, None, None).await.id;
+        svc.hub_for(&id).await.unwrap();
+        id
+    }
+
+    /// A child thread plus its sub-agent `sa_id` in `status`.
+    async fn child(svc: &CoderService, coordinator: &str, sa_id: &str, status: CoderSubAgentStatus) -> String {
+        // A platform thread id and a workspace that does not exist: a run that reaches the loop fails in
+        // `validate_workspace_root` with no HTTP call (the service reads the developer's real platform settings).
+        let missing = std::env::temp_dir().join(format!("portal-test-missing-{}", uuid::Uuid::new_v4()));
+        let c = svc.create_thread(missing.to_string_lossy().into(), None, None, Some(CoderThreadKind::SubAgent), None).await.id;
+        svc.threads.lock().await.get_mut(&c).unwrap().platform_thread_id = Some(1);
+        svc.upsert_sub_agent(CoderSubAgent { id: sa_id.into(), status, ..test_sub_agent(coordinator, &c) }).await;
+        c
+    }
+
+    /// A turn the hub has open in `c`, as `actor` sent it. Bypasses the client gate, like the spawn task.
+    async fn open_turn(svc: &CoderService, c: &str, actor: &str) {
+        let ack = svc.hub_command_as(c, ThreadCommand::Send { text: "go".into() }, actor.into(), None, false).await.unwrap();
+        assert_eq!(ack.status, AckStatus::Accepted);
+    }
+
+    async fn turn_open(hub: &Arc<ThreadHub>, c: &str) -> bool {
+        hub.snapshot(c).await.unwrap().unwrap().state.turn_open()
+    }
+
+    async fn status_of(svc: &CoderService, sa_id: &str) -> CoderSubAgentStatus {
+        svc.sub_agents.lock().await[sa_id].status
+    }
+
+    /// Take a parallel-limit permit for `c`, as the spawn task does.
+    async fn hold_permit(svc: &CoderService, c: &str) {
+        let p = Arc::clone(&svc.multitask_semaphore).acquire_owned().await.unwrap();
+        svc.child_permits.lock().unwrap().insert(c.into(), p);
+    }
+
+    fn permits_free(svc: &CoderService) -> bool {
+        svc.multitask_semaphore.available_permits() == DEFAULT_MAX_PARALLEL_SUBAGENTS
+    }
+
+    /// `Some(owned)` of the run registered for `c`.
+    async fn run_owned(svc: &CoderService, c: &str) -> Option<bool> {
+        svc.active_runs.lock().await.get(c).map(|h| h.owned)
+    }
+
+    /// Wait for a spawned run to leave (it fails fast: there is no platform to talk to).
+    async fn settle(svc: &CoderService, c: &str) {
+        for _ in 0..200 {
+            if run_owned(svc, c).await.is_none() {
+                drop(svc.lifecycle.lock().await); // `end_run` finishes its status and permit under this
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        }
+        panic!("run did not end");
+    }
+
+    fn start(trigger: TurnTrigger, actor: &str) -> Effect {
+        Effect::StartTurn { trigger, text: "x".into(), actor: actor.into() }
+    }
+
+    /// Transition #2: the sub-agent's own StartTurn takes Pending to Running with an owned run;
+    /// on a Cancelled one it runs nothing and closes the turn the Send opened.
+    #[tokio::test]
+    async fn system_start_turn_runs_a_pending_sub_agent_only() {
+        let (svc, hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Pending).await;
+        hold_permit(&svc, &c).await;
+        open_turn(&svc, &c, "subagent:sa1").await;
+        svc.run(&c, start(TurnTrigger::Send, "subagent:sa1")).await;
+        {
+            let _freeze = svc.lifecycle.lock().await; // the run's end waits for this
+            assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Running);
+            assert_eq!(run_owned(&svc, &c).await, Some(true));
+        }
+        settle(&svc, &c).await;
+        assert!(status_of(&svc, "sa1").await.is_terminal());
+        assert!(permits_free(&svc));
+
+        let c = child(&svc, &coord, "sa2", CoderSubAgentStatus::Cancelled).await;
+        open_turn(&svc, &c, "subagent:sa2").await;
+        svc.run(&c, start(TurnTrigger::Send, "subagent:sa2")).await;
+        assert_eq!(run_owned(&svc, &c).await, None);
+        assert!(!turn_open(&hub, &c).await);
+        assert_eq!(status_of(&svc, "sa2").await, CoderSubAgentStatus::Cancelled);
+    }
+
+    /// A user's turn in a finished child is plain (no status change, no permit), and so is a
+    /// queued message that drains with actor `system` (amendment A3: only `subagent:<id>` counts).
+    #[tokio::test]
+    async fn user_and_system_turns_in_a_finished_child_are_plain() {
+        let (svc, _hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Completed).await;
+        for actor in ["local", "system", "subagent:other"] {
+            svc.run(&c, start(TurnTrigger::Queue, actor)).await;
+            {
+                let _freeze = svc.lifecycle.lock().await;
+                assert_eq!(run_owned(&svc, &c).await, Some(false), "{actor}");
+                assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Completed);
+                assert!(permits_free(&svc));
+            }
+            settle(&svc, &c).await;
+            assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Completed, "{actor}");
+        }
+    }
+
+    /// Transitions #3 and the parked case: an owned run that parks keeps Running and its permit
+    /// (#2057); one that finishes is Completed and frees the permit.
+    #[tokio::test]
+    async fn owned_run_end_parks_or_completes() {
+        let (svc, _hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Running).await;
+        hold_permit(&svc, &c).await;
+        let g = svc.lifecycle.lock().await;
+        let t = svc.begin_run(&g, &c, true).await;
+        assert!(!svc.end_run(&g, &c, &t, RunOutcome::Parked).await);
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Running);
+        assert!(!permits_free(&svc));
+        let t = svc.begin_run(&g, &c, true).await;
+        svc.end_run(&g, &c, &t, RunOutcome::Done).await;
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Completed);
+        assert!(permits_free(&svc));
+    }
+
+    /// Transition #4: an owned run that failed to prepare fails the sub-agent and frees the permit;
+    /// a plain run's prepare failure leaves the sub-agent alone.
+    #[tokio::test]
+    async fn prepare_failure_fails_only_an_owned_run() {
+        let (svc, _hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Running).await;
+        hold_permit(&svc, &c).await;
+        let g = svc.lifecycle.lock().await;
+        let t = svc.begin_run(&g, &c, false).await;
+        svc.end_run(&g, &c, &t, RunOutcome::Failed("boom".into())).await;
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Running);
+        assert!(!permits_free(&svc));
+        let t = svc.begin_run(&g, &c, true).await;
+        svc.end_run(&g, &c, &t, RunOutcome::Failed("boom".into())).await;
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Failed);
+        assert_eq!(svc.sub_agents.lock().await["sa1"].error.as_deref(), Some("boom"));
+        assert!(permits_free(&svc));
+    }
+
+    /// Transition #7 is compare-and-set from Pending only (A7).
+    #[tokio::test]
+    async fn fail_pending_only_from_pending() {
+        let (svc, _hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        child(&svc, &coord, "sa1", CoderSubAgentStatus::Running).await;
+        svc.fail_pending("sa1", "late".into()).await;
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Running);
+        child(&svc, &coord, "sa2", CoderSubAgentStatus::Pending).await;
+        svc.fail_pending("sa2", "early".into()).await;
+        assert_eq!(status_of(&svc, "sa2").await, CoderSubAgentStatus::Failed);
+    }
+
+    /// Transitions #5/#6 (A1, A5): cancelling a running owned run marks Cancelled at once, flags the
+    /// run, keeps the permit until `end_run`, and the run's later `Ok` does not make it Completed.
+    #[tokio::test]
+    async fn cancel_of_an_owned_run_waits_for_its_end() {
+        let (svc, _hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Running).await;
+        hold_permit(&svc, &c).await;
+        let g = svc.lifecycle.lock().await;
+        let t = svc.begin_run(&g, &c, true).await;
+        assert!(svc.cancel_sub_agent(&g, &c).await);
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Cancelled);
+        assert!(t.cancel.load(Ordering::SeqCst));
+        assert!(!permits_free(&svc));
+        assert!(svc.end_run(&g, &c, &t, RunOutcome::Done).await, "a flagged current run is a stop");
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Cancelled);
+        assert!(permits_free(&svc));
+        assert!(!svc.cancel_sub_agent(&g, &c).await, "already final");
+    }
+
+    /// A5: cancelling the sub-agent leaves a plain run in its child running.
+    #[tokio::test]
+    async fn cancel_leaves_a_plain_run_alone() {
+        let (svc, _hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Running).await;
+        let g = svc.lifecycle.lock().await;
+        let t = svc.begin_run(&g, &c, false).await;
+        assert!(svc.cancel_sub_agent(&g, &c).await);
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Cancelled);
+        assert!(!t.cancel.load(Ordering::SeqCst));
+        assert_eq!(svc.active_runs.lock().await.len(), 1);
+    }
+
+    /// Transition #6 on a parked sub-agent: Cancelled, the turn closed, the permit freed.
+    #[tokio::test]
+    async fn cancel_of_a_parked_sub_agent_closes_the_turn() {
+        let (svc, hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Running).await;
+        hold_permit(&svc, &c).await;
+        open_turn(&svc, &c, "subagent:sa1").await;
+        let pending = PendingApproval {
+            call_id: "c1".into(),
+            tool: "run_command".into(),
+            arguments: json!({}),
+            suggested_rule: String::new(),
+            summary: "ls".into(),
+        };
+        svc.feed(&c, PortalInput::Pending(pending)).await;
+        assert!(turn_open(&hub, &c).await);
+        let g = svc.lifecycle.lock().await;
+        assert!(svc.cancel_sub_agent(&g, &c).await);
+        drop(g);
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Cancelled);
+        assert!(!turn_open(&hub, &c).await);
+        assert!(permits_free(&svc));
+    }
+
+    /// #2058: a sub-agent cancelled while Pending drops the permit the spawn task then wins.
+    #[tokio::test]
+    async fn permit_won_after_a_pending_cancel_is_dropped() {
+        let (svc, _hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Pending).await;
+        {
+            let g = svc.lifecycle.lock().await;
+            assert!(svc.cancel_sub_agent(&g, &c).await);
+        }
+        let permit = Arc::clone(&svc.multitask_semaphore).acquire_owned().await.unwrap();
+        assert!(!svc.adopt_permit("sa1", &c, permit).await);
+        assert!(permits_free(&svc));
+        // And a Pending one keeps it.
+        let c2 = child(&svc, &coord, "sa2", CoderSubAgentStatus::Pending).await;
+        let permit = Arc::clone(&svc.multitask_semaphore).acquire_owned().await.unwrap();
+        assert!(svc.adopt_permit("sa2", &c2, permit).await);
+        assert!(!permits_free(&svc));
+    }
+
+    /// `multitask_cancel` skips a target that already ended: no stop, no `Finished` fed to its thread.
+    #[tokio::test]
+    async fn multitask_cancel_skips_a_final_target() {
+        let (svc, hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Completed).await;
+        open_turn(&svc, &c, "local").await; // the user's own turn in the finished child
+        let req = MultitaskCancelRequest { coordinator_thread_id: coord.clone(), sub_agent_id: Some("sa1".into()) };
+        svc.multitask_cancel(req).await.unwrap();
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Completed);
+        assert!(turn_open(&hub, &c).await);
+    }
+
+    fn approval() -> Effect {
+        Effect::ResolveApproval { call_id: "c1".into(), allow: true, remember: false, edited_pattern: None, edited_command: None }
+    }
+
+    /// An approval in a Cancelled child is not refused: the user's own turn runs plain, the sub-agent
+    /// stays Cancelled, and the waiting `prepared()` channel is answered (no 10 s hang).
+    #[tokio::test]
+    async fn approval_in_a_cancelled_child_runs_plain() {
+        let (svc, _hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Cancelled).await;
+        let (tx, mut rx) = oneshot::channel();
+        svc.prep.lock().unwrap().insert(c.clone(), tx);
+        svc.resume_approve(&c, "c1".into(), true, false, None, None).await.unwrap();
+        assert_eq!(rx.try_recv(), Ok(Ok(())));
+        {
+            let _freeze = svc.lifecycle.lock().await;
+            assert_eq!(run_owned(&svc, &c).await, Some(false));
+        }
+        settle(&svc, &c).await;
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Cancelled);
+    }
+
+    /// A2: an approval whose turn a Cancel already closed runs nothing and answers `prepared`;
+    /// one in an open turn of a Running sub-agent resumes it as its own (owned) run.
+    #[tokio::test]
+    async fn approval_after_cancel_runs_nothing() {
+        let (svc, _hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Running).await;
+        hold_permit(&svc, &c).await;
+        let (tx, mut rx) = oneshot::channel();
+        svc.prep.lock().unwrap().insert(c.clone(), tx);
+        svc.run(&c, approval()).await; // no open turn
+        assert_eq!(rx.try_recv(), Ok(Err("turn was stopped".to_string())));
+        assert_eq!(run_owned(&svc, &c).await, None);
+
+        open_turn(&svc, &c, "subagent:sa1").await;
+        svc.run(&c, approval()).await;
+        {
+            let _freeze = svc.lifecycle.lock().await;
+            assert_eq!(run_owned(&svc, &c).await, Some(true));
+        }
+        settle(&svc, &c).await;
+        assert!(status_of(&svc, "sa1").await.is_terminal());
+        assert!(permits_free(&svc));
+    }
+
+    /// `Effect::Cancel` on a plain run in a finished child stops that run and leaves the sub-agent be.
+    #[tokio::test]
+    async fn cancel_effect_on_a_plain_run_leaves_the_sub_agent() {
+        let (svc, _hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Completed).await;
+        let t = {
+            let g = svc.lifecycle.lock().await;
+            svc.begin_run(&g, &c, false).await
+        };
+        svc.run(&c, Effect::Cancel).await;
+        assert!(t.cancel.load(Ordering::SeqCst));
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Completed);
+        // On the sub-agent's own run it cancels the sub-agent.
+        let c2 = child(&svc, &coord, "sa2", CoderSubAgentStatus::Running).await;
+        let t2 = {
+            let g = svc.lifecycle.lock().await;
+            svc.begin_run(&g, &c2, true).await
+        };
+        svc.run(&c2, Effect::Cancel).await;
+        assert!(t2.cancel.load(Ordering::SeqCst));
+        assert_eq!(status_of(&svc, "sa2").await, CoderSubAgentStatus::Cancelled);
+    }
+
+    /// A7: a client Send, Retry or Edit into a child that has not started (Pending, or no sub-agent
+    /// row yet) is refused before the hub sees it; a finished child takes them.
+    #[tokio::test]
+    async fn client_turns_into_a_pending_child_are_refused() {
+        let (svc, _hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let pending = child(&svc, &coord, "sa1", CoderSubAgentStatus::Pending).await;
+        let orphan = svc.create_thread("/w".into(), None, None, Some(CoderThreadKind::SubAgent), None).await.id;
+        for c in [&pending, &orphan] {
+            for cmd in [
+                ThreadCommand::Send { text: "x".into() },
+                ThreadCommand::Retry,
+                ThreadCommand::EditMessage { index: 0, text: "x".into() },
+            ] {
+                let err = svc.hub_command(c, cmd, "local".into(), None).await.unwrap_err();
+                assert!(err.contains("not started"), "{err}");
+            }
+        }
+        let done = child(&svc, &coord, "sa2", CoderSubAgentStatus::Completed).await;
+        send(&svc, &done, "hello").await;
+    }
+
+    /// #1845 (kept): deleting a parked child cancels its sub-agent and frees the permit.
+    #[tokio::test]
+    async fn delete_of_a_parked_child_frees_its_permit() {
+        let (svc, hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Running).await;
+        hold_permit(&svc, &c).await;
+        park(&svc, &c).await;
+        assert!(turn_open(&hub, &c).await);
+        assert_eq!(svc.delete_thread(&c).await, Ok(true));
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Cancelled);
+        assert!(permits_free(&svc));
+        assert!(!hub.snapshot(&c).await.unwrap().is_some_and(|s| s.state.turn_open()));
+    }
+
+    /// Restart settle: Pending and not-parked Running fail at load; the hub hears of it only from
+    /// `report_restart_settle`.
+    #[tokio::test]
+    async fn restart_settles_and_reports_only_when_asked() {
+        let (svc, hub, db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        child(&svc, &coord, "p", CoderSubAgentStatus::Pending).await;
+        child(&svc, &coord, "r", CoderSubAgentStatus::Running).await;
+        child(&svc, &coord, "d", CoderSubAgentStatus::Completed).await;
+        let svc2 = Arc::new(CoderService::new(db.clone(), Arc::new(VaultSession::default())).await);
+        svc2.init_events(Arc::new(Null));
+        svc2.attach_hub(hub.clone());
+        assert_eq!(status_of(&svc2, "p").await, CoderSubAgentStatus::Failed);
+        assert_eq!(status_of(&svc2, "r").await, CoderSubAgentStatus::Failed);
+        assert_eq!(status_of(&svc2, "d").await, CoderSubAgentStatus::Completed);
+        assert!(hub.snapshot(&coord).await.unwrap().unwrap().state.sub_agents.is_empty());
+        svc2.report_restart_settle().await;
+        let reported = hub.snapshot(&coord).await.unwrap().unwrap().state.sub_agents;
+        let failed = reported.iter().filter(|s| s.status == CoderSubAgentStatus::Failed).count();
+        assert_eq!(failed, 2);
+    }
+
+    /// A8: the architect's interleaving. R1 (owned) finishes with a user Send queued; the drained
+    /// StartTurn begins R2 before R1's `end_run`. The sub-agent is Completed, R1 is not a stop (it feeds
+    /// no `Finished`), the hub's turn stays open for R2, and the permit frees only when R2 ends.
+    #[tokio::test]
+    async fn a_drained_turn_replacing_the_owned_run_is_not_a_stop() {
+        let (svc, hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Running).await;
+        hold_permit(&svc, &c).await;
+        let r1 = {
+            let g = svc.lifecycle.lock().await;
+            svc.begin_run(&g, &c, true).await
+        };
+        send(&svc, &c, "first").await;
+        send(&svc, &c, "queued").await;
+        svc.finish(&c, None, false, false).await; // R1's loop is done: the hub drains "queued"
+        assert!(turn_open(&hub, &c).await);
+        let g = svc.lifecycle.lock().await;
+        let r2 = svc.begin_run(&g, &c, false).await; // what the drained StartTurn does
+        assert!(r1.cancel.load(Ordering::SeqCst), "replaced: its flag is set");
+        let stopped = svc.end_run(&g, &c, &r1, RunOutcome::Done).await;
+        assert!(!stopped, "a replaced run is not a stop, so spawn_run feeds no Finished");
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Completed);
+        assert!(!permits_free(&svc));
+        svc.end_run(&g, &c, &r2, RunOutcome::Done).await;
+        assert!(permits_free(&svc));
+        drop(g);
+        assert!(turn_open(&hub, &c).await);
+    }
+
+    /// A turn parked on an approval in `c`.
+    async fn park(svc: &CoderService, c: &str) {
+        open_turn(svc, c, "local").await;
+        let pending = PendingApproval {
+            call_id: "c1".into(),
+            tool: "run_command".into(),
+            arguments: json!({}),
+            suggested_rule: String::new(),
+            summary: "ls".into(),
+        };
+        svc.feed(c, PortalInput::Pending(pending)).await;
+    }
+
+    /// Restart settle (#8): a Running sub-agent parked on an approval stays Running and re-takes a free
+    /// permit; past the limit it stays Running without one.
+    #[tokio::test]
+    async fn restart_keeps_a_parked_sub_agent_and_takes_free_permits() {
+        let (svc, hub, db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        for i in 0..=DEFAULT_MAX_PARALLEL_SUBAGENTS {
+            let c = child(&svc, &coord, &format!("p{i}"), CoderSubAgentStatus::Running).await;
+            park(&svc, &c).await;
+            assert!(turn_open(&hub, &c).await);
+        }
+        let svc2 = Arc::new(CoderService::new(db.clone(), Arc::new(VaultSession::default())).await);
+        for i in 0..=DEFAULT_MAX_PARALLEL_SUBAGENTS {
+            assert_eq!(status_of(&svc2, &format!("p{i}")).await, CoderSubAgentStatus::Running);
+        }
+        assert_eq!(svc2.child_permits.lock().unwrap().len(), DEFAULT_MAX_PARALLEL_SUBAGENTS);
+        assert_eq!(svc2.multitask_semaphore.available_permits(), 0);
+    }
+
+    /// `Effect::Cancel` on a Pending child whose spawn Send opened the turn but whose StartTurn has not
+    /// run: the turn closes, the sub-agent is Cancelled, the permit is freed, and the late system
+    /// StartTurn runs nothing.
+    #[tokio::test]
+    async fn cancel_before_the_start_turn_runs_leaves_nothing_to_start() {
+        let (svc, hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Pending).await;
+        hold_permit(&svc, &c).await;
+        open_turn(&svc, &c, "subagent:sa1").await;
+        svc.run(&c, Effect::Cancel).await;
+        assert!(!turn_open(&hub, &c).await);
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Cancelled);
+        assert!(permits_free(&svc));
+        svc.run(&c, start(TurnTrigger::Send, "subagent:sa1")).await;
+        assert_eq!(run_owned(&svc, &c).await, None);
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Cancelled);
+    }
+
+    /// An owned run that ends `Ok` without parking, with its flag set after `finish` already reported
+    /// the turn and the hub drained a queued user turn, must not feed a second `Finished(Stopped)`:
+    /// that would close the user's new turn.
+    #[tokio::test]
+    async fn a_late_stop_flag_does_not_close_the_next_turn() {
+        let (svc, hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Running).await;
+        send(&svc, &c, "first").await;
+        send(&svc, &c, "queued").await;
+        let result = svc.finish(&c, None, false, false).await; // the hub drains "queued"
+        assert!(turn_open(&hub, &c).await);
+        svc.report_run_end(&c, Ok(result), true).await;
+        assert!(turn_open(&hub, &c).await);
+    }
+
+    /// The gate follows the sub-agent, not the thread kind: a Pending child switched to Coordinator
+    /// (`coder_set_thread_kind` is unchecked) still refuses a client Send, Retry and Edit.
+    #[tokio::test]
+    async fn the_pending_gate_survives_a_kind_change() {
+        let (svc, _hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Pending).await;
+        svc.set_thread_kind(&c, CoderThreadKind::Coordinator).await.unwrap();
+        for cmd in [
+            ThreadCommand::Send { text: "x".into() },
+            ThreadCommand::Retry,
+            ThreadCommand::EditMessage { index: 0, text: "x".into() },
+        ] {
+            let err = svc.hub_command(&c, cmd, "local".into(), None).await.unwrap_err();
+            assert!(err.contains("not started"), "{err}");
+        }
+    }
+
+    /// #7 reports like any other end: a sub-agent failed from Pending emits `subagent-finished`.
+    #[tokio::test]
+    async fn fail_pending_reports_the_finish() {
+        #[derive(Debug, Default)]
+        struct Recorder(std::sync::Mutex<Vec<String>>);
+        impl EventSink for Recorder {
+            fn emit_json(&self, event: &str, _: Value) -> bool {
+                self.0.lock().unwrap().push(event.into());
+                true
+            }
+        }
+        let (_svc, hub, db, _id, _dir) = setup().await;
+        let sink = Arc::new(Recorder::default());
+        let svc = Arc::new(CoderService::new(db, Arc::new(VaultSession::default())).await);
+        svc.init_events(sink.clone());
+        svc.attach_hub(hub);
+        let coord = coordinator(&svc).await;
+        child(&svc, &coord, "sa1", CoderSubAgentStatus::Pending).await;
+        svc.fail_pending("sa1", "boom".into()).await;
+        assert!(sink.0.lock().unwrap().iter().any(|e| e == "coder://subagent-finished"));
+    }
+
+    /// `multitask_cancel` on live targets: an owned run is flagged (its permit frees when it ends), a
+    /// parked sub-agent's turn is closed and its permit freed at once.
+    #[tokio::test]
+    async fn multitask_cancel_cancels_live_targets() {
+        let (svc, hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let running = child(&svc, &coord, "sa1", CoderSubAgentStatus::Running).await;
+        hold_permit(&svc, &running).await;
+        let t = {
+            let g = svc.lifecycle.lock().await;
+            svc.begin_run(&g, &running, true).await
+        };
+        let parked = child(&svc, &coord, "sa2", CoderSubAgentStatus::Running).await;
+        hold_permit(&svc, &parked).await;
+        park(&svc, &parked).await;
+        let req = MultitaskCancelRequest { coordinator_thread_id: coord.clone(), sub_agent_id: None };
+        svc.multitask_cancel(req).await.unwrap();
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Cancelled);
+        assert_eq!(status_of(&svc, "sa2").await, CoderSubAgentStatus::Cancelled);
+        assert!(t.cancel.load(Ordering::SeqCst));
+        assert!(!turn_open(&hub, &parked).await);
+        assert_eq!(svc.child_permits.lock().unwrap().len(), 1, "only the run's permit is left");
+        let g = svc.lifecycle.lock().await;
+        svc.end_run(&g, &running, &t, RunOutcome::Done).await;
+        assert!(permits_free(&svc));
+    }
+
+    /// A prepare failure on the sub-agent's own StartTurn (a Retry with no user message) goes through
+    /// `end_run`: the sub-agent is Failed, the permit released, no run left behind.
+    #[tokio::test]
+    async fn start_turn_prepare_failure_fails_the_sub_agent() {
+        let (svc, _hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Pending).await;
+        hold_permit(&svc, &c).await;
+        svc.run(&c, start(TurnTrigger::Retry, "subagent:sa1")).await;
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Failed);
+        assert_eq!(run_owned(&svc, &c).await, None);
+        assert!(permits_free(&svc));
+    }
+
+    /// A1 through `stop()` (the legacy `coder_stop` fallback, not `cancel_sub_agent`): the flag alone
+    /// ends an owned run's sub-agent as Cancelled, not Completed, and frees the permit.
+    #[tokio::test]
+    async fn stop_flag_ends_an_owned_run_as_cancelled() {
+        let (svc, _hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        let c = child(&svc, &coord, "sa1", CoderSubAgentStatus::Running).await;
+        hold_permit(&svc, &c).await;
+        let g = svc.lifecycle.lock().await;
+        let t = svc.begin_run(&g, &c, true).await;
+        drop(g);
+        assert!(svc.stop(&c).await);
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Running);
+        let g = svc.lifecycle.lock().await;
+        assert!(svc.end_run(&g, &c, &t, RunOutcome::Done).await);
+        assert_eq!(status_of(&svc, "sa1").await, CoderSubAgentStatus::Cancelled);
+        assert!(permits_free(&svc));
+    }
+
+    /// The hub approval effect in a finished child, in the user's own parked turn: a plain run, the
+    /// sub-agent untouched, and `prepared` answered.
+    #[tokio::test]
+    async fn hub_approval_in_a_finished_child_runs_plain() {
+        let (svc, _hub, _db, _id, _dir) = setup().await;
+        let coord = coordinator(&svc).await;
+        for (sa, status) in [("sa1", CoderSubAgentStatus::Completed), ("sa2", CoderSubAgentStatus::Cancelled)] {
+            let c = child(&svc, &coord, sa, status).await;
+            park(&svc, &c).await;
+            let (tx, mut rx) = oneshot::channel();
+            svc.prep.lock().unwrap().insert(c.clone(), tx);
+            svc.run(&c, approval()).await;
+            assert_eq!(rx.try_recv(), Ok(Ok(())));
+            {
+                let _freeze = svc.lifecycle.lock().await;
+                assert_eq!(run_owned(&svc, &c).await, Some(false));
+            }
+            settle(&svc, &c).await;
+            assert_eq!(status_of(&svc, sa).await, status);
+        }
     }
 }

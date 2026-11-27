@@ -386,6 +386,13 @@ pub enum CoderSubAgentStatus {
     Cancelled,
 }
 
+impl CoderSubAgentStatus {
+    /// Completed, Failed and Cancelled are final.
+    pub fn is_terminal(self) -> bool {
+        matches!(self, Self::Completed | Self::Failed | Self::Cancelled)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct GitHubIssueRef {
