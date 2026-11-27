@@ -26,6 +26,7 @@
     "tauri:build": "node scripts/fetch-agent-platformd.mjs && tauri build --config src-tauri/tauri.sidecar.conf.json",
     "fetch:agent-platformd": "node scripts/fetch-agent-platformd.mjs",
     "portal:ensure": "node scripts/ensure-portal.mjs",
+    "prune:build": "node scripts/prune-build-dirs.mjs",
     "n8n:start": "cd n8n-workflows && npx n8n start",
     "n8n:dev": "cd n8n-workflows && npx n8n start --tunnel",
     "ollama:install": "curl -fsSL https://ollama.ai/install.sh | sh",

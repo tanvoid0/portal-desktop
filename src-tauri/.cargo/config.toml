@@ -7,8 +7,8 @@
 # them was not safe: cargo names a path crate's artifacts by its
 # workspace-relative path and judges freshness by mtime, so `cargo test` in
 # one worktree could run another worktree's portal-core test binary and still
-# report "Fresh". Cost: one full build and its own few GB per worktree; delete
-# stale ones under I:/build/cargo/portal-desktop/build/.
+# report "Fresh". Cost: one full build per crate dir per worktree (3-30 GB each),
+# never deleted with the worktree - run `pnpm prune:build` after removing one.
 #
 # Per-machine paths, not portable - elsewhere or in CI, override with the
 # CARGO_TARGET_DIR and CARGO_BUILD_BUILD_DIR env vars (they take precedence
