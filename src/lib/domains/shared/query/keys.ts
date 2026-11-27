@@ -13,6 +13,11 @@ export const queryKeys = {
     envBackup: ['projects', 'env-backup'] as const,
     moves: ['projects', 'moves'] as const,
   },
+  driveSync: {
+    all: ['drive-sync'] as const,
+    drives: ['drive-sync', 'drives'] as const,
+    status: (drive: string, id: number) => ['drive-sync', 'status', drive, id] as const,
+  },
   actions: {
     workflowRun: (runId: string) => ['actions', 'workflow-run', runId] as const,
   },

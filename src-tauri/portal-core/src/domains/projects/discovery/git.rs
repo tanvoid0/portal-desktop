@@ -209,7 +209,7 @@ fn git_net(dir: &Path, args: &[&str], cancel: &AtomicBool) -> Result<String, Str
 /// The line of git's stderr that says what went wrong: the first `fatal:` /
 /// `error:` one (the last line is often advice, e.g. "and the repository
 /// exists."), else the last non-empty line.
-fn error_line(stderr: &str) -> String {
+pub(crate) fn error_line(stderr: &str) -> String {
     let lines = || stderr.lines().map(str::trim).filter(|l| !l.is_empty());
     lines()
         .find(|l| {

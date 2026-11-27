@@ -329,6 +329,9 @@ mod tests {
             "set_project_push_ok",
             "sync_repo_facts",
             "sync_apply_resolution",
+            "drive_sync_drives",
+            "drive_sync_status",
+            "drive_sync_apply",
         ] {
             // local_only commands are not in the registry at all.
             assert!(!is_registered(name), "{name}");

@@ -28,6 +28,7 @@
   import { createSyncStatusQuery } from '$lib/domains/sync/queries/syncQueries';
   import PasswordDialog from '$lib/domains/sync/components/PasswordDialog.svelte';
   import SyncItemCard from '$lib/domains/projects/components/SyncItemCard.svelte';
+  import DriveSync from '$lib/domains/projects/components/DriveSync.svelte';
   import { syncAll, PHASE_LABEL } from '$lib/domains/projects/state/syncAll.svelte';
   import { syncTriage } from '$lib/domains/projects/state/syncTriage.svelte';
   import { openSteps } from '$lib/domains/projects/utils/syncTriage';
@@ -165,10 +166,13 @@
     <Tabs.List>
       <Tabs.Trigger value="repos">Projects</Tabs.Trigger>
       <Tabs.Trigger value="env">Environments</Tabs.Trigger>
+      <Tabs.Trigger value="drive">External drive</Tabs.Trigger>
     </Tabs.List>
   </Tabs.Root>
 
-  {#if syncAll.tab === 'env'}
+  {#if syncAll.tab === 'drive'}
+    <DriveSync />
+  {:else if syncAll.tab === 'env'}
     <EnvBackupSection bind:filter={syncAll.envFilter} bind:lastRun={syncAll.envLastRun} />
   {:else}
     <div class="flex flex-wrap items-center gap-3">

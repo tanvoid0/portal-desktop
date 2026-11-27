@@ -10,6 +10,7 @@ pub use portal_core::domains::projects::*;
 
 pub mod commands;
 pub mod discovery_commands;
+pub mod drive_sync_commands;
 pub mod env_commands;
 pub mod move_commands;
 pub mod sync_all_commands;

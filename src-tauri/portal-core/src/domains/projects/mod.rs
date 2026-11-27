@@ -1,4 +1,5 @@
 pub mod discovery;
+pub mod drive_sync;
 pub mod entities;
 pub mod env;
 pub mod modules;

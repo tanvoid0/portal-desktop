@@ -64,7 +64,7 @@ class SyncAllState {
   report = $state<SyncAllReport | null>(readReport());
   /** Projects with a re-sync, push or rebase in flight. */
   busy = $state<number[]>([]);
-  tab = $state<'repos' | 'env'>('repos');
+  tab = $state<'repos' | 'env' | 'drive'>('repos');
   view = $state<'attention' | 'all'>('attention');
   search = $state('');
   /** Projects whose env files are expanded. */
