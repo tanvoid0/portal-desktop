@@ -16,8 +16,27 @@ use crate::domains::projects::drive_sync::{
 use crate::domains::projects::move_lock;
 use crate::entities::project;
 
-/// One apply at a time: they share each drive's manifest.
+/// One apply at a time: they share each drive's manifest. Other processes are
+/// kept out by the lock file `drive_sync` takes on the drive.
 static APPLY: Mutex<()> = Mutex::new(());
+
+struct ProjectLock(PathBuf);
+
+impl ProjectLock {
+    fn take(path: &Path) -> Result<Self, String> {
+        let path = path.to_path_buf();
+        move_lock::try_lock(std::slice::from_ref(&path))
+            .map_err(|held| format!("{} is busy with a move or another sync", held.display()))?;
+        Ok(Self(path))
+    }
+}
+
+/// Unlocks on every way out, a panic included.
+impl Drop for ProjectLock {
+    fn drop(&mut self) {
+        move_lock::unlock(std::slice::from_ref(&self.0));
+    }
+}
 
 /// Every volume but the system drive. USB disks often report as fixed, so
 /// `removable` is information only.
@@ -142,7 +161,8 @@ pub async fn drive_sync_apply(
         let _one = APPLY.lock().unwrap_or_else(|e| e.into_inner());
         // Looked up under the lock so free space reflects earlier copies.
         let volume = volume(&drive)?;
-        move_lock::ensure_unlocked(&subject.path)?;
+        // Held for the whole apply so a move cannot start under it.
+        let _held = ProjectLock::take(&subject.path)?;
         if let Some(parent) = subject.parent() {
             return Err(format!("Covered by {parent}; sync that project instead"));
         }

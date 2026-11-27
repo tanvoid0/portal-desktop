@@ -717,3 +717,92 @@ fn a_dangling_origin_head_does_not_block_the_sync() {
     assert_eq!(f.push().status.state, S::InSync);
     assert!(!all_in_progress(&f));
 }
+
+fn mtime(p: &Path) -> std::time::SystemTime {
+    fs::metadata(p).unwrap().modified().unwrap()
+}
+
+fn set_mtime(p: &Path, to: std::time::SystemTime) {
+    let f = fs::File::options().write(true).open(p).unwrap();
+    f.set_modified(to).unwrap();
+}
+
+#[test]
+fn same_size_edit_moments_later_is_copied() {
+    let f = Fx::plain();
+    write(&f.local, "a.txt", "one");
+    f.push();
+    let was = mtime(&f.local.join("a.txt"));
+    write(&f.local, "a.txt", "two");
+    let soon = was + std::time::Duration::from_millis(100);
+    set_mtime(&f.local.join("a.txt"), soon);
+    assert_eq!(f.state().state, S::DriveBehind);
+    f.push();
+    assert_eq!(read(&f.replica(), "a.txt"), "two");
+}
+
+#[test]
+fn pulled_file_gets_a_current_mtime_and_reads_in_sync() {
+    let f = Fx::plain();
+    write(&f.local, "a.txt", "one");
+    f.push();
+    write(&f.replica(), "a.txt", "from the drive");
+    let old = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+    set_mtime(&f.replica().join("a.txt"), old);
+    assert_eq!(f.pull().status.state, S::InSync);
+    assert!(mtime(&f.local.join("a.txt")) > old + std::time::Duration::from_secs(1800));
+    assert_eq!(f.state().state, S::InSync);
+}
+
+#[test]
+fn leftover_temp_copies_are_swept() {
+    let f = Fx::git();
+    f.push();
+    let left = format!("a.txt{TMP}");
+    let in_git = format!(".git/HEAD{TMP}");
+    write(&f.local, &left, "half");
+    write(&f.replica(), &left, "half");
+    write(&f.replica(), &in_git, "half");
+    f.push();
+    assert!(!f.local.join(&left).exists());
+    assert!(!f.replica().join(&left).exists());
+    assert!(!f.replica().join(&in_git).exists());
+    write(&f.local, &left, "half");
+    f.pull();
+    assert!(!f.local.join(&left).exists());
+}
+
+#[test]
+fn a_second_apply_on_the_drive_is_refused() {
+    let f = Fx::plain();
+    write(&f.local, "a.txt", "one");
+    let held = lock_drive(f.drive.path()).unwrap();
+    assert!(f.push_err().contains("Another Portal"));
+    drop(held);
+    f.push();
+}
+
+#[test]
+fn failed_fast_forward_leaves_the_index_as_it_was() {
+    let f = Fx::git();
+    commit(&f.local, "b.txt", "one");
+    sh(&f.local, &["checkout", "-q", "-b", "next"]);
+    commit(&f.local, "a.txt", "incoming a");
+    commit(&f.local, "b.txt", "incoming b");
+    sh(&f.local, &["checkout", "-q", "main"]);
+    // `a.txt` already matches what is coming; `b.txt` blocks the merge.
+    write(&f.local, "a.txt", "incoming a");
+    write(&f.local, "b.txt", "mine");
+    let index = || sh(&f.local, &["ls-files", "-s"]);
+    let before = index();
+    assert!(fast_forward(&f.local, "next").is_err());
+    assert_eq!(index(), before);
+
+    // A different version the user staged is not replaced.
+    write(&f.local, "a.txt", "staged by hand");
+    sh(&f.local, &["add", "a.txt"]);
+    write(&f.local, "a.txt", "incoming a");
+    let before = index();
+    assert!(fast_forward(&f.local, "next").is_err());
+    assert_eq!(index(), before);
+}

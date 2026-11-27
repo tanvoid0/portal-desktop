@@ -36,8 +36,9 @@ use crate::process_ext::NoWindowExt;
 const META: &str = ".portal-sync";
 const MANIFEST: &str = "portal-sync.json";
 const TMP: &str = ".portal-sync-tmp";
-/// FAT stores mtimes in 2 s steps.
-const MTIME_SLACK: i64 = 2;
+/// FAT stores mtimes in 2 s steps. Only for comparisons that involve the drive.
+// ponytail: a same-size edit made on the drive within 2 s goes unseen; hash if it matters.
+const MTIME_SLACK: i64 = 2_000_000_000;
 const LIST_CAP: usize = 20;
 /// Names too generic to skip unless git says they are ignored.
 const IGNORED_ONLY: &[&str] = &[
@@ -723,7 +724,7 @@ fn dirty(repo: &Path, on_drive: bool) -> Option<HashSet<String>> {
 
 // ── Walk ─────────────────────────────────────────────────────────────────────
 
-/// rel (forward slashes) -> (length, mtime in seconds).
+/// rel (forward slashes) -> (length, mtime in nanoseconds).
 type Files = BTreeMap<String, (u64, i64)>;
 
 #[derive(Default)]
@@ -734,6 +735,8 @@ struct Walk {
     repos: BTreeSet<String>,
     /// What could not be read. Nothing under these is compared or deleted.
     errors: BTreeMap<String, String>,
+    /// Half-written copies an interrupted apply left behind.
+    tmps: Vec<String>,
 }
 
 /// Whether the walk leaves `dir` out. `repo` is the nearest enclosing repository.
@@ -754,7 +757,7 @@ fn stat(m: &fs::Metadata) -> (u64, i64) {
         .modified()
         .ok()
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map_or(0, |d| d.as_secs() as i64);
+        .map_or(0, |d| d.as_nanos() as i64);
     (m.len(), mtime)
 }
 
@@ -783,6 +786,11 @@ fn walk_tracked(w: &mut Walk, repo: &Path, dir: &Path, rel: &str, with_git: bool
         } else {
             format!("{rel}/{tail}")
         };
+        let mut tmp = full.clone().into_os_string();
+        tmp.push(TMP);
+        if Path::new(&tmp).is_file() {
+            w.tmps.push(format!("{child}{TMP}"));
+        }
         let meta = match fs::symlink_metadata(&full) {
             Ok(meta) => meta,
             Err(e) => {
@@ -862,6 +870,9 @@ fn walk_dir(
             continue;
         }
         if name.ends_with(TMP) {
+            if entry.file_type().is_ok_and(|t| t.is_file()) {
+                w.tmps.push(child);
+            }
             continue;
         }
         let kind = match entry.file_type() {
@@ -1239,8 +1250,8 @@ struct Cmp {
     drive_only: BTreeSet<String>,
 }
 
-fn differs(a: &(u64, i64), b: &(u64, i64)) -> bool {
-    a.0 != b.0 || (a.1 - b.1).abs() > MTIME_SLACK
+fn differs(a: &(u64, i64), b: &(u64, i64), slack: i64) -> bool {
+    a.0 != b.0 || (a.1 - b.1).abs() > slack
 }
 
 fn under_error(rel: &str, errors: &BTreeMap<String, String>) -> bool {
@@ -1256,7 +1267,7 @@ fn gone(p: &Path) -> bool {
 }
 
 /// Added, modified or deleted since `base`. No base: everything is changed.
-fn changed(w: &Walk, base: Option<&Files>, root: &Path) -> BTreeSet<String> {
+fn changed(w: &Walk, base: Option<&Files>, root: &Path, slack: i64) -> BTreeSet<String> {
     let mut out: BTreeSet<String> = w
         .files
         .iter()
@@ -1264,7 +1275,7 @@ fn changed(w: &Walk, base: Option<&Files>, root: &Path) -> BTreeSet<String> {
             !has_git(rel)
                 && base
                     .and_then(|b| b.get(*rel))
-                    .is_none_or(|was| differs(st, was))
+                    .is_none_or(|was| differs(st, was, slack))
         })
         .map(|(rel, _)| rel.clone())
         .collect();
@@ -1388,8 +1399,8 @@ fn compare(
         });
     }
 
-    let local_changed = changed(&l, base.map(|b| &b.local), local);
-    let drive_changed = changed(&d, base.map(|b| &b.drive), replica);
+    let local_changed = changed(&l, base.map(|b| &b.local), local, 0);
+    let drive_changed = changed(&d, base.map(|b| &b.drive), replica, MTIME_SLACK);
     here()?;
     let differing = |set: &BTreeSet<String>| -> BTreeSet<String> {
         set.iter()
@@ -1591,17 +1602,58 @@ fn remove_file(p: &Path) -> io::Result<()> {
     }
 }
 
+/// Removes what [`copy_file`] left behind when it was cut off.
+fn sweep(root: &Path, w: &Walk) {
+    for rel in &w.tmps {
+        if !has_link(root, rel) {
+            let _ = remove_file(&join(root, rel));
+        }
+    }
+}
+
+/// One apply per drive across processes (a dev and a release Portal). Held until
+/// the returned file is dropped.
+fn lock_drive(mount: &Path) -> Result<fs::File, String> {
+    let rel = format!("{META}/apply.lock");
+    if has_link(mount, &rel) {
+        return Err("Refusing to write through a link on the drive".into());
+    }
+    let fail = |e: io::Error| format!("Cannot lock the drive: {e}");
+    fs::create_dir_all(mount.join(META)).map_err(fail)?;
+    let file = fs::File::options()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(join(mount, &rel))
+        .map_err(fail)?;
+    match file.try_lock() {
+        Ok(()) => Ok(file),
+        Err(fs::TryLockError::WouldBlock) => {
+            Err("Another Portal is syncing with this drive. Try again when it is done.".into())
+        }
+        Err(fs::TryLockError::Error(e)) => Err(fail(e)),
+    }
+}
+
 /// Copies next to `dst`, then renames over it: an interrupted copy never
 /// truncates the destination. `recycle` keeps the replaced file recoverable.
-fn copy_file(src: &Path, dst: &Path, recycle: bool) -> Result<u64, String> {
+/// `keep_mtime` carries the source's mtime over; otherwise the copy is "now".
+fn copy_file(src: &Path, dst: &Path, recycle: bool, keep_mtime: bool) -> Result<u64, String> {
     let mut tmp = dst.as_os_str().to_owned();
     tmp.push(TMP);
     let tmp = PathBuf::from(tmp);
     let put = || -> Result<u64, String> {
         let io = |e: io::Error| e.to_string();
         remove_file(&tmp).map_err(io)?;
+        // Read first: a source rewritten during the copy then still reads as newer.
+        let source = fs::metadata(src).and_then(|m| m.modified()).map_err(io)?;
         let bytes = fs::copy(src, &tmp).map_err(io)?;
-        let mtime = fs::metadata(src).and_then(|m| m.modified()).map_err(io)?;
+        // Set either way: `fs::copy` itself keeps the mtime on some systems.
+        let mtime = if keep_mtime {
+            source
+        } else {
+            std::time::SystemTime::now()
+        };
         if fs::metadata(&tmp).and_then(|m| m.modified()).map_err(io)? != mtime {
             let was = make_writable(&tmp);
             fs::File::options()
@@ -1679,6 +1731,7 @@ pub fn to_drive(
     free: u64,
 ) -> Result<DriveSyncResult, String> {
     precheck(local, mount)?;
+    let _drive = lock_drive(mount)?;
     let mut t = locate(local, mount)?;
     let replica = check_replica(local, mount, &t.key)?;
     let foreign = foreign(&t.manifest, &t.key, local);
@@ -1725,11 +1778,24 @@ pub fn to_drive(
         change();
     }
     let mut dst = walk(&replica, true)?;
+    sweep(local, &src);
+    sweep(&replica, &dst);
     prune(&mut dst, &foreign, &src);
     if src.files.is_empty() && !dst.files.is_empty() {
         return Err("The folder on this PC is empty; not clearing the drive copy".into());
     }
-    let stale = |rel: &str, st: &(u64, i64)| dst.files.get(rel).is_none_or(|d| differs(st, d));
+    let me = owner(local);
+    let mut state = load_state(mount, &t.key);
+    // The slack for the drive must not hide an edit made here since the last copy.
+    let stale = |rel: &str, st: &(u64, i64)| {
+        dst.files
+            .get(rel)
+            .is_none_or(|d| differs(st, d, MTIME_SLACK))
+            || state
+                .get(&me)
+                .and_then(|b| b.local.get(rel))
+                .is_some_and(|was| was != st)
+    };
     let stores = object_stores(&src);
     let is_object = |rel: &str| {
         stores.iter().any(|s| {
@@ -1768,7 +1834,6 @@ pub fn to_drive(
         ));
     }
 
-    let me = owner(local);
     let entry = Entry {
         name: name.to_string(),
         source_path: local.to_string_lossy().into_owned(),
@@ -1825,7 +1890,7 @@ pub fn to_drive(
         if has_link(&replica, rel) {
             return Err("a link on the drive is in the way".into());
         }
-        copy_file(&join(local, rel), &join(&replica, rel), false)
+        copy_file(&join(local, rel), &join(&replica, rel), false, true)
     };
     for rel in &src.dirs {
         if let Err(e) = mkdir(rel) {
@@ -1955,7 +2020,6 @@ pub fn to_drive(
     // The listing taken before copying: an edit made meanwhile still shows.
     let mut mirrored = tracked(&src.files);
     mirrored.retain(|rel, _| !under_error(rel, &failures));
-    let mut state = load_state(mount, &t.key);
     state.insert(
         me,
         Base {
@@ -2005,7 +2069,17 @@ pub fn to_drive(
 fn fast_forward(repo: &Path, target: &str) -> Result<(), String> {
     // Uncommitted files that already equal the incoming version (synced as work
     // in progress, then committed on the drive) would block git. Staging them
-    // loses nothing.
+    // loses nothing. A path the user staged is theirs: left alone.
+    let diff = [
+        "diff",
+        "--cached",
+        "--name-only",
+        "-z",
+        "--no-renames",
+        "HEAD",
+    ];
+    let staged = git_at(repo, None, &diff)?;
+    let staged: HashSet<&str> = staged.split('\0').collect();
     let incoming = tree(repo, Some(target));
     let changed = git_at(
         repo,
@@ -2014,24 +2088,33 @@ fn fast_forward(repo: &Path, target: &str) -> Result<(), String> {
     )?;
     let present: Vec<&str> = changed
         .split('\0')
-        .filter(|f| incoming.contains_key(*f) && repo.join(f).is_file())
+        .filter(|f| incoming.contains_key(*f) && !staged.contains(f) && repo.join(f).is_file())
         .collect();
+    let mut identical: Vec<&str> = Vec::new();
     if !present.is_empty() {
         let hashes = git_in(repo, &["hash-object", "--stdin-paths"], present.join("\n"))?;
-        let identical: Vec<&str> = present
+        identical = present
             .iter()
             .zip(hashes.lines())
             .filter(|(f, hash)| incoming.get(**f).is_some_and(|b| b == hash))
             .map(|(f, _)| *f)
             .collect();
+    }
+    let each = |args: &[&str]| -> Result<(), String> {
         for chunk in identical.chunks(100) {
             let mut c = git_cmd(repo, None);
-            c.args(["--literal-pathspecs", "add", "-f", "--"])
-                .args(chunk);
+            c.arg("--literal-pathspecs").args(args).args(chunk);
             run(c, None)?;
         }
+        Ok(())
+    };
+    let merged = each(&["add", "-f", "--"])
+        .and_then(|()| git_at(repo, None, &["merge", "--ff-only", target]).map(drop));
+    if merged.is_err() {
+        // None of these were staged before, so HEAD is what the index held.
+        let _ = each(&["reset", "-q", "HEAD", "--"]);
     }
-    git_at(repo, None, &["merge", "--ff-only", target]).map(drop)
+    merged
 }
 
 #[derive(Default)]
@@ -2189,6 +2272,7 @@ fn adopt_repo(local: &Path, drive: &Path, label: &str, log: &mut Log) -> Result<
 /// overwritten: what cannot be applied safely is reported instead.
 pub fn to_local(local: &Path, mount: &Path) -> Result<DriveSyncResult, String> {
     precheck(local, mount)?;
+    let _drive = lock_drive(mount)?;
     let t = locate(local, mount)?;
     let replica = check_replica(local, mount, &t.key)?;
     let foreign = foreign(&t.manifest, &t.key, local);
@@ -2208,6 +2292,8 @@ pub fn to_local(local: &Path, mount: &Path) -> Result<DriveSyncResult, String> {
     let mut state = load_state(mount, &t.key);
     let base = state.get(&me).cloned();
     let before = compare(local, &replica, &foreign, base.as_ref())?;
+    sweep(local, &before.local);
+    sweep(&replica, &before.drive);
     for r in &before.repos {
         if r.local.is_some() && !r.rel.is_empty() {
             if let Some(why @ ("rebase in progress" | "merge in progress")) =
@@ -2309,7 +2395,7 @@ pub fn to_local(local: &Path, mount: &Path) -> Result<DriveSyncResult, String> {
                 .parent()
                 .map_or(Ok(()), fs::create_dir_all)
                 .map_err(|e| e.to_string())
-                .and_then(|()| copy_file(&join(&replica, rel), &dest, !recoverable));
+                .and_then(|()| copy_file(&join(&replica, rel), &dest, !recoverable, false));
             match copied {
                 Ok(n) => {
                     files_copied += 1;
