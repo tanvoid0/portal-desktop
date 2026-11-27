@@ -10,7 +10,7 @@ vi.mock('$lib/domains/threads/api/threadApi', () => ({ threadApi: {} }));
 vi.mock('$lib/domains/mobile/browserShim', () => ({ isBrowserClient: false }));
 vi.mock('$lib/domains/mobile/shell', () => ({ isMobileShell: false }));
 
-import { canAnswerHost, hostCallOf } from './hostResponder';
+import { canAnswerHost, claimCall, hostCallOf } from './hostResponder';
 
 const frame = (event: ThreadEventFrame['event']): ThreadEventFrame => ({
   thread_id: 't1',
@@ -53,6 +53,16 @@ describe('hostCallOf', () => {
     expect(canAnswerHost(true, true, false)).toBe(false);
     expect(canAnswerHost(true, false, true)).toBe(false);
     expect(canAnswerHost(false, false, false)).toBe(false);
+  });
+
+  it('claims a call once per thread and frees it after the answer', () => {
+    const a = { kind: 'list_terminals' as const, threadId: 't1', callId: 'call_0' };
+    const release = claimCall(a);
+    expect(release).not.toBeNull();
+    expect(claimCall(a)).toBeNull(); // the startup scan and the live frame
+    expect(claimCall({ ...a, threadId: 't2' })).not.toBeNull(); // same id, other thread
+    release?.();
+    expect(claimCall(a)).not.toBeNull(); // a later request with the same id
   });
 
   it('ignores other requests and events', () => {

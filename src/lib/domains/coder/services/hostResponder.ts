@@ -74,7 +74,7 @@ function parseArgs(raw: string): Record<string, unknown> {
 /** Echo a `run_command` result that this window did not run (a background run) into the session terminal. */
 export function mirrorToolResult(threadId: string, messages: ChatMessage[], m: ChatMessage) {
   if (m.role !== 'tool' || !m.tool_call_id || m.content == null) return;
-  if (delegated.delete(m.tool_call_id)) return;
+  if (delegated.delete(`${threadId}:${m.tool_call_id}`)) return;
   const call = messages
     .flatMap((x) => (x.role === 'assistant' ? (x.tool_calls ?? []) : []))
     .find((c) => c.id === m.tool_call_id && c.function.name === 'run_command');
@@ -90,12 +90,28 @@ export function mirrorToolResult(threadId: string, messages: ChatMessage[], m: C
   );
 }
 
-/** A call is answered once, whether it came live or from a snapshot. */
-const answered = new Set<string>();
+/** Calls being answered. Some providers number calls per turn (`call_0`), so the key has the thread. */
+const answering = new Set<string>();
+
+/** Claim a call so it is answered once, live or from a snapshot; returns the release, or null if taken. */
+export function claimCall(call: HostCall): (() => void) | null {
+  const key = `${call.threadId}:${call.callId}`;
+  if (answering.has(key)) return null;
+  answering.add(key);
+  return () => void answering.delete(key);
+}
 
 async function answer(call: HostCall, openTerminal: () => void) {
-  if (answered.has(call.callId)) return;
-  answered.add(call.callId);
+  const release = claimCall(call);
+  if (!release) return;
+  try {
+    await run(call, openTerminal);
+  } finally {
+    release();
+  }
+}
+
+async function run(call: HostCall, openTerminal: () => void) {
   if (call.kind === 'list_terminals') {
     const list = coderTerminalStore.listForAgent(call.threadId);
     await coderService.submitTerminalList(call.threadId, call.callId, JSON.stringify(list));
@@ -104,7 +120,7 @@ async function answer(call: HostCall, openTerminal: () => void) {
   openTerminal();
   const tab = coderTerminalStore.ensureDefault(call.threadId, call.workspaceRoot);
   coderWorkspaceStore.openTerminal(call.threadId, tab.id, tab.label);
-  delegated.add(call.callId);
+  delegated.add(`${call.threadId}:${call.callId}`);
   let result: string;
   try {
     result = await executeAgentCommand({ ...call, terminalId: call.terminalId });

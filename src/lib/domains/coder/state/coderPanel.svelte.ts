@@ -53,7 +53,7 @@ export class CoderPanelState {
   thread = $derived(coderSession.thread);
   /** True from the click until the RPC returned and the thread's view is in, so the empty hero does not flash. */
   sending = $state(false);
-  private sendReturned = false;
+  private sendReturned = $state(false);
   private stamped: { id: string | null; list: ChatMessage[] } = { id: null, list: [] };
   messages = $derived.by(() => {
     const raw = this.view?.messages ?? [];
