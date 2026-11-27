@@ -5,12 +5,22 @@
 	`apply_relocation` commands, which AI agents call too.
 -->
 
+<script module lang="ts">
+  import type { RelocatableTool } from '../generated/RelocatableTool';
+  import type { RelocationPlan } from '../generated/RelocationPlan';
+
+  // Module level: destination and plans survive navigation, and a move still
+  // running keeps its button disabled on return.
+  let tools = $state<RelocatableTool[]>([]);
+  let targetRoot = $state('');
+  let plans = $state<Record<string, RelocationPlan>>({});
+  let busyId = $state<string | null>(null);
+</script>
+
 <script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { open } from '@tauri-apps/plugin-dialog';
-  import type { RelocatableTool } from '../generated/RelocatableTool';
-  import type { RelocationPlan } from '../generated/RelocationPlan';
   import type { RelocationResult } from '../generated/RelocationResult';
   import { fmtBytes } from '../utils';
   import { confirmAction } from '$lib/utils/confirm';
@@ -20,10 +30,6 @@
   import { Input } from '$lib/components/ui/input';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 
-  let tools = $state<RelocatableTool[]>([]);
-  let targetRoot = $state('');
-  let plans = $state<Record<string, RelocationPlan>>({});
-  let busyId = $state<string | null>(null);
   let error = $state('');
 
   const movable = $derived(tools.filter((t) => t.exists && !t.currentEnv));

@@ -9,12 +9,12 @@
   import CleanupSavedScanCard from './CleanupSavedScanCard.svelte';
   import CleanupVerifyCards from './CleanupVerifyCards.svelte';
   import CleanupProposalTable from './CleanupProposalTable.svelte';
-  import { CleanupTabState } from './cleanupTabState.svelte';
+  import { cleanupTab as st } from './cleanupTabState.svelte';
   import { Button } from '$lib/components/ui/button';
 
   let { pending }: { pending: { tab: string; path?: string; seq: number } | null } = $props();
 
-  const st = new CleanupTabState(() => pending);
+  st.watch(() => pending);
 
   onMount(st.init);
 </script>

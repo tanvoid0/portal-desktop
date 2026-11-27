@@ -11,22 +11,17 @@ import type {
   VerificationResult,
   VerifyProgress,
 } from '../types';
-import {
-  buildTree,
-  flattenTree,
-  folderPaths,
-  fmtBytes,
-  fmtDate,
-  verdictMap,
-  type TreeNode,
-} from '../utils';
+import { buildTree, flattenTree, folderPaths, fmtBytes, fmtDate, verdictMap } from '../utils';
 import { confirmAction } from '$lib/utils/confirm';
 import { backgroundJobs } from '$lib/domains/shared/jobs/backgroundJobs.svelte';
 
 type Pending = { tab: string; path?: string; seq: number } | null;
 
-/** Scan / select / verify / quarantine state behind CleanupTab. Construct during component init (uses `$effect`). */
-export class CleanupTabState {
+/**
+ * Scan / select / verify / quarantine state behind CleanupTab. Module-level
+ * singleton: it all survives navigating away from /utilities/disk.
+ */
+class CleanupTabState {
   root = $state('');
   busy = $state(false);
   progress = $state<ScanProgress | null>(null);
@@ -57,11 +52,17 @@ export class CleanupTabState {
   tree = $derived(this.summary ? buildTree(this.summary.proposals, this.summary.root) : []);
   rows = $derived(flattenTree(this.tree, this.expanded));
 
-  constructor(getPending: () => Pending) {
-    let lastTreeRef: TreeNode[] | null = null;
+  /** What the effects below already handled, so a remount doesn't redo it. */
+  private expandedFor: ScanSummary | null = null;
+  private jumpSeen = 0;
+  /** Latest scan wins: a deep link can start one while another is still running. */
+  private run = 0;
+
+  /** The `$effect`s live and die with the component: call during its init. */
+  watch(getPending: () => Pending) {
     $effect(() => {
-      if (this.tree !== lastTreeRef) {
-        lastTreeRef = this.tree;
+      if (this.summary !== this.expandedFor) {
+        this.expandedFor = this.summary;
         this.expanded = new Set(folderPaths(this.tree));
       }
     });
@@ -81,11 +82,10 @@ export class CleanupTabState {
       };
     });
 
-    let jumpSeen = 0;
     $effect(() => {
       const pending = getPending();
-      if (pending && pending.tab === 'cleanup' && pending.path && pending.seq !== jumpSeen) {
-        jumpSeen = pending.seq;
+      if (pending && pending.tab === 'cleanup' && pending.path && pending.seq !== this.jumpSeen) {
+        this.jumpSeen = pending.seq;
         this.root = pending.path;
         void this.scan(pending.path);
       }
@@ -141,6 +141,7 @@ export class CleanupTabState {
     const dir = target ?? this.root;
     if (!dir) return;
     if (target) this.root = target;
+    const run = ++this.run;
     this.busy = true;
     this.status = 'Scanning…';
     this.progress = null;
@@ -156,16 +157,20 @@ export class CleanupTabState {
     });
     try {
       const res = await invoke<ScanSummary>('scan_directory', { root: dir });
+      if (run !== this.run) return;
       this.summary = res;
       this.status = `Scanned ${res.scannedFiles.toLocaleString()} files in ${res.elapsedMs} ms · ${res.proposals.length} proposals`;
       void this.refreshCached(dir);
     } catch (e) {
+      if (run !== this.run) return;
       this.status = String(e) === 'cancelled' ? 'Scan cancelled' : `Scan failed: ${String(e)}`;
       if (String(e) === 'cancelled') void this.refreshCached(dir);
     } finally {
-      this.busy = false;
-      this.progress = null;
-      backgroundJobs.remove('scan');
+      if (run === this.run) {
+        this.busy = false;
+        this.progress = null;
+        backgroundJobs.remove('scan');
+      }
     }
   };
 
@@ -287,3 +292,5 @@ export class CleanupTabState {
     }
   };
 }
+
+export const cleanupTab = new CleanupTabState();

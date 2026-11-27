@@ -7,18 +7,32 @@
 	roots are now a scope you add to this scan, not a separate page.
 -->
 
+<script module lang="ts">
+  import type { DevCleanerCleanProgress, DevCleanerScan, ScanProgress } from '../types';
+
+  // Module level: scan, selection and scope survive leaving /utilities/disk.
+  let busy = $state(false);
+  let cleanProgress = $state<DevCleanerCleanProgress | null>(null);
+  let scanProgress = $state<ScanProgress | null>(null);
+  let scanResult = $state<DevCleanerScan | null>(null);
+  let selected = $state<Set<string>>(new Set());
+  let collapsed = $state<Set<string>>(new Set());
+  let subCollapsed = $state<Set<string>>(new Set());
+  let status = $state('');
+  let scanRoots = $state<Set<string>>(new Set());
+  let permanentDelete = $state(false);
+  let rootsLoaded = false;
+  let jumpSeen = 0;
+  // Latest scan wins: a deep link can start one while another is still running.
+  let latestRun = 0;
+</script>
+
 <script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { open } from '@tauri-apps/plugin-dialog';
-  import type {
-    DevCleanerCleanProgress,
-    DevCleanerCleanResult,
-    DevCleanerScan,
-    Location,
-    ScanProgress,
-  } from '../types';
+  import type { DevCleanerCleanResult, Location } from '../types';
   import { fmtBytes } from '../utils';
   import { confirmAction } from '$lib/utils/confirm';
   import { Button } from '$lib/components/ui/button';
@@ -34,25 +48,21 @@
 
   let { pending }: { pending: { tab: string; path?: string; seq: number } | null } = $props();
 
-  let busy = $state(false);
-  let cleanProgress = $state<DevCleanerCleanProgress | null>(null);
-  let scanProgress = $state<ScanProgress | null>(null);
-  let scanResult = $state<DevCleanerScan | null>(null);
-  let selected = $state<Set<string>>(new Set());
-  let collapsed = $state<Set<string>>(new Set());
-  let subCollapsed = $state<Set<string>>(new Set());
-  let status = $state('');
   let locations = $state<Location[]>([]);
-  let scanRoots = $state<Set<string>>(new Set());
-  let permanentDelete = $state(false);
 
   onMount(() => {
     invoke<Location[]>('list_locations')
       .then((l) => (locations = l))
       .catch(() => (locations = []));
-    invoke<string[]>('list_dev_scan_roots')
-      .then((roots) => (scanRoots = new Set([...scanRoots, ...roots])))
-      .catch(() => {});
+    // Once: merging again on return would re-add roots a deep link had replaced.
+    if (!rootsLoaded) {
+      invoke<string[]>('list_dev_scan_roots')
+        .then((roots) => {
+          scanRoots = new Set([...scanRoots, ...roots]);
+          rootsLoaded = true;
+        })
+        .catch(() => {});
+    }
     const offs = [
       listen<DevCleanerCleanProgress>('dev-clean://progress', (e) => (cleanProgress = e.payload)),
       listen<ScanProgress>('scan://progress', (e) => (scanProgress = e.payload)),
@@ -74,7 +84,6 @@
   );
 
   // Deep link from the project audit: "clean this project's build output".
-  let jumpSeen = 0;
   $effect(() => {
     if (pending && pending.tab === 'devtools' && pending.seq !== jumpSeen) {
       jumpSeen = pending.seq;
@@ -103,6 +112,7 @@
   }
 
   async function runScan() {
+    const run = ++latestRun;
     busy = true;
     status = 'Scanning…';
     scanProgress = null;
@@ -112,6 +122,7 @@
       const res = await invoke<DevCleanerScan>('scan_dev_cleaners', {
         roots: roots.length ? roots : null,
       });
+      if (run !== latestRun) return;
       scanResult = res;
       collapsed = new Set();
       subCollapsed = new Set();
@@ -121,10 +132,13 @@
           ? `Nothing to reclaim · ${available} source${available === 1 ? '' : 's'} checked`
           : `${res.itemCount} item${res.itemCount === 1 ? '' : 's'} found · ${fmtBytes(res.totalBytes)} reclaimable`;
     } catch (e) {
+      if (run !== latestRun) return;
       status = String(e) === 'cancelled' ? 'Scan cancelled' : `Scan failed: ${String(e)}`;
     } finally {
-      busy = false;
-      scanProgress = null;
+      if (run === latestRun) {
+        busy = false;
+        scanProgress = null;
+      }
     }
   }
 

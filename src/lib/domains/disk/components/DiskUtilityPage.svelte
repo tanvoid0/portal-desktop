@@ -7,6 +7,17 @@
 	one ("Settings") that held a single paragraph.
 -->
 
+<script module lang="ts">
+  type Tab = 'overview' | 'files' | 'developer' | 'history' | 'rules';
+
+  // Module level: leaving /utilities/disk and coming back changes nothing.
+  let tab = $state<Tab>('overview');
+  // Deep-link request from the dashboard: switch tab + optionally auto-scan a path.
+  // `pending.tab` keeps the child-facing names the scan tabs already match on.
+  let pending = $state<{ tab: string; path?: string; seq: number } | null>(null);
+  let seq = 0;
+</script>
+
 <script lang="ts">
   import DashboardTab from './DashboardTab.svelte';
   import CleanupTab from './CleanupTab.svelte';
@@ -15,9 +26,8 @@
   import RulesTab from './RulesTab.svelte';
   import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import HardDrive from '~icons/fa6-solid/hard-drive';
-  import { onMount } from 'svelte';
-
-  type Tab = 'overview' | 'files' | 'developer' | 'history' | 'rules';
+  import { onMount, tick } from 'svelte';
+  import { goto } from '$app/navigation';
 
   const TABS: { id: Tab; label: string; blurb: string }[] = [
     {
@@ -49,13 +59,7 @@
     },
   ];
 
-  let tab = $state<Tab>('overview');
   const blurb = $derived(TABS.find((t) => t.id === tab)?.blurb ?? '');
-
-  // Deep-link request from the dashboard: switch tab + optionally auto-scan a path.
-  // `pending.tab` keeps the child-facing names the scan tabs already match on.
-  let pending = $state<{ tab: string; path?: string; seq: number } | null>(null);
-  let seq = 0;
 
   function go(target: 'cleanup' | 'projects' | 'devtools', path?: string) {
     // `projects` folded into the developer scan; keep the old name working so
@@ -87,6 +91,9 @@
     } else {
       tab = target;
     }
+    // Consumed: Back to this entry must show the kept results, not scan over them.
+    // `tick` because on a cold load the router isn't ready during mount.
+    void tick().then(() => goto(window.location.pathname, { shallow: true, replace: true }));
   });
 </script>
 
