@@ -1,14 +1,16 @@
+import { invoke } from '@tauri-apps/api/core';
 import { openCoderSession } from '$lib/domains/coder/utils/launch';
 import { openAgentsSession } from '$lib/domains/agents/utils/launch';
 import { toast } from '$lib/utils/toast';
 import type { Project } from '$lib/domains/projects/types';
 
+/** Opens a folder in the OS file manager. Goes through Rust because the
+ *  webview's `openPath` is not granted by `opener:default`. */
 export async function openInExplorer(path: string): Promise<void> {
   try {
-    const { openPath } = await import('@tauri-apps/plugin-opener');
-    await openPath(path);
-  } catch {
-    toast.error('Could not open the folder');
+    await invoke('coder_open_in_explorer', { workspaceRoot: path, path: '.' });
+  } catch (err) {
+    toast.error('Could not open the folder', err);
   }
 }
 

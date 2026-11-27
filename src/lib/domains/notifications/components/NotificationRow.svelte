@@ -6,7 +6,7 @@
   import { agentRuns } from '$lib/domains/agents/state/agentRuns.svelte';
   import type { AgentSessionSummary } from '$lib/domains/agents/generated/AgentSessionSummary';
   import type { Project } from '$lib/domains/projects/types';
-  import { revealItemInDir } from '@tauri-apps/plugin-opener';
+  import { openInExplorer } from '$lib/domains/projects/utils/launch';
   import { toast } from '$lib/utils/toast';
   import { formatRelativeTime } from '$lib/domains/shared/utils';
   import { isMobileShell } from '$lib/domains/mobile/shell';
@@ -94,11 +94,6 @@
       toast.error('Could not send your decision', err);
     }
   }
-
-  function showFolder(path: string) {
-    // `revealItemInDir`: `opener:default` allows it, and not `openPath`.
-    revealItemInDir(path).catch((err) => toast.error('Could not show the folder', err));
-  }
 </script>
 
 <li class="flex gap-3 p-3">
@@ -182,7 +177,7 @@
         </Button>
       {/if}
       {#if folder && !isMobileShell}
-        <Button size="sm" variant="outline" class="gap-1.5" onclick={() => showFolder(folder)}>
+        <Button size="sm" variant="outline" class="gap-1.5" onclick={() => openInExplorer(folder)}>
           <FolderOpen class="h-3 w-3" />
           Show folder
         </Button>
