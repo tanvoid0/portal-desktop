@@ -196,6 +196,7 @@ export interface RunSegment {
   startedAt?: string;
   expectedMs?: number;
   label?: string;
+  durationMs?: number; // finished steps only
 }
 
 /** Backend run progress: `progress` on pipeline-execution-update, get_pipeline_execution, release_list. */

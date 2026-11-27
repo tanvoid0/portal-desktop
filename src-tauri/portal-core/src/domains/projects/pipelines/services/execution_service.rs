@@ -1185,6 +1185,7 @@ impl ExecutionService {
                     long_running: s.longRunning,
                     expected_ms: s.expectedMs,
                     progress: s.progress,
+                    duration_ms: s.duration,
                 })
                 .collect();
         let mut item = json!({

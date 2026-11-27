@@ -26,3 +26,8 @@ export function etaText(etaAt: string | null | undefined, now: number): string {
   if (sec < 60) return `about ${sec} sec left`;
   return `about ${Math.round(sec / 60)} min left`;
 }
+
+export function durationText(ms: number): string {
+  const sec = Math.round(ms / 1000);
+  return sec < 60 ? `${sec}s` : `${Math.floor(sec / 60)}m ${sec % 60}s`;
+}

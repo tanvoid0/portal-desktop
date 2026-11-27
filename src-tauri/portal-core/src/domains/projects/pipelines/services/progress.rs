@@ -86,6 +86,8 @@ pub struct ProgressStep {
     pub expected_ms: Option<i64>,
     pub started_at: Option<DateTime<Utc>>,
     pub progress: Option<StepProgress>,
+    /// Measured run time of a finished step.
+    pub duration_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -102,6 +104,8 @@ pub struct Segment {
     pub expected_ms: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -165,6 +169,7 @@ pub fn compute_progress(steps: &[ProgressStep], run_status: &str, now: DateTime<
             started_at: s.started_at.map(|t| t.to_rfc3339()),
             expected_ms: s.expected_ms,
             label: s.progress.as_ref().and_then(|p| p.label.clone()),
+            duration_ms: s.duration_ms,
         });
     }
     Progress {
@@ -239,6 +244,7 @@ mod tests {
             expected_ms: exp,
             started_at: None,
             progress: None,
+            duration_ms: None,
         }
     }
 
