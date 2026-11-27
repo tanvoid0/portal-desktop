@@ -65,7 +65,7 @@ pub async fn agents_resume_session(
     text: String,
     command_id: Option<String>,
 ) -> Result<String, String> {
-    service.resume(&run_id, text, &caller.actor(), command_id).await
+    service.inner().resume_session(&run_id, text, Some((&caller.actor(), command_id))).await
 }
 
 /// Deletes a persisted session and its transcript/event log. Refused while
@@ -86,7 +86,7 @@ pub async fn agents_send_user(
     text: String,
     command_id: Option<String>,
 ) -> Result<(), String> {
-    service.send_user(&run_id, text, &caller.actor(), command_id).await?;
+    service.inner().send_user(&run_id, text, &caller.actor(), command_id).await?;
     Ok(())
 }
 

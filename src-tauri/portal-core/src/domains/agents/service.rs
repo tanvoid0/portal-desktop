@@ -356,12 +356,10 @@ impl AgentRunService {
         if has_prompt {
             self.persist_message(&run_id, 0, "user", &params.prompt, None)
                 .await;
-            // The backend never echoes the user's turn, so the log is told here. Awaited,
-            // after the session row exists: the thread is created before the id is returned.
-            let first = AgentEvent::Message { role: "user".into(), text: params.prompt.clone(), parent_tool_use_id: None };
-            if let Err(e) = self.command(&run_id, ThreadCommand::Provider(first), actor, command_id).await {
-                eprintln!("agents: thread log missed the first turn: {e}");
-            }
+            // Awaited, after the session row exists: the thread is created before the id is
+            // returned. The command_id only tags this frame: a retried start is a new run,
+            // so it cannot dedup.
+            self.record_user(&run_id, &params.prompt, actor, command_id).await;
         }
 
         self.spawn_pump(run_id.clone(), rx, permit);
@@ -394,12 +392,13 @@ impl AgentRunService {
     /// backend's own `--resume <backend_session_id>`), never a new row.
     /// Confirmed decision for the IDE-shaped session view (#546): "Resume"
     /// continues the thread rather than forking a new one.
-    /// Starts the process only: the user turn is already in the thread log
-    /// (clients come in through `resume` / `send_user`).
+    /// `by` = (actor, command_id) of a client's turn, recorded in the thread log once the
+    /// process is up; `None` when the log already has it (the `StartTurn` effect).
     pub async fn resume_session(
         self: &Arc<Self>,
         session_id: &str,
         text: String,
+        by: Option<(&str, Option<String>)>,
     ) -> Result<String, String> {
         let conn = self.db.get_connection();
         let (row, backend_session_id) = self.resumable(session_id).await?;
@@ -446,6 +445,10 @@ impl AgentRunService {
         }
         self.persist_message(session_id, seq, "user", &text, None)
             .await;
+        // Also when the thread still reads as mid-turn: the message just appends.
+        if let Some((actor, command_id)) = by {
+            self.record_user(session_id, &text, actor, command_id).await;
+        }
 
         self.spawn_pump(session_id.to_string(), rx, permit);
         Ok(session_id.to_string())
@@ -536,6 +539,13 @@ impl AgentRunService {
                 if let Some(hub) = svc.thread_hub.get() {
                     hub.submit(&rid, ThreadCommand::Provider(event.clone()));
                 }
+                if exited {
+                    // Before the persists below: a send in that window must resume, not
+                    // write to a dead stdin.
+                    if let Some(e) = svc.runs.lock().await.get_mut(&rid) {
+                        e.exited = true;
+                    }
+                }
 
                 // `TextDelta`/`ThinkingDelta` are superseded by the `Message`
                 // event that follows once the turn finishes — persisting
@@ -587,21 +597,26 @@ impl AgentRunService {
         });
     }
 
-    /// A user turn from a client: the hub records it (queued behind a running turn) and
-    /// its `StartTurn` effect delivers it, resuming a finished run. Returns the run id.
-    pub async fn send_user(&self, run_id: &str, text: String, actor: &str, command_id: Option<String>) -> Result<String, String> {
-        // Fail here, not in the effect, where nobody could hear it.
+    /// A user turn from a client. A live run gets it straight away, even mid-turn (the
+    /// agents UI has no queue view yet; S4b, #1934, switches this to `Send` + the hub's
+    /// queue). A finished run is resumed, so start errors reach the caller. The turn is
+    /// recorded in the thread log as the backend's user message. Returns the run id.
+    pub async fn send_user(self: &Arc<Self>, run_id: &str, text: String, actor: &str, command_id: Option<String>) -> Result<String, String> {
         if !self.is_live(run_id).await {
-            self.resumable(run_id).await?;
+            return self.resume_session(run_id, text, Some((actor, command_id))).await;
         }
-        self.command(run_id, ThreadCommand::Send { text }, actor, command_id).await?;
+        // Before the send, so the log orders it ahead of the reply's events.
+        self.record_user(run_id, &text, actor, command_id).await;
+        self.send_live(run_id, text).await?;
         Ok(run_id.to_string())
     }
 
-    /// Resume in place: `send_user` that insists the run is not live.
-    pub async fn resume(&self, session_id: &str, text: String, actor: &str, command_id: Option<String>) -> Result<String, String> {
-        self.resumable(session_id).await?;
-        self.send_user(session_id, text, actor, command_id).await
+    /// The backend never echoes the user's turn, so the log is told here.
+    async fn record_user(&self, run_id: &str, text: &str, actor: &str, command_id: Option<String>) {
+        let msg = AgentEvent::Message { role: "user".into(), text: text.to_string(), parent_tool_use_id: None };
+        if let Err(e) = self.command(run_id, ThreadCommand::Provider(msg), actor, command_id).await {
+            eprintln!("agents: thread log missed a user turn: {e}");
+        }
     }
 
     /// The hub records `ApprovalResolved{by: actor}` first and rejects a second answer.
@@ -681,10 +696,8 @@ impl AgentRunService {
             am.update(conn)
                 .await
                 .map_err(|e| format!("agents: reconcile stale session failed: {e}"))?;
-            // Its thread may be mid-turn; end it (a no-op without a hub or when idle).
-            if let Some(hub) = self.thread_hub.get() {
-                hub.submit(&row.id, ThreadCommand::Provider(AgentEvent::Exited { code: None }));
-            }
+            // The thread log's own startup reconcile (`threads::legacy_import`, S3c) ends any
+            // turn left open; submitting here would race its direct commits.
         }
         Ok(stale.len())
     }
@@ -1158,7 +1171,9 @@ impl ThreadEffects for Arc<AgentRunService> {
         let result = match effect {
             // The turn is already in the log; deliver it, resuming a finished run.
             Effect::StartTurn { text, .. } if self.is_live(thread_id).await => self.send_live(thread_id, text).await,
-            Effect::StartTurn { text, .. } => self.resume_session(thread_id, text).await.map(|_| ()),
+            // A Stop landing while this is still starting the process finds no run and is
+            // lost; a second Stop works once the entry is inserted.
+            Effect::StartTurn { text, .. } => self.resume_session(thread_id, text, None).await.map(|_| ()),
             Effect::ResolveApproval { call_id, allow, .. } => match self.runs.lock().await.get(thread_id) {
                 Some(e) => e.control.decide_permission(call_id, allow).await,
                 None => Err("run not found".into()),
@@ -1266,7 +1281,7 @@ mod tests {
         );
 
         let err = svc
-            .resume_session("sess-1", "go".to_string())
+            .resume_session("sess-1", "go".to_string(), None)
             .await
             .unwrap_err();
         assert!(err.contains("already running"), "got: {err}");
@@ -1296,7 +1311,7 @@ mod tests {
             .expect("insert");
 
         let err = svc
-            .resume_session("sess-2", "go".to_string())
+            .resume_session("sess-2", "go".to_string(), None)
             .await
             .unwrap_err();
         assert!(err.contains("already running"), "got: {err}");
@@ -1325,7 +1340,7 @@ mod tests {
             .expect("insert");
 
         let err = svc
-            .resume_session("sess-3", "go".to_string())
+            .resume_session("sess-3", "go".to_string(), None)
             .await
             .unwrap_err();
         assert!(err.contains("never reached the backend"), "got: {err}");
@@ -1405,7 +1420,7 @@ mod tests {
 
     /// A recorded run replayed through the hub, with client commands in the middle: the
     /// approval is recorded once with its answerer, the backend's echo and a second answer
-    /// are dropped, a mid-turn message queues and drains when the turn completes.
+    /// are dropped, a mid-turn message goes to the backend and is logged in order.
     #[tokio::test]
     async fn replayed_run_with_client_commands_snapshots_as_expected() {
         use crate::domains::threads::{ThreadEvent, ThreadStatus};
@@ -1419,7 +1434,7 @@ mod tests {
             ],
         );
         svc.send_user("run-1", "next".into(), "local", None).await.unwrap();
-        assert!(calls.lock().unwrap().sent.is_empty(), "queued behind the running turn");
+        assert_eq!(calls.lock().unwrap().sent, ["next"], "mid-turn sends go straight to the backend");
 
         svc.decide_permission("run-1", "r1".into(), true, "device:phone", Some("c1".into())).await.unwrap();
         until(|| calls.lock().unwrap().decided == [("r1".to_string(), true)]).await;
@@ -1434,17 +1449,16 @@ mod tests {
                 AgentEvent::TurnDone { final_text: Some("ok".into()), is_error: false },
             ],
         );
-        until(|| calls.lock().unwrap().sent == ["next"]).await;
 
         let snap = hub.snapshot("run-1").await.unwrap().unwrap();
         let page = hub.events_since("run-1", 0).await.unwrap();
         let resolved: Vec<_> = page.events.iter().filter(|f| matches!(f.event, ThreadEvent::ApprovalResolved { .. })).collect();
         assert_eq!(resolved.len(), 1, "the echo is dropped as already resolved");
         assert_eq!((resolved[0].actor.as_str(), resolved[0].command_id.as_deref()), ("device:phone", Some("c1")));
-        assert_eq!(snap.state.status, ThreadStatus::Running, "the queued turn started");
+        assert_eq!(snap.state.status, ThreadStatus::Idle);
         assert!(snap.state.queue.is_empty() && snap.state.approvals.is_empty());
         let texts: Vec<_> = snap.messages.iter().map(|m| m.content.clone().unwrap_or_default()).collect();
-        assert_eq!(texts, ["go", "ok", "next"]);
+        assert_eq!(texts, ["go", "next", "ok"]);
         assert_eq!(snap.seq, page.head_seq);
     }
 
