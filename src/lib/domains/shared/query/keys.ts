@@ -58,6 +58,9 @@ export const queryKeys = {
     feed: (backendId: string) => ['agents', 'events', backendId] as const,
     analytics: (backendId: string) => ['agents', 'analytics', backendId] as const,
   },
+  threads: {
+    list: ['threads', 'list'] as const,
+  },
   sync: {
     all: ['sync'] as const,
     config: ['sync', 'config'] as const,

@@ -1,0 +1,336 @@
+{
+  "events": [
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 1,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "local",
+      "event": {
+        "type": "created",
+        "provider": "portal",
+        "model": null,
+        "llm_provider": null,
+        "workspace_root": "/w",
+        "project_id": null,
+        "kind": "chat",
+        "title": "New"
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 2,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "local",
+      "command_id": "c1",
+      "event": {
+        "type": "message_appended",
+        "message": {
+          "role": "user",
+          "content": "hi",
+          "timestamp": "2026-01-01T00:00:00Z"
+        }
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 3,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "local",
+      "command_id": "c1",
+      "event": {
+        "type": "turn_started",
+        "trigger": "send"
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 4,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "device:phone",
+      "command_id": "c2",
+      "event": {
+        "type": "enqueued",
+        "queue_id": "q1",
+        "text": "next"
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 5,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "messages_rewritten",
+        "keep": 1,
+        "tail": [
+          {
+            "role": "assistant",
+            "content": "yo"
+          }
+        ]
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 6,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "title_set",
+        "title": "T"
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 7,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "approval_requested",
+        "approval": {
+          "call_id": "a1",
+          "tool": "run",
+          "arguments": {},
+          "suggested_rule": "",
+          "summary": "ls"
+        }
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 8,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "local",
+      "command_id": "c3",
+      "event": {
+        "type": "approval_resolved",
+        "call_id": "a1",
+        "allow": true,
+        "auto": false
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 9,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "host_requested",
+        "call_id": "h1",
+        "kind": "ask_user",
+        "payload": {
+          "q": 1
+        }
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 10,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "device:phone",
+      "command_id": "c5",
+      "event": {
+        "type": "host_resolved",
+        "call_id": "h1"
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 11,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "local",
+      "event": {
+        "type": "model_set",
+        "model": "m",
+        "llm_provider": "p"
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 12,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "change_recorded",
+        "change_id": "ch",
+        "path": "a.rs",
+        "status": "pending"
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 13,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "turn_ended",
+        "outcome": "completed",
+        "error": null,
+        "final_text": null
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 14,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "dequeued",
+        "queue_id": "q1",
+        "reason": "sent"
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 15,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "message_appended",
+        "message": {
+          "role": "user",
+          "content": "next",
+          "timestamp": "2026-01-01T00:00:00Z"
+        }
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 16,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "turn_started",
+        "trigger": "queue"
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 17,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "turn_ended",
+        "outcome": "completed",
+        "error": null,
+        "final_text": null
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 18,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "local",
+      "event": {
+        "type": "turn_started",
+        "trigger": "retry"
+      }
+    },
+    {
+      "thread_id": "p-fixture",
+      "provider": "portal",
+      "seq": 19,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "turn_ended",
+        "outcome": "error",
+        "error": "boom",
+        "final_text": null
+      }
+    }
+  ],
+  "snapshot": {
+    "thread": {
+      "id": "p-fixture",
+      "provider": "portal",
+      "kind": "chat",
+      "title": "T",
+      "workspace_root": "/w",
+      "project_id": null,
+      "model": "m",
+      "llm_provider": "p",
+      "status": "error",
+      "last_seq": 19,
+      "message_count": 3,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    },
+    "seq": 19,
+    "messages": [
+      {
+        "role": "user",
+        "content": "hi",
+        "timestamp": "2026-01-01T00:00:00Z"
+      },
+      {
+        "role": "assistant",
+        "content": "yo"
+      },
+      {
+        "role": "user",
+        "content": "next",
+        "timestamp": "2026-01-01T00:00:00Z"
+      }
+    ],
+    "state": {
+      "meta": {
+        "provider": "portal",
+        "model": "m",
+        "llm_provider": "p",
+        "workspace_root": "/w",
+        "project_id": null,
+        "kind": "chat",
+        "title": "T"
+      },
+      "status": "error",
+      "approvals": [],
+      "usage": {
+        "total_cost_usd": null,
+        "model_usage": null
+      },
+      "todos": null,
+      "subagents_running": 0,
+      "host_requests": [],
+      "queue": [],
+      "sub_agents": [],
+      "stopping": false,
+      "recently_resolved": [
+        {
+          "call_id": "a1",
+          "allow": true,
+          "by": "local"
+        },
+        {
+          "call_id": "h1",
+          "allow": true,
+          "by": "device:phone"
+        }
+      ],
+      "error": "boom",
+      "backend_session_id": null,
+      "last_seq": 19
+    },
+    "partial_text": "",
+    "partial_thinking": "",
+    "waited_seconds": 0
+  }
+}

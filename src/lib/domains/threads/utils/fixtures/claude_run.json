@@ -1,0 +1,330 @@
+{
+  "events": [
+    {
+      "thread_id": "run-1",
+      "provider": "claude-code",
+      "seq": 1,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "created",
+        "provider": "claude-code",
+        "model": "opus",
+        "llm_provider": null,
+        "workspace_root": "/w",
+        "project_id": null,
+        "kind": "session",
+        "title": "claude-code session"
+      }
+    },
+    {
+      "thread_id": "run-1",
+      "provider": "claude-code",
+      "seq": 2,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "turn_started",
+        "trigger": "send"
+      }
+    },
+    {
+      "thread_id": "run-1",
+      "provider": "claude-code",
+      "seq": 3,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "message_appended",
+        "message": {
+          "role": "user",
+          "content": "go",
+          "timestamp": "2026-01-01T00:00:00Z"
+        }
+      }
+    },
+    {
+      "thread_id": "run-1",
+      "provider": "claude-code",
+      "seq": 4,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "session_linked",
+        "backend_session_id": "sess"
+      }
+    },
+    {
+      "thread_id": "run-1",
+      "provider": "claude-code",
+      "seq": 5,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "message_appended",
+        "message": {
+          "role": "assistant",
+          "content": "hello",
+          "timestamp": "2026-01-01T00:00:00Z"
+        }
+      }
+    },
+    {
+      "thread_id": "run-1",
+      "provider": "claude-code",
+      "seq": 6,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "message_appended",
+        "message": {
+          "role": "assistant",
+          "content": "hmm",
+          "tool_calls": [
+            {
+              "id": "t1",
+              "type": "function",
+              "function": {
+                "name": "Bash",
+                "arguments": "{\"command\":\"ls\"}"
+              }
+            }
+          ],
+          "timestamp": "2026-01-01T00:00:00Z"
+        }
+      }
+    },
+    {
+      "thread_id": "run-1",
+      "provider": "claude-code",
+      "seq": 7,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "approval_requested",
+        "approval": {
+          "call_id": "r1",
+          "tool": "Bash",
+          "arguments": {
+            "command": "ls"
+          },
+          "suggested_rule": "",
+          "summary": "ls"
+        }
+      }
+    },
+    {
+      "thread_id": "run-1",
+      "provider": "claude-code",
+      "seq": 8,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "approval_resolved",
+        "call_id": "r1",
+        "allow": true,
+        "auto": false
+      }
+    },
+    {
+      "thread_id": "run-1",
+      "provider": "claude-code",
+      "seq": 9,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "message_appended",
+        "message": {
+          "role": "tool",
+          "content": "Error: boom",
+          "tool_call_id": "t1",
+          "timestamp": "2026-01-01T00:00:00Z"
+        }
+      }
+    },
+    {
+      "thread_id": "run-1",
+      "provider": "claude-code",
+      "seq": 10,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "usage_updated",
+        "total_cost_usd": 0.5,
+        "model_usage": null
+      }
+    },
+    {
+      "thread_id": "run-1",
+      "provider": "claude-code",
+      "seq": 11,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "todos_updated",
+        "items": [
+          {
+            "a": 1
+          }
+        ]
+      }
+    },
+    {
+      "thread_id": "run-1",
+      "provider": "claude-code",
+      "seq": 12,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "subagents_running",
+        "count": 1
+      }
+    },
+    {
+      "thread_id": "run-1",
+      "provider": "claude-code",
+      "seq": 13,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "subagents_running",
+        "count": 0
+      }
+    },
+    {
+      "thread_id": "run-1",
+      "provider": "claude-code",
+      "seq": 14,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "message_appended",
+        "message": {
+          "role": "assistant",
+          "content": "done",
+          "timestamp": "2026-01-01T00:00:00Z"
+        }
+      }
+    },
+    {
+      "thread_id": "run-1",
+      "provider": "claude-code",
+      "seq": 15,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "turn_ended",
+        "outcome": "completed",
+        "error": null,
+        "final_text": "done"
+      }
+    },
+    {
+      "thread_id": "run-1",
+      "provider": "claude-code",
+      "seq": 16,
+      "at": "2026-01-01T00:00:00Z",
+      "actor": "system",
+      "event": {
+        "type": "process_exited",
+        "code": 0
+      }
+    }
+  ],
+  "snapshot": {
+    "thread": {
+      "id": "run-1",
+      "provider": "claude-code",
+      "kind": "session",
+      "title": "claude-code session",
+      "workspace_root": "/w",
+      "project_id": null,
+      "model": "opus",
+      "llm_provider": null,
+      "status": "idle",
+      "last_seq": 16,
+      "message_count": 5,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    },
+    "seq": 16,
+    "messages": [
+      {
+        "role": "user",
+        "content": "go",
+        "timestamp": "2026-01-01T00:00:00Z"
+      },
+      {
+        "role": "assistant",
+        "content": "hello",
+        "timestamp": "2026-01-01T00:00:00Z"
+      },
+      {
+        "role": "assistant",
+        "content": "hmm",
+        "tool_calls": [
+          {
+            "id": "t1",
+            "type": "function",
+            "function": {
+              "name": "Bash",
+              "arguments": "{\"command\":\"ls\"}"
+            }
+          }
+        ],
+        "timestamp": "2026-01-01T00:00:00Z"
+      },
+      {
+        "role": "tool",
+        "content": "Error: boom",
+        "tool_call_id": "t1",
+        "timestamp": "2026-01-01T00:00:00Z"
+      },
+      {
+        "role": "assistant",
+        "content": "done",
+        "timestamp": "2026-01-01T00:00:00Z"
+      }
+    ],
+    "state": {
+      "meta": {
+        "provider": "claude-code",
+        "model": "opus",
+        "llm_provider": null,
+        "workspace_root": "/w",
+        "project_id": null,
+        "kind": "session",
+        "title": "claude-code session"
+      },
+      "status": "idle",
+      "approvals": [],
+      "usage": {
+        "total_cost_usd": 0.5,
+        "model_usage": null
+      },
+      "todos": [
+        {
+          "a": 1
+        }
+      ],
+      "subagents_running": 0,
+      "host_requests": [],
+      "queue": [],
+      "sub_agents": [],
+      "stopping": false,
+      "recently_resolved": [
+        {
+          "call_id": "r1",
+          "allow": true,
+          "by": "system"
+        }
+      ],
+      "error": null,
+      "backend_session_id": "sess",
+      "last_seq": 16
+    },
+    "partial_text": "",
+    "partial_thinking": "",
+    "waited_seconds": 0
+  }
+}

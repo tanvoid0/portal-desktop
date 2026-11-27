@@ -291,37 +291,43 @@ async fn stop_and_heartbeat() {
     assert!(sink.0.lock().unwrap().iter().any(|(n, p)| n == "coder://thread-heartbeat" && p["waited_seconds"] == 7));
 }
 
+/// The Portal-engine script shared by the replay test and the vitest fixtures.
+async fn drive_portal_turn(hub: &Arc<ThreadHub>, id: &str) {
+    create_portal(hub, id).await;
+    cmd(hub, id, send("hi"), "local", Some("c1")).await;
+    cmd(hub, id, send("next"), "device:phone", Some("c2")).await; // running: queued
+    let reconcile = |messages| ThreadCommand::Portal(PortalInput::Reconcile { messages, title: Some("T".into()) });
+    cmd(hub, id, reconcile(vec![say("user", "hi"), say("assistant", "yo")]), "system", None).await;
+    let pending = crate::domains::coder::types::PendingApproval {
+        call_id: "a1".into(), tool: "run".into(), arguments: json!({}), suggested_rule: String::new(), summary: "ls".into(),
+    };
+    cmd(hub, id, ThreadCommand::Portal(PortalInput::Pending(pending)), "system", None).await;
+    assert_eq!(cmd(hub, id, approve("a1", true), "local", Some("c3")).await.status, AckStatus::Accepted);
+    assert_eq!(cmd(hub, id, approve("a1", false), "device:phone", Some("c4")).await.status, AckStatus::Rejected);
+    let host = ThreadCommand::Portal(PortalInput::HostRequest { call_id: "h1".into(), kind: "ask_user".into(), payload: json!({"q": 1}) });
+    cmd(hub, id, host, "system", None).await;
+    let ack = cmd(hub, id, ThreadCommand::ResolveHost { call_id: "h1".into(), result: json!("ok") }, "device:phone", Some("c5")).await;
+    assert_eq!(ack.status, AckStatus::Accepted);
+    let ack = cmd(hub, id, ThreadCommand::ResolveHost { call_id: "h1".into(), result: json!("late") }, "local", Some("c6")).await;
+    assert_eq!(ack.resolved_by.as_deref(), Some("device:phone"));
+    cmd(hub, id, ThreadCommand::SetModel { model: Some("m".into()), llm_provider: Some("p".into()) }, "local", None).await;
+    cmd(hub, id, ThreadCommand::ChangeRecorded { change_id: "ch".into(), path: "a.rs".into(), status: "pending".into() }, "system", None).await;
+    let finish = ThreadCommand::Portal(PortalInput::Finished { outcome: TurnOutcome::Completed, final_text: None });
+    cmd(hub, id, finish.clone(), "system", None).await;
+    hub.snapshot(id).await.unwrap(); // the queue drain lands behind this one
+    cmd(hub, id, ThreadCommand::Portal(PortalInput::Heartbeat { waited_seconds: 3 }), "system", None).await;
+    cmd(hub, id, finish, "system", None).await;
+    cmd(hub, id, ThreadCommand::Retry, "local", None).await;
+    cmd(hub, id, ThreadCommand::Portal(PortalInput::Failed { error: "boom".into() }), "system", None).await;
+
+}
+
 #[tokio::test]
 async fn replay_matches_portal_turn() {
     let (hub, _db, _sink, _dir) = setup().await;
     record(&hub);
     let id = "p-replay";
-    create_portal(&hub, id).await;
-    cmd(&hub, id, send("hi"), "local", Some("c1")).await;
-    cmd(&hub, id, send("next"), "device:phone", Some("c2")).await; // running: queued
-    let reconcile = |messages| ThreadCommand::Portal(PortalInput::Reconcile { messages, title: Some("T".into()) });
-    cmd(&hub, id, reconcile(vec![say("user", "hi"), say("assistant", "yo")]), "system", None).await;
-    let pending = crate::domains::coder::types::PendingApproval {
-        call_id: "a1".into(), tool: "run".into(), arguments: json!({}), suggested_rule: String::new(), summary: "ls".into(),
-    };
-    cmd(&hub, id, ThreadCommand::Portal(PortalInput::Pending(pending)), "system", None).await;
-    assert_eq!(cmd(&hub, id, approve("a1", true), "local", Some("c3")).await.status, AckStatus::Accepted);
-    assert_eq!(cmd(&hub, id, approve("a1", false), "device:phone", Some("c4")).await.status, AckStatus::Rejected);
-    let host = ThreadCommand::Portal(PortalInput::HostRequest { call_id: "h1".into(), kind: "ask_user".into(), payload: json!({"q": 1}) });
-    cmd(&hub, id, host, "system", None).await;
-    let ack = cmd(&hub, id, ThreadCommand::ResolveHost { call_id: "h1".into(), result: json!("ok") }, "device:phone", Some("c5")).await;
-    assert_eq!(ack.status, AckStatus::Accepted);
-    let ack = cmd(&hub, id, ThreadCommand::ResolveHost { call_id: "h1".into(), result: json!("late") }, "local", Some("c6")).await;
-    assert_eq!(ack.resolved_by.as_deref(), Some("device:phone"));
-    cmd(&hub, id, ThreadCommand::SetModel { model: Some("m".into()), llm_provider: Some("p".into()) }, "local", None).await;
-    cmd(&hub, id, ThreadCommand::ChangeRecorded { change_id: "ch".into(), path: "a.rs".into(), status: "pending".into() }, "system", None).await;
-    let finish = ThreadCommand::Portal(PortalInput::Finished { outcome: TurnOutcome::Completed, final_text: None });
-    cmd(&hub, id, finish.clone(), "system", None).await;
-    hub.snapshot(id).await.unwrap(); // the queue drain lands behind this one
-    cmd(&hub, id, ThreadCommand::Portal(PortalInput::Heartbeat { waited_seconds: 3 }), "system", None).await;
-    cmd(&hub, id, finish, "system", None).await;
-    cmd(&hub, id, ThreadCommand::Retry, "local", None).await;
-    cmd(&hub, id, ThreadCommand::Portal(PortalInput::Failed { error: "boom".into() }), "system", None).await;
+    drive_portal_turn(&hub, id).await;
 
     let snap = hub.snapshot(id).await.unwrap().unwrap();
     let page = hub.events_since(id, 0).await.unwrap();
@@ -568,4 +574,66 @@ async fn a_failed_commit_reloads_and_recovers() {
     let healed = hub.snapshot(ID).await.unwrap().unwrap();
     assert_eq!(healed.seq, before.seq + 1);
     assert_eq!(healed.messages.last().unwrap().content.as_deref(), Some("kept"));
+}
+
+// ---- S3d: fixtures the frontend reducer is tested against ----
+
+/// Makes a run reproducible: wall-clock strings and generated queue ids get fixed values.
+fn stabilize(v: &mut Value, queue_ids: &mut Vec<String>) {
+    match v {
+        Value::Object(m) => {
+            for (k, x) in m.iter_mut() {
+                match (k.as_str(), &*x) {
+                    ("at" | "created_at" | "updated_at" | "timestamp", Value::String(_)) => {
+                        *x = json!("2026-01-01T00:00:00Z")
+                    }
+                    ("queue_id", Value::String(q)) => {
+                        let i = queue_ids.iter().position(|e| e == q).unwrap_or_else(|| {
+                            queue_ids.push(q.clone());
+                            queue_ids.len() - 1
+                        });
+                        *x = json!(format!("q{}", i + 1));
+                    }
+                    _ => stabilize(x, queue_ids),
+                }
+            }
+        }
+        Value::Array(a) => a.iter_mut().for_each(|x| stabilize(x, queue_ids)),
+        _ => {}
+    }
+}
+
+/// `{ events, snapshot }` of a finished thread, as the frontend fixtures hold it.
+async fn fixture(hub: &Arc<ThreadHub>, id: &str) -> String {
+    let snapshot = hub.snapshot(id).await.unwrap().unwrap();
+    let events = hub.events_since(id, 0).await.unwrap().events;
+    let mut v = json!({ "events": events, "snapshot": snapshot });
+    stabilize(&mut v, &mut Vec::new());
+    serde_json::to_string_pretty(&v).unwrap() + "
+"
+}
+
+/// `UPDATE_THREAD_FIXTURES=1 cargo test threads::tests::fixtures` rewrites them; without it
+/// a drifted fold or wire shape fails here instead of in vitest.
+#[tokio::test]
+async fn fixtures_match_checked_in() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../src/lib/domains/threads/utils/fixtures");
+    let (hub, _db, _sink, _dir) = setup().await;
+    record(&hub);
+    feed(&hub, script());
+    drive_portal_turn(&hub, "p-fixture").await;
+    let runs = [("claude_run.json", ID), ("portal_turn.json", "p-fixture")];
+    for (name, id) in runs {
+        let got = fixture(&hub, id).await;
+        let path = dir.join(name);
+        if std::env::var_os("UPDATE_THREAD_FIXTURES").is_some() {
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(&path, got).unwrap();
+        } else {
+            let want = std::fs::read_to_string(&path).unwrap_or_default().replace("
+", "
+");
+            assert_eq!(got, want, "{name} drifted; rerun with UPDATE_THREAD_FIXTURES=1");
+        }
+    }
 }

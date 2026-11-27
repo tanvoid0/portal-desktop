@@ -20,6 +20,7 @@ const GENERATED = [
   'src/lib/domains/disk/generated',
   'src/lib/domains/github/generated',
   'src/lib/domains/projects/generated',
+  'src/lib/domains/threads/generated',
 ];
 
 execFileSync(
