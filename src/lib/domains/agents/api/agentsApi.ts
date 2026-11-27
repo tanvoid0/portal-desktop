@@ -10,6 +10,9 @@ import type {
   BackendInfo,
 } from '../generated';
 
+/** A fresh id per call: the hub dedups on it, so a user's retry after an error is a new call. */
+const commandId = () => crypto.randomUUID();
+
 /** Thin wrapper over the `agents_*` Tauri commands — the backend trait, the
  * process spawn, and the permission-hook relay all live in Rust. */
 export const agentsApi = {
@@ -32,12 +35,17 @@ export const agentsApi = {
       model: model ?? null,
       resumeSessionId: resumeSessionId ?? null,
       taskId: taskId ?? null,
+      commandId: commandId(),
     });
   },
 
   /** Resumes a prior session in place — same row/id, same backend conversation. */
   resumeSession(sessionId: string, text: string): Promise<string> {
-    return invokeClient.post<string>('agents_resume_session', { runId: sessionId, text });
+    return invokeClient.post<string>('agents_resume_session', {
+      runId: sessionId,
+      text,
+      commandId: commandId(),
+    });
   },
 
   /** Deletes a persisted session + its transcript/event log. Refused while live. */
@@ -46,15 +54,20 @@ export const agentsApi = {
   },
 
   sendUser(runId: string, text: string): Promise<void> {
-    return invokeClient.post<void>('agents_send_user', { runId, text });
+    return invokeClient.post<void>('agents_send_user', { runId, text, commandId: commandId() });
   },
 
   decidePermission(runId: string, requestId: string, allow: boolean): Promise<void> {
-    return invokeClient.post<void>('agents_decide_permission', { runId, requestId, allow });
+    return invokeClient.post<void>('agents_decide_permission', {
+      runId,
+      requestId,
+      allow,
+      commandId: commandId(),
+    });
   },
 
   interrupt(runId: string): Promise<void> {
-    return invokeClient.post<void>('agents_interrupt', { runId });
+    return invokeClient.post<void>('agents_interrupt', { runId, commandId: commandId() });
   },
 
   cancel(runId: string): Promise<void> {

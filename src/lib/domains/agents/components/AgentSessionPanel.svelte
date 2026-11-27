@@ -1,7 +1,7 @@
 <!-- Main panel of the Agents workspace (#546): the launcher when no session
      is focused, a live transcript/timeline + composer when one is. Reuses
-     Coder's feed/approval leaves — see `eventsToMessages.ts` for the shape
-     that bridges a native `AgentEvent` stream onto them. -->
+     Coder's feed/approval leaves, fed by the thread store (the Timeline tab
+     still reads the raw `agent_events`). -->
 <script lang="ts">
   import { createQuery } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
@@ -18,6 +18,7 @@
   import { Input } from '$lib/components/ui/input';
   import AgentSessionTimeline from './AgentSessionTimeline.svelte';
   import { agentCapabilities } from '$lib/domains/coder/config/capabilities.js';
+  import { threadStore } from '$lib/domains/threads/state/threadStore.svelte';
   import { agentRuns } from '../state/agentRuns.svelte.js';
   import { agentBackendsQuery, agentSessionQuery } from '../queries/agentsQueries.js';
   import { groupSessionsByProject } from '../utils/groupSessions.js';
@@ -76,12 +77,15 @@
   });
 
   const caps = $derived(agentCapabilities(backendId));
-  const view = $derived(sessionId ? agentRuns.viewFor(sessionId) : null);
+  // `agentRuns.attach` holds the thread subscription; null until the first snapshot lands.
+  const thread = $derived(sessionId ? threadStore.view(sessionId) : null);
+  // A pending approval pauses the turn: `running` stays false so its buttons are live (QA-110).
+  const running = $derived(thread?.status === 'running');
   const detail = $derived(sessionDetailQuery.data ?? null);
   const title = $derived(detail?.session.title || detail?.session.backend_id || 'Session');
   const ended = $derived(!!sessionId && agentRuns.isEnded(sessionId));
-  const firstPending = $derived(view?.pending[0] ?? null);
-  const extraPending = $derived(view?.pending.slice(1) ?? []);
+  const firstPending = $derived(thread?.approvals[0] ?? null);
+  const extraPending = $derived(thread?.approvals.slice(1) ?? []);
 
   // Project/task chips — same cwd→project matching the sidebar groups by,
   // scoped to just this one session.
@@ -108,8 +112,8 @@
   });
 
   $effect(() => {
-    view?.messages.length;
-    view?.streamingText;
+    thread?.messages.length;
+    thread?.streamingText;
     if (scrollViewport && pinnedToBottom) {
       const el = scrollViewport;
       requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
@@ -229,12 +233,12 @@
   {:else}
     <CoderSessionHeader
       {title}
-      running={view?.running ?? false}
-      statusLabel={ended ? 'Ended' : view?.running ? 'Running' : (detail?.session.status ?? '…')}
+      {running}
+      statusLabel={ended ? 'Ended' : running ? 'Running' : (detail?.session.status ?? '…')}
       meta={detail
         ? `${detail.session.backend_id}${detail.session.model ? ` · ${detail.session.model}` : ''}`
         : undefined}
-      costUsd={caps.cost ? (view?.totalCostUsd ?? null) : null}
+      costUsd={caps.cost ? (thread?.usage.total_cost_usd ?? null) : null}
       workspaceRoot={detail?.session.cwd ?? ''}
       workspaceName={detail?.session.cwd.split(/[\\/]/).filter(Boolean).pop() ?? ''}
     >
@@ -270,9 +274,9 @@
       <ScrollArea class="min-h-0 flex-1" bind:viewportRef={scrollViewport}>
         <PageContainer variant="chat" class="space-y-3 py-4">
           <CoderFeed
-            messages={view?.messages ?? []}
-            streamingText={view?.streamingText ?? ''}
-            running={view?.running ?? false}
+            messages={thread?.messages ?? []}
+            streamingText={thread?.streamingText ?? ''}
+            {running}
             pending={firstPending}
             showRemember={caps.rememberRule}
             onDecision={(approve) =>
@@ -295,8 +299,9 @@
         onSend={send}
         onStop={() => sessionId && void agentRuns.interrupt(sessionId)}
         placeholder={ended ? 'Send a message to resume…' : 'Send a follow-up…'}
-        running={view?.running ?? false}
-        canStop={(view?.running ?? false) || !!firstPending}
+        {running}
+        canStop={running || !!firstPending}
+        queuedMessages={thread?.queue.map((q) => q.text) ?? []}
         workspaceRoot={detail?.session.cwd ?? ''}
         queue={caps.queue}
         class="pt-0"

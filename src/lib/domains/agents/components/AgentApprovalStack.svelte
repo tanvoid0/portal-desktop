@@ -6,8 +6,10 @@
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
   import ApprovalBanner from '$lib/domains/coder/components/ApprovalBanner.svelte';
+  import type { PendingApproval } from '$lib/domains/coder/generated';
   import { agentCapabilities } from '$lib/domains/coder/config/capabilities.js';
   import { isAgentTabRoute } from '$lib/config/agents-tabs';
+  import { threadStore } from '$lib/domains/threads/state/threadStore.svelte';
   import { agentRuns } from '../state/agentRuns.svelte.js';
   import { agentSessionsQuery } from '../queries/agentsQueries.js';
 
@@ -22,18 +24,18 @@
       id: string;
       title: string;
       backendId: string;
-      pending: ReturnType<typeof agentRuns.viewFor>['pending'];
+      pending: PendingApproval[];
     }[] = [];
     for (const id of agentRuns.runningIds) {
       if (id === focusedId) continue;
-      const view = agentRuns.viewFor(id);
-      if (view.pending.length === 0) continue;
+      const pending = threadStore.view(id)?.approvals ?? [];
+      if (pending.length === 0) continue;
       const summary = sessions.find((s) => s.id === id);
       out.push({
         id,
         title: summary?.title || summary?.backend_id || id,
         backendId: summary?.backend_id ?? '',
-        pending: view.pending,
+        pending,
       });
     }
     return out;

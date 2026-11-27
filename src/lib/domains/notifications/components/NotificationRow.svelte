@@ -4,6 +4,7 @@
   import { Badge } from '$lib/components/ui/badge';
   import ApprovalBanner from '$lib/domains/coder/components/ApprovalBanner.svelte';
   import { agentRuns } from '$lib/domains/agents/state/agentRuns.svelte';
+  import { threadStore } from '$lib/domains/threads/state/threadStore.svelte';
   import type { AgentSessionSummary } from '$lib/domains/agents/generated/AgentSessionSummary';
   import type { Project } from '$lib/domains/projects/types';
   import { openInExplorer } from '$lib/domains/projects/utils/launch';
@@ -82,7 +83,7 @@
   // Only while the run is still blocked on it; answered or dead requests get no buttons.
   const approval = $derived(
     item.runId && item.requestId && agentRuns.runningIds.has(item.runId)
-      ? agentRuns.viewFor(item.runId).pending.find((p) => p.call_id === item.requestId)
+      ? threadStore.view(item.runId)?.approvals.find((p) => p.call_id === item.requestId)
       : undefined
   );
 

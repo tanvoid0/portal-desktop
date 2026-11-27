@@ -3,7 +3,8 @@ import { notify, initNotify } from '$lib/utils/notify';
 import { permissionFact, pipelineFacts } from '$lib/domains/notifications/utils/facts';
 import { agentsApi } from '$lib/domains/agents/api/agentsApi';
 import { agentRuns } from '$lib/domains/agents/state/agentRuns.svelte.js';
-import { agentTabPath } from '$lib/config/agents-tabs';
+import { threadApi } from '$lib/domains/threads/api/threadApi';
+import { PORTAL_ENGINE_TAB, agentTabPath } from '$lib/config/agents-tabs';
 import type { PipelineExecution } from '$lib/domains/projects/pipelines';
 import { isMobileShell } from '$lib/domains/mobile/shell';
 
@@ -62,16 +63,6 @@ export function startAppNotifications(): () => void {
           body: event.final_text?.slice(0, 120),
           type: 'success',
         });
-      } else if (event.type === 'permission_request') {
-        notify({
-          ...about,
-          title: 'Agent needs your approval',
-          body: `Wants to run ${event.tool_name}`,
-          type: 'warning',
-          duration: 0,
-          requestId: event.request_id,
-          facts: permissionFact(event.tool_name, event.tool_input),
-        });
       } else if (event.type === 'exited' && event.code) {
         notify({
           ...about,
@@ -81,6 +72,33 @@ export function startAppNotifications(): () => void {
           facts: [{ kind: 'exit', value: String(event.code) }],
         });
       }
+    })
+    .then(keep);
+
+  // One alert per approval, for the Portal coder and every CLI agent alike: the thread log's
+  // `approval_requested` is the single source (the legacy `agents://event` one is not used).
+  // A re-request of the same call_id (upsert) is not a new ask.
+  const notifiedApprovals = new Set<string>();
+  threadApi
+    .onEvent((f) => {
+      if (f.event.type !== 'approval_requested') return;
+      const a = f.event.approval;
+      if (notifiedApprovals.has(a.call_id)) return;
+      notifiedApprovals.add(a.call_id);
+      const portal = f.provider === 'portal';
+      notify({
+        route: portal
+          ? `${PORTAL_ENGINE_TAB.url}?id=${f.thread_id}`
+          : `${agentTabPath(f.provider)}?session=${f.thread_id}`,
+        source: 'agent',
+        runId: f.thread_id,
+        title: portal ? 'Portal needs your approval' : 'Agent needs your approval',
+        body: `Wants to run ${a.tool}`,
+        type: 'warning',
+        duration: 0,
+        requestId: a.call_id,
+        facts: permissionFact(a.tool, a.arguments),
+      });
     })
     .then(keep);
 

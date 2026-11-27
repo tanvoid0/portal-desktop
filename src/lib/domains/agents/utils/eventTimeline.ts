@@ -1,5 +1,5 @@
 // Projects the raw persisted event log onto rows the Timeline tab can render
-// directly — mirrors `eventsToMessages.ts`'s "pure reducer" shape, but keeps
+// directly — a pure reducer like the thread one, but keeps
 // every event instead of folding into chat turns. `TextDelta`/`ThinkingDelta`
 // are never persisted (see `service.rs`'s pump loop — the `Message` event
 // that follows already carries the finished text), so there is no chunk

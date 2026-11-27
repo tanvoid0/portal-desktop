@@ -2,12 +2,13 @@
  * Module-level agent run/session state — survives page navigation, one
  * `agents://event` listener for the app's lifetime. Same shape as coder's
  * `coderSession.svelte.ts` (lazy `ensureInit`, module singleton), scaled down
- * to what the agents domain needs: per-session event logs rather than a
- * chat-message runtime per thread.
+ * to what the agents domain needs: per-session event logs (Timeline, Board) plus a
+ * `threadStore` subscription per attached run, which is what the transcript, approvals
+ * and queue read.
  */
 
 import { agentsApi } from '../api/agentsApi.js';
-import { eventsToMessages, type AgentRunView } from '../utils/eventsToMessages.js';
+import { threadStore } from '$lib/domains/threads/state/threadStore.svelte';
 import type { AgentEvent, AgentEventSeq, AgentSessionDetail } from '../generated';
 import { queryClient } from '$lib/domains/shared/query/queryClient';
 import { queryKeys } from '$lib/domains/shared/query/keys';
@@ -77,6 +78,8 @@ class AgentRunsState {
   /** Per-session live+persisted log, seq-ordered, delta-folded. Absence of a
    *  key means "not attached" — `append` drops events for those. */
   private logs = $state<Record<string, AgentEventSeq[]>>({});
+  // ponytail: thread subscriptions are never released, like `logs`; unsubscribe on delete if it costs.
+  private subscribed = new Set<string>();
   /** Session ids with a live backend process right now. */
   runningIds = $state<Set<string>>(new Set());
   /** True once `listRunning` answered — before that `runningIds` is empty, not authoritative. */
@@ -150,6 +153,10 @@ class AgentRunsState {
    *  live events arrive via the shared listener. A no-op if already tracked. */
   async attach(sessionId: string): Promise<AgentEventSeq[]> {
     await this.ensureInit();
+    if (!this.subscribed.has(sessionId)) {
+      this.subscribed.add(sessionId);
+      threadStore.subscribe(sessionId);
+    }
     const cached = this.logs[sessionId];
     if (cached) return cached;
 
@@ -175,12 +182,6 @@ class AgentRunsState {
     return log;
   }
 
-  /** Reduces a session's full log through `eventsToMessages`. Empty view for an untracked session. */
-  viewFor(sessionId: string): AgentRunView {
-    const log = this.logs[sessionId];
-    return eventsToMessages(log ? log.map((item) => item.event) : []);
-  }
-
   /** Raw event log of an attached session ([] if untracked). */
   eventsFor(sessionId: string): AgentEvent[] {
     return (this.logs[sessionId] ?? []).map((item) => item.event);
@@ -189,12 +190,11 @@ class AgentRunsState {
   /** No live backend process. Imported sessions never emit `exited`, so the
    *  event view alone can't say; the running ids can. */
   isEnded(sessionId: string): boolean {
-    if (!this.runningKnown) return this.viewFor(sessionId).ended;
-    return !this.runningIds.has(sessionId);
+    return this.runningKnown && !this.runningIds.has(sessionId);
   }
 
   pendingCountFor(sessionId: string): number {
-    return this.viewFor(sessionId).pending.length;
+    return threadStore.view(sessionId)?.approvals.length ?? 0;
   }
 
   async start(

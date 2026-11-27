@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentEventSeq } from '../generated';
 import { appendFolded, detailToLog } from './agentRuns.svelte.js';
-import { eventsToMessages } from '../utils/eventsToMessages.js';
 
 function seq(n: number, event: AgentEventSeq['event']): AgentEventSeq {
   return { seq: n, event };
@@ -23,7 +22,7 @@ describe('detailToLog', () => {
         { id: 'a', seq: 1, role: 'user', text: 'yo', parent_tool_use_id: null, created_at: '' },
       ],
     });
-    expect(eventsToMessages(log.map((i) => i.event)).messages.length).toBe(2);
+    expect(log.length).toBe(2);
     expect(log[0].seq).toBe(1);
   });
 });
