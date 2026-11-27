@@ -120,6 +120,29 @@ async fn import(db: &DatabaseConnection, report: &mut Report) -> Result<(), Stri
     Ok(())
 }
 
+/// Refresh one session's thread after the transcript sync rewrote its rows: the same
+/// fold as startup, so a fresh import and a later sync agree. A thread the hub has
+/// already written to (`last_seq > 0`) is left alone, and so is a running session.
+/// Runs inside the thread's actor (`ThreadHub::resync_session`). True when written.
+pub(super) async fn resync(db: &DatabaseConnection, id: &str) -> Result<bool, String> {
+    let Some(s) = agent_session::Entity::find_by_id(id.to_string()).one(db).await.map_err(|e| err("load session", e))? else {
+        return Ok(false);
+    };
+    if s.status == "running" {
+        return Ok(false);
+    }
+    let stamp = s.ended_at.clone().unwrap_or_else(|| s.started_at.clone());
+    let known = thread::Entity::find_by_id(id.to_string())
+        .one(db)
+        .await
+        .map_err(|e| err("load thread", e))?
+        .map(|t| Known { last_seq: t.last_seq, created_at: t.created_at, updated_at: t.updated_at });
+    if !matches!(action(known.as_ref(), &stamp, |_| false), Action::Import) {
+        return Ok(false);
+    }
+    import_session(db, id, &s.started_at, &stamp).await.map(|()| true)
+}
+
 async fn import_portal(db: &DatabaseConnection, row: &coder_thread::Model) -> Result<(), String> {
     let mut messages: Vec<ChatMessage> = serde_json::from_str(&row.messages_json).unwrap_or_default();
     for m in &mut messages {
@@ -676,5 +699,41 @@ mod tests {
         let before = dump(db).await;
         assert_eq!(run(db, &startup).await.unwrap(), Report::default());
         assert_eq!(dump(db).await, before);
+    }
+
+    /// The transcript sync writes agent rows after startup: `resync_session` gives the
+    /// session a thread, extends it when it grows, and leaves a running one alone.
+    #[tokio::test]
+    async fn resync_follows_the_transcript_sync() {
+        let dir = tempfile::tempdir().unwrap();
+        let dbm = Arc::new(DatabaseManager::new(dir.path().to_path_buf()).await.unwrap());
+        let db = dbm.get_connection();
+        let hub = ThreadHub::new(dbm.clone(), Arc::new(NoopSink));
+        let words = |v: Vec<(String, String, i64)>| v.into_iter().map(|m| m.1).collect::<Vec<_>>();
+
+        session(db, "t1", "claude-code").await;
+        message(db, "t1", 0, "user", "q", OLD).await;
+        message(db, "t1", 1, "assistant", "a", OLD).await;
+        assert!(hub.resync_session("t1").await.unwrap());
+        assert_eq!(words(texts(db, "t1").await), ["q", "a"]);
+        assert!(!hub.resync_session("t1").await.unwrap()); // nothing changed
+
+        // The transcript grew: the sync replaces the rows and moves `ended_at`.
+        message(db, "t1", 2, "user", "q2", OLD).await;
+        let mut am: agent_session::ActiveModel = agent_session::Entity::find_by_id("t1").one(db).await.unwrap().unwrap().into();
+        am.ended_at = Set(Some("2026-01-02T00:00:00Z".into()));
+        am.update(db).await.unwrap();
+        assert!(hub.resync_session("t1").await.unwrap());
+        assert_eq!(words(texts(db, "t1").await), ["q", "a", "q2"]);
+        assert!(!hub.resync_session("t1").await.unwrap());
+
+        // Running: Portal owns it.
+        session(db, "t2", "claude-code").await;
+        message(db, "t2", 0, "user", "q", OLD).await;
+        let mut am: agent_session::ActiveModel = agent_session::Entity::find_by_id("t2").one(db).await.unwrap().unwrap().into();
+        am.status = Set("running".into());
+        am.update(db).await.unwrap();
+        assert!(!hub.resync_session("t2").await.unwrap());
+        assert!(store::summary(db, "t2").await.unwrap().is_none());
     }
 }

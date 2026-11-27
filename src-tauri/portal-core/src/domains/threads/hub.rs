@@ -11,6 +11,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use super::apply::apply;
 use super::decide::{decide, react};
+use super::legacy_import;
 use super::store;
 use super::types::*;
 use crate::database::DatabaseManager;
@@ -32,6 +33,8 @@ enum Msg {
     /// The reply is for client commands; producers fire and forget.
     Command(Box<Envelope>, Option<oneshot::Sender<CommandAck>>),
     Snapshot(oneshot::Sender<Option<ThreadSnapshot>>),
+    /// Re-fold the session's agent rows into its thread (see `legacy_import::resync`).
+    Resync(oneshot::Sender<Result<bool, String>>),
 }
 
 pub struct ThreadHub {
@@ -87,6 +90,14 @@ impl ThreadHub {
         let (tx, rx) = oneshot::channel();
         self.send(thread_id, Msg::Snapshot(tx));
         rx.await.map_err(|_| "threads: actor stopped".to_string())
+    }
+
+    /// After the transcript sync rewrote a session's rows: the actor refreshes the thread
+    /// from them, so it stays the only writer. Never touches a thread the hub has written to.
+    pub async fn resync_session(self: &Arc<Self>, thread_id: &str) -> Result<bool, String> {
+        let (tx, rx) = oneshot::channel();
+        self.send(thread_id, Msg::Resync(tx));
+        rx.await.map_err(|_| "threads: actor stopped".to_string())?
     }
 
     pub async fn events_since(&self, thread_id: &str, seq: i64) -> Result<ThreadEventsPage, String> {
@@ -206,6 +217,15 @@ async fn actor_loop(hub: Arc<ThreadHub>, id: String, mut rx: mpsc::UnboundedRece
             Ok(Some(Msg::Snapshot(reply))) => {
                 a.flush_delta(); // so the client's partial matches the next frame's offset
                 let _ = reply.send(a.snapshot().await);
+            }
+            Ok(Some(Msg::Resync(reply))) => {
+                let done = legacy_import::resync(a.db.get_connection(), &a.id).await;
+                if matches!(done, Ok(true)) {
+                    a.trusted = false; // the projection changed under the cached state
+                    a.last_load = None;
+                    a.ensure_trusted().await;
+                }
+                let _ = reply.send(done);
             }
             Ok(None) => break,
             Err(_) if a.pending.is_some() => {}

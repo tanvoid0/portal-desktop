@@ -136,15 +136,16 @@ fn scan(root: &Path) -> Vec<(String, PathBuf, SystemTime)> {
     out
 }
 
-/// One sweep. Returns how many sessions were (re)imported.
-pub async fn sync_claude_transcripts(db: &DatabaseManager) -> Result<usize, String> {
+/// One sweep. Returns the ids of the sessions that were (re)imported, for the caller
+/// to refresh their threads.
+pub async fn sync_claude_transcripts(db: &DatabaseManager) -> Result<Vec<String>, String> {
     let Some(root) = claude_projects_dir() else {
-        return Ok(0);
+        return Ok(Vec::new());
     };
     sync_from(db, &root).await
 }
 
-async fn sync_from(db: &DatabaseManager, root: &Path) -> Result<usize, String> {
+async fn sync_from(db: &DatabaseManager, root: &Path) -> Result<Vec<String>, String> {
     let conn = db.get_connection();
     let root = root.to_path_buf();
     let mut files = tokio::task::spawn_blocking(move || scan(&root))
@@ -155,24 +156,27 @@ async fn sync_from(db: &DatabaseManager, root: &Path) -> Result<usize, String> {
     files.sort_by(|a, b| a.0.cmp(&b.0).then(b.2.cmp(&a.2)));
     files.dedup_by(|b, a| a.0 == b.0);
 
-    // sessionId -> (row id, ended_at) for every claude-code row we know.
-    let known: HashMap<String, (String, Option<String>)> = agent_session::Entity::find()
+    // sessionId -> (row id, ended_at, status) for every claude-code row we know.
+    let known: HashMap<String, (String, Option<String>, String)> = agent_session::Entity::find()
         .filter(agent_session::Column::BackendId.eq(BACKEND_ID))
         .all(conn)
         .await
         .map_err(|e| format!("agents: load sessions for import failed: {e}"))?
         .into_iter()
-        .filter_map(|r| r.backend_session_id.map(|b| (b, (r.id, r.ended_at))))
+        .filter_map(|r| r.backend_session_id.map(|b| (b, (r.id, r.ended_at, r.status))))
         .collect();
 
-    let mut imported = 0;
+    let mut imported = Vec::new();
     for (sid, path, mtime) in files {
         let mtime: DateTime<Utc> = mtime.into();
         match known.get(&sid) {
             // Portal-launched run: its own persistence is authoritative.
-            Some((id, _)) if *id != sid => continue,
+            Some((id, ..)) if *id != sid => continue,
+            // Portal is resuming it (its own persistence is authoritative; a replace
+            // here would wipe the run's rows, #1976).
+            Some((_, _, status)) if status == "running" => continue,
             // Imported earlier and file hasn't moved since.
-            Some((_, Some(ended))) if DateTime::parse_from_rfc3339(ended)
+            Some((_, Some(ended), _)) if DateTime::parse_from_rfc3339(ended)
                 .map(|e| mtime <= e.with_timezone(&Utc))
                 .unwrap_or(false) =>
             {
@@ -194,7 +198,7 @@ async fn sync_from(db: &DatabaseManager, root: &Path) -> Result<usize, String> {
             eprintln!("agents: import {sid} failed: {e}");
             continue;
         }
-        imported += 1;
+        imported.push(sid);
     }
     Ok(imported)
 }
@@ -264,6 +268,7 @@ async fn store(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sea_orm::ActiveModelTrait;
 
     #[tokio::test]
     async fn sweep_imports_once_dedups_across_dirs_and_reimports_on_growth() {
@@ -275,8 +280,8 @@ mod tests {
             std::fs::create_dir(root.path().join(proj)).unwrap();
             std::fs::write(root.path().join(proj).join("sid1.jsonl"), line).unwrap();
         }
-        assert_eq!(sync_from(&db, root.path()).await.unwrap(), 1);
-        assert_eq!(sync_from(&db, root.path()).await.unwrap(), 0); // unchanged
+        assert_eq!(sync_from(&db, root.path()).await.unwrap(), ["sid1"]);
+        assert!(sync_from(&db, root.path()).await.unwrap().is_empty()); // unchanged
         let rows = agent_session::Entity::find().all(db.get_connection()).await.unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].backend_session_id.as_deref(), Some("sid1"));
@@ -284,9 +289,18 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(50));
         let grown = format!("{line}\n{}", r#"{"type":"assistant","message":{"content":[{"type":"text","text":"yo"}]}}"#);
         std::fs::write(root.path().join("a").join("sid1.jsonl"), grown).unwrap();
-        assert_eq!(sync_from(&db, root.path()).await.unwrap(), 1);
+        assert_eq!(sync_from(&db, root.path()).await.unwrap(), ["sid1"]);
         let msgs = agent_message::Entity::find().all(db.get_connection()).await.unwrap();
         assert_eq!(msgs.len(), 2);
+
+        // Portal is running it: the sync leaves it alone even though the file moved.
+        let mut am: agent_session::ActiveModel = rows[0].clone().into();
+        am.status = Set("running".into());
+        am.ended_at = Set(None);
+        am.update(db.get_connection()).await.unwrap();
+        std::fs::write(root.path().join("a").join("sid1.jsonl"), line).unwrap();
+        assert!(sync_from(&db, root.path()).await.unwrap().is_empty());
+        assert_eq!(agent_message::Entity::find().all(db.get_connection()).await.unwrap().len(), 2);
     }
 
     #[test]

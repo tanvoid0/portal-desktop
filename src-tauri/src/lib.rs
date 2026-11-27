@@ -350,13 +350,20 @@ pub fn run() {
             // desktop app) from ~/.claude/projects; 30s poll, mtime-gated.
             {
                 let db = db_manager_arc.clone();
+                let hub = thread_hub.clone();
                 tauri::async_runtime::spawn(async move {
                     loop {
                         match domains::agents::transcripts::sync_claude_transcripts(&db)
                             .await
                         {
-                            Ok(n) if n > 0 => {
-                                log_info!("Agents", "Imported {} Claude Code sessions", n)
+                            Ok(ids) if !ids.is_empty() => {
+                                log_info!("Agents", "Imported {} Claude Code sessions", ids.len());
+                                // The agents panel renders from the thread, not these rows.
+                                for id in ids {
+                                    if let Err(e) = hub.resync_session(&id).await {
+                                        log_warn!("Threads", "{} (resync {})", e, id);
+                                    }
+                                }
                             }
                             Ok(_) => {}
                             Err(e) => log_warn!("Agents", "Transcript import failed: {}", e),
