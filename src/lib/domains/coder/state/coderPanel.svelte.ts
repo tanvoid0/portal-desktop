@@ -102,7 +102,7 @@ export class CoderPanelState {
   );
   contextUsage = $derived(this.rt.contextUsage);
   llmUsage = $derived(this.rt.llmUsage);
-  /** The hub's queue behind the open turn; read-only (no remove command yet). */
+  /** The hub's queue behind the open turn. */
   queuedMessages = $derived((this.view?.queue ?? []).map((q) => q.text));
   subAgents = $derived(this.rt.subAgents);
   parentCoordinatorId = $derived.by(() => {
@@ -431,7 +431,7 @@ export class CoderPanelState {
       await coderSession.send(text);
       if (coderSession.activeThreadId) this.syncUrl(coderSession.activeThreadId);
     } catch (e) {
-      // Nothing was sent (`busy`, a failed write): give the draft back.
+      // Nothing was sent: give the draft back.
       if (!this.input) this.input = text;
       toast.error(errorText(e));
       this.sending = false;
@@ -453,6 +453,8 @@ export class CoderPanelState {
       toast.error('Failed to spawn background sub-agent', errorText(e));
     }
   };
+
+  removeQueued = (index: number) => void coderSession.removeQueued(index);
 
   /** Only the open thread's queue is live. */
   queuedCountFor = (id: string) => (id === this.activeThreadId ? this.queuedMessages.length : 0);

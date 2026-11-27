@@ -95,7 +95,7 @@ export function actorLabel(by: string): string {
 }
 
 export function errorText(e: unknown): string {
-  return (e instanceof Error ? e.message : String(e)).replace(/^busy:\s*/, '');
+  return e instanceof Error ? e.message : String(e);
 }
 
 function loadStoredProvider(): string | null {
@@ -766,7 +766,7 @@ class CoderSessionState {
 
   /**
    * Plain Send: a message while a turn is open is the hub's to queue (shown from the thread
-   * state). Throws the hub's rejection (`busy: ...`) so the caller can restore the draft.
+   * state). Throws the hub's rejection so the caller can restore the draft.
    */
   async send(text: string) {
     await this.ensureInit();
@@ -822,6 +822,13 @@ class CoderSessionState {
     if (!id) return Promise.resolve();
     abortAgentCommands(id);
     return this.write(() => coderService.stop(id));
+  }
+
+  /** `index` is the position in the view's queue. */
+  async removeQueued(index: number) {
+    const id = this.thread?.id;
+    const q = this.view?.queue[index];
+    if (id && q) await this.write(() => coderService.removeQueued(id, q.queue_id));
   }
 
   /** Resume a failed run, or answer a user turn nobody answered. */

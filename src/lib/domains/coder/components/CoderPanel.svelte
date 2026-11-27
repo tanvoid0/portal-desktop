@@ -115,6 +115,7 @@
             disabled={p.composerDisabled}
             running={p.running}
             queuedMessages={p.queuedMessages}
+            onRemoveQueued={p.removeQueued}
             agentMode={caps.agentModes ? coderSession.agentMode : undefined}
             effectiveMode={p.effectiveMode}
             onAgentModeChange={caps.agentModes ? (m) => coderSession.changeAgentMode(m) : undefined}
@@ -191,6 +192,7 @@
       running={p.running}
       canStop={(p.running || !!p.pending) && !p.stopping}
       queuedMessages={p.queuedMessages}
+      onRemoveQueued={p.removeQueued}
       agentMode={caps.agentModes ? coderSession.agentMode : undefined}
       effectiveMode={p.effectiveMode}
       onAgentModeChange={caps.agentModes ? (m) => coderSession.changeAgentMode(m) : undefined}

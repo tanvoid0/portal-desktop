@@ -78,11 +78,16 @@ export class CoderService {
 
   // Every write carries a fresh `command_id` (the hub dedups on it), so a user retry after
   // an error is a new command. Writes still answer in the legacy shape: Ok, or the
-  // rejection code as the error string (`busy: ...`, `already_resolved`).
+  // rejection code as the error string (`already_resolved`...).
 
   /** Send a user message and start a background run. */
   send(threadId: string, message: string): Promise<void> {
     return invoke<void>('coder_send', { threadId, message, commandId: generateId() });
+  }
+
+  /** Drop a message still waiting in the hub's queue. */
+  removeQueued(threadId: string, queueId: string): Promise<void> {
+    return invoke<void>('coder_remove_queued', { threadId, queueId, commandId: generateId() });
   }
 
   /** Resume a failed run from the current thread state. */
