@@ -8,7 +8,6 @@
   import Ban from '~icons/fa6-solid/ban';
   import Forward from '~icons/fa6-solid/forward';
   import Spinner from '~icons/fa6-solid/spinner';
-  import Circle from '~icons/fa6-regular/circle';
   import { cn } from '$lib/utils';
   import { durationText, etaText, isOverrun, segmentFraction } from '../runProgress';
   import type { RunProgress, RunSegment } from '../types';
@@ -151,7 +150,7 @@
             {:else if s.status === 'running'}
               <Spinner class="h-3 w-3 shrink-0 text-primary motion-safe:animate-spin" />
             {:else}
-              <Circle class="h-3 w-3 shrink-0" />
+              <span class="h-3 w-3 shrink-0 rounded-full border border-current"></span>
             {/if}
             <span class="truncate">{s.name}</span>
           </div>
